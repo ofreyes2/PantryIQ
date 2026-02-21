@@ -53,7 +53,7 @@ mobile/src/
 - **Phase 1** (complete): Navigation, theme, Dashboard screen, onboarding flow
 - **Phase 2** (complete): Pantry (barcode scan, Open Food Facts API, category filter, swipe actions) + Meals (food diary, nutrition tracking, water intake, pantry sync)
 - **Phase 3** (complete): Recipes (discovery feed, Claude AI generation, URL import, recipe box, cook-mode pantry deduction) + Shopping (store tabs, low-stock suggestions, price history, trip completion)
-- **Phase 4**: Health tracking (weight, body fat, measurements) + Settings + API integrations
+- **Phase 4** (complete): Health (weight chart, body fat gauge, measurements, progress photos, milestone confetti, streak heatmap, Claude weekly report) + Settings (profile, API keys, notifications, data export/clear) + Dashboard wired to live data from all stores
 
 ## APIs (user-provided keys in Settings)
 - Open Food Facts — free, no key
