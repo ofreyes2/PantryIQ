@@ -52,7 +52,7 @@ mobile/src/
 ## Build Phases
 - **Phase 1** (complete): Navigation, theme, Dashboard screen, onboarding flow
 - **Phase 2** (complete): Pantry (barcode scan, Open Food Facts API, category filter, swipe actions) + Meals (food diary, nutrition tracking, water intake, pantry sync)
-- **Phase 3**: Recipes (Claude recipe gen, import from URL) + Shopping
+- **Phase 3** (complete): Recipes (discovery feed, Claude AI generation, URL import, recipe box, cook-mode pantry deduction) + Shopping (store tabs, low-stock suggestions, price history, trip completion)
 - **Phase 4**: Health tracking (weight, body fat, measurements) + Settings + API integrations
 
 ## APIs (user-provided keys in Settings)

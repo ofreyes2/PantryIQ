@@ -47,6 +47,11 @@ function RootLayoutNav() {
         <Stack.Screen name="barcode-scanner" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="pantry-item-detail" options={{ headerShown: false }} />
         <Stack.Screen name="add-meal-entry" options={{ headerShown: false }} />
+        <Stack.Screen name="recipe-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="generate-recipe" options={{ headerShown: false }} />
+        <Stack.Screen name="import-recipe" options={{ headerShown: false }} />
+        <Stack.Screen name="recipe-box" options={{ headerShown: false }} />
+        <Stack.Screen name="shopping-history" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
