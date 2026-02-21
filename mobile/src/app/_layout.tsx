@@ -43,6 +43,10 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="add-pantry-item" options={{ headerShown: false }} />
+        <Stack.Screen name="barcode-scanner" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="pantry-item-detail" options={{ headerShown: false }} />
+        <Stack.Screen name="add-meal-entry" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

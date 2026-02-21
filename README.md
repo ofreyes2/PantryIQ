@@ -16,23 +16,29 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 ```
 mobile/src/
 ├── app/
-│   ├── _layout.tsx          # Root layout, font loading, onboarding redirect
-│   ├── onboarding.tsx        # 6-step onboarding flow
+│   ├── _layout.tsx              # Root layout, font loading, onboarding redirect
+│   ├── onboarding.tsx            # 6-step onboarding flow
+│   ├── add-pantry-item.tsx       # Add/edit pantry item form (with barcode pre-fill)
+│   ├── barcode-scanner.tsx       # Full-screen camera barcode scanner
+│   ├── pantry-item-detail.tsx    # Item detail: nutrition, history, edit/delete
+│   ├── add-meal-entry.tsx        # Add food to meal (search, pantry, favorites)
 │   └── (tabs)/
-│       ├── _layout.tsx      # 7-tab navigator (navy theme)
-│       ├── index.tsx        # Dashboard (Phase 1 — complete)
-│       ├── pantry.tsx       # Pantry (Phase 2)
-│       ├── meals.tsx        # Meals (Phase 2)
-│       ├── recipes.tsx      # Recipes (Phase 3)
-│       ├── shopping.tsx     # Shopping (Phase 3)
-│       ├── health.tsx       # Health (Phase 4)
-│       └── settings.tsx     # Settings (Phase 4)
+│       ├── _layout.tsx          # 7-tab navigator (navy theme)
+│       ├── index.tsx            # Dashboard (Phase 1 — complete)
+│       ├── pantry.tsx           # Pantry — full CRUD, barcode scan, category filter
+│       ├── meals.tsx            # Meals — food diary, nutrition tracking
+│       ├── recipes.tsx          # Recipes (Phase 3)
+│       ├── shopping.tsx         # Shopping (Phase 3)
+│       ├── health.tsx           # Health (Phase 4)
+│       └── settings.tsx         # Settings (Phase 4)
 ├── constants/
-│   └── theme.ts             # Colors, spacing, typography, shadows
+│   └── theme.ts                 # Colors, spacing, typography, shadows
 └── lib/
-    ├── storage.ts           # Typed AsyncStorage wrapper
+    ├── storage.ts               # Typed AsyncStorage wrapper
     └── stores/
-        └── appStore.ts      # Zustand store (profile, settings, streak, onboarding)
+        ├── appStore.ts          # User profile, settings, streak, onboarding state
+        ├── pantryStore.ts       # Pantry items CRUD with AsyncStorage persistence
+        └── mealsStore.ts        # Food diary entries, water intake, favorites
 ```
 
 ## Color Theme
@@ -45,7 +51,7 @@ mobile/src/
 
 ## Build Phases
 - **Phase 1** (complete): Navigation, theme, Dashboard screen, onboarding flow
-- **Phase 2**: Pantry (barcode scan, Open Food Facts API, Claude photo ID) + Meals
+- **Phase 2** (complete): Pantry (barcode scan, Open Food Facts API, category filter, swipe actions) + Meals (food diary, nutrition tracking, water intake, pantry sync)
 - **Phase 3**: Recipes (Claude recipe gen, import from URL) + Shopping
 - **Phase 4**: Health tracking (weight, body fat, measurements) + Settings + API integrations
 
