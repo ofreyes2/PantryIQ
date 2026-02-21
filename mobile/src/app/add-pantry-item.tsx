@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Animated as RNAnimated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -22,6 +23,7 @@ import {
   Image as ImageIcon,
   ChevronDown,
   Check,
+  Scan,
 } from 'lucide-react-native';
 import { usePantryStore, PantryCategory, PantryUnit } from '@/lib/stores/pantryStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
@@ -198,6 +200,48 @@ function PickerRow({
   );
 }
 
+// ─── Success Toast ─────────────────────────────────────────────────────────────
+
+function SuccessToast({ visible }: { visible: boolean }) {
+  const opacity = useState(() => new RNAnimated.Value(0))[0];
+
+  useEffect(() => {
+    if (visible) {
+      RNAnimated.sequence([
+        RNAnimated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        RNAnimated.delay(900),
+        RNAnimated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [visible, opacity]);
+
+  return (
+    <RNAnimated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        top: 100,
+        alignSelf: 'center',
+        opacity,
+        backgroundColor: Colors.green,
+        borderRadius: BorderRadius.full,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        zIndex: 999,
+        ...Shadows.elevated,
+      }}
+    >
+      <Check size={16} color={Colors.navy} />
+      <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.navy }}>
+        Item added
+      </Text>
+    </RNAnimated.View>
+  );
+}
+
 export default function AddPantryItemScreen() {
   const params = useLocalSearchParams<{
     name?: string;
@@ -210,9 +254,12 @@ export default function AddPantryItemScreen() {
     servingSize?: string;
     barcode?: string;
     photoUri?: string;
+    returnTo?: string;
   }>();
 
   const addItem = usePantryStore((s) => s.addItem);
+
+  const returnToScanner = params.returnTo === 'scanner';
 
   const [photoUri, setPhotoUri] = useState<string>(params.photoUri ?? '');
   const [name, setName] = useState(params.name ?? '');
@@ -231,6 +278,7 @@ export default function AddPantryItemScreen() {
   const [lowStockThreshold, setLowStockThreshold] = useState(2);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showToast, setShowToast] = useState(false);
 
   const pickImage = useCallback(async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -293,12 +341,24 @@ export default function AddPantryItemScreen() {
 
     setSaving(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+
+    if (returnToScanner) {
+      // Show toast then navigate back to scanner
+      setShowToast(true);
+      setTimeout(() => {
+        router.back();
+      }, 600);
+    } else {
+      router.back();
+    }
   };
 
   return (
     <LinearGradient colors={['#0A1628', '#0B1C35']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']} testID="add-pantry-item-screen">
+        {/* Success Toast */}
+        <SuccessToast visible={showToast} />
+
         {/* Header */}
         <View
           style={{
@@ -343,11 +403,23 @@ export default function AddPantryItemScreen() {
               paddingHorizontal: 16,
               paddingVertical: 8,
               opacity: saving ? 0.7 : 1,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
             }}
             testID="save-button"
           >
             {saving ? (
               <ActivityIndicator size="small" color={Colors.navy} />
+            ) : returnToScanner ? (
+              <>
+                <Text
+                  style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.navy }}
+                >
+                  Save
+                </Text>
+                <Scan size={13} color={Colors.navy} />
+              </>
             ) : (
               <Text
                 style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.navy }}
@@ -652,11 +724,23 @@ export default function AddPantryItemScreen() {
                 alignItems: 'center',
                 marginTop: 16,
                 opacity: saving ? 0.7 : 1,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                gap: 8,
               }}
               testID="save-bottom-button"
             >
               {saving ? (
                 <ActivityIndicator size="small" color={Colors.navy} />
+              ) : returnToScanner ? (
+                <>
+                  <Text
+                    style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.navy }}
+                  >
+                    Save &amp; Scan Next
+                  </Text>
+                  <Scan size={18} color={Colors.navy} />
+                </>
               ) : (
                 <Text
                   style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.navy }}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,6 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  withSequence,
-  interpolate,
-  runOnJS,
 } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import * as Haptics from 'expo-haptics';
@@ -33,7 +30,7 @@ import {
   Edit3,
   Scan,
   Trash2,
-  ChevronRight,
+  Calendar,
 } from 'lucide-react-native';
 import { usePantryStore, PantryItem, PantryCategory } from '@/lib/stores/pantryStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
@@ -51,19 +48,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   Beverages: '#2980B9',
   'Bread & Wraps': '#D35400',
   Other: '#95A5A6',
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  Proteins: '🥩',
-  Dairy: '🥛',
-  Vegetables: '🥦',
-  Frozen: '❄️',
-  'Pantry Staples': '🌾',
-  Snacks: '🥜',
-  Condiments: '🫙',
-  Beverages: '🥤',
-  'Bread & Wraps': '🫓',
-  Other: '📦',
 };
 
 const ALL_CATEGORIES: (PantryCategory | 'All')[] = [
@@ -103,6 +87,16 @@ function PantryItemCard({
       ? Colors.amber
       : Colors.green;
 
+  // Format expiry date for display
+  const formatExpiry = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch {
+      return dateStr;
+    }
+  };
+
   const renderRightActions = () => (
     <Pressable
       onPress={() => {
@@ -114,7 +108,7 @@ function PantryItemCard({
         justifyContent: 'center',
         alignItems: 'center',
         width: 72,
-        marginVertical: 4,
+        marginVertical: 6,
         borderRadius: BorderRadius.xl,
         marginLeft: 4,
       }}
@@ -140,7 +134,7 @@ function PantryItemCard({
         justifyContent: 'center',
         alignItems: 'center',
         width: 72,
-        marginVertical: 4,
+        marginVertical: 6,
         borderRadius: BorderRadius.xl,
         marginRight: 4,
       }}
@@ -166,112 +160,185 @@ function PantryItemCard({
       >
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
             backgroundColor: Colors.navyCard,
             borderRadius: BorderRadius.xl,
             marginHorizontal: 16,
-            marginVertical: 4,
-            padding: 12,
+            marginVertical: 6,
+            padding: 16,
             borderWidth: 1,
             borderColor: Colors.border,
             ...Shadows.card,
           }}
         >
-          {/* Category indicator */}
+          {/* ROW 1: Category + Low Stock badge */}
           <View
             style={{
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor: `${catColor}20`,
+              flexDirection: 'row',
+              justifyContent: 'space-between',
               alignItems: 'center',
-              justifyContent: 'center',
-              marginRight: 12,
+              marginBottom: 10,
             }}
           >
-            <Text style={{ fontSize: 18 }}>{CATEGORY_EMOJI[item.category] ?? '📦'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View
+                style={{
+                  width: 14,
+                  height: 14,
+                  borderRadius: 7,
+                  backgroundColor: catColor,
+                }}
+              />
+              <Text
+                style={{
+                  fontFamily: 'DMSans_400Regular',
+                  fontSize: 11,
+                  color: Colors.textSecondary,
+                  letterSpacing: 0.3,
+                }}
+              >
+                {item.category}
+              </Text>
+            </View>
+
+            {isLowStock ? (
+              <View
+                style={{
+                  backgroundColor: `${Colors.error}20`,
+                  borderRadius: BorderRadius.full,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderWidth: 1,
+                  borderColor: `${Colors.error}50`,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 10,
+                    color: Colors.error,
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  Low Stock
+                </Text>
+              </View>
+            ) : null}
           </View>
 
-          {/* Content */}
-          <View style={{ flex: 1, marginRight: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          {/* ROW 2: Main content */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            {/* LEFT: name, brand, quantity */}
+            <View style={{ flex: 1, marginRight: 16 }}>
               <Text
                 style={{
                   fontFamily: 'DMSans_700Bold',
-                  fontSize: 15,
+                  fontSize: 17,
                   color: Colors.textPrimary,
+                  marginBottom: 4,
                 }}
                 numberOfLines={1}
               >
                 {item.name}
               </Text>
-              {isLowStock ? (
-                <View
+
+              {item.brand ? (
+                <Text
                   style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: Colors.error,
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 13,
+                    color: 'rgba(255,255,255,0.5)',
+                    marginBottom: 8,
                   }}
-                />
-              ) : null}
+                  numberOfLines={1}
+                >
+                  {item.brand}
+                </Text>
+              ) : (
+                <View style={{ height: 8 }} />
+              )}
+
+              {/* Quantity row */}
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 15,
+                    color: qtyColor,
+                  }}
+                >
+                  {item.quantity}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  {item.unit}
+                </Text>
+              </View>
             </View>
-            {item.brand ? (
+
+            {/* RIGHT: nutrition info */}
+            <View style={{ alignItems: 'flex-end' }}>
               <Text
                 style={{
-                  fontFamily: 'DMSans_400Regular',
-                  fontSize: 12,
-                  color: Colors.textSecondary,
-                  marginBottom: 4,
+                  fontFamily: 'DMSans_500Medium',
+                  fontSize: 13,
+                  color: Colors.textPrimary,
+                  marginBottom: 2,
                 }}
               >
-                {item.brand}
+                {item.caloriesPerServing} kcal
               </Text>
-            ) : null}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Text
-                style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary }}
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 15,
+                  color: Colors.green,
+                  marginBottom: 2,
+                }}
               >
                 {item.carbsPerServing}g carbs
               </Text>
               <Text
-                style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary }}
+                style={{
+                  fontFamily: 'DMSans_400Regular',
+                  fontSize: 10,
+                  color: Colors.textSecondary,
+                }}
               >
-                {item.caloriesPerServing} cal
-              </Text>
-              <Text
-                style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary }}
-              >
-                {item.proteinPerServing}g protein
+                per serving
               </Text>
             </View>
           </View>
 
-          {/* Qty Badge */}
-          <View style={{ alignItems: 'flex-end' }}>
+          {/* BOTTOM ROW: expiry date if set */}
+          {item.expiryDate ? (
             <View
               style={{
-                backgroundColor: `${qtyColor}20`,
-                borderRadius: BorderRadius.md,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderWidth: 1,
-                borderColor: `${qtyColor}40`,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+                marginTop: 12,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: 'rgba(255,255,255,0.06)',
               }}
             >
+              <Calendar size={12} color={Colors.amber} />
               <Text
                 style={{
-                  fontFamily: 'DMSans_700Bold',
-                  fontSize: 14,
-                  color: qtyColor,
+                  fontFamily: 'DMSans_400Regular',
+                  fontSize: 12,
+                  color: Colors.amber,
                 }}
               >
-                {item.quantity} {item.unit}
+                Expires {formatExpiry(item.expiryDate)}
               </Text>
             </View>
-            <ChevronRight size={14} color={Colors.textTertiary} style={{ marginTop: 6 }} />
-          </View>
+          ) : null}
         </View>
       </Pressable>
     </Swipeable>
@@ -280,8 +347,9 @@ function PantryItemCard({
 
 // ─── FAB ──────────────────────────────────────────────────────────────────────
 
-function FloatingActionButton({ onScan, onPhoto, onManual }: {
-  onScan: () => void;
+function FloatingActionButton({ onBatchScan, onSingleScan, onPhoto, onManual }: {
+  onBatchScan: () => void;
+  onSingleScan: () => void;
   onPhoto: () => void;
   onManual: () => void;
 }) {
@@ -293,6 +361,8 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
   const option2Y = useSharedValue(20);
   const option3Opacity = useSharedValue(0);
   const option3Y = useSharedValue(20);
+  const option4Opacity = useSharedValue(0);
+  const option4Y = useSharedValue(20);
 
   const toggle = () => {
     const newOpen = !open;
@@ -302,7 +372,9 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
     rotation.value = withSpring(newOpen ? 45 : 0);
 
     if (newOpen) {
-      option3Opacity.value = withTiming(1, { duration: 150 });
+      option4Opacity.value = withTiming(1, { duration: 120 });
+      option4Y.value = withSpring(0);
+      option3Opacity.value = withTiming(1, { duration: 160 });
       option3Y.value = withSpring(0);
       option2Opacity.value = withTiming(1, { duration: 200 });
       option2Y.value = withSpring(0);
@@ -311,10 +383,12 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
     } else {
       option1Opacity.value = withTiming(0, { duration: 150 });
       option1Y.value = withTiming(20, { duration: 150 });
-      option2Opacity.value = withTiming(0, { duration: 100 });
-      option2Y.value = withTiming(20, { duration: 100 });
+      option2Opacity.value = withTiming(0, { duration: 110 });
+      option2Y.value = withTiming(20, { duration: 110 });
       option3Opacity.value = withTiming(0, { duration: 80 });
       option3Y.value = withTiming(20, { duration: 80 });
+      option4Opacity.value = withTiming(0, { duration: 60 });
+      option4Y.value = withTiming(20, { duration: 60 });
     }
   };
 
@@ -333,6 +407,10 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
   const opt3Style = useAnimatedStyle(() => ({
     opacity: option3Opacity.value,
     transform: [{ translateY: option3Y.value }],
+  }));
+  const opt4Style = useAnimatedStyle(() => ({
+    opacity: option4Opacity.value,
+    transform: [{ translateY: option4Y.value }],
   }));
 
   return (
@@ -395,13 +473,13 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
           </Pressable>
         </Animated.View>
 
-        {/* Option 3: Scan Barcode */}
-        <Animated.View style={[opt3Style, { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+        {/* Option 3: Scan Single Item */}
+        <Animated.View style={[opt3Style, { marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
           <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textPrimary }}>
-            Scan Barcode
+            Scan Single Item
           </Text>
           <Pressable
-            onPress={() => { toggle(); onScan(); }}
+            onPress={() => { toggle(); onSingleScan(); }}
             style={{
               width: 48,
               height: 48,
@@ -413,9 +491,38 @@ function FloatingActionButton({ onScan, onPhoto, onManual }: {
               borderColor: Colors.border,
               ...Shadows.card,
             }}
-            testID="fab-scan-barcode"
+            testID="fab-scan-single"
           >
             <Scan size={20} color={Colors.textPrimary} />
+          </Pressable>
+        </Animated.View>
+
+        {/* Option 4: Batch Scan (Rapid) — highlighted */}
+        <Animated.View style={[opt4Style, { marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.green }}>
+              Batch Scan (Rapid)
+            </Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.textSecondary }}>
+              Scan multiple items quickly
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => { toggle(); onBatchScan(); }}
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: Colors.greenMuted,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: Colors.green,
+              ...Shadows.card,
+            }}
+            testID="fab-batch-scan"
+          >
+            <Scan size={20} color={Colors.green} />
           </Pressable>
         </Animated.View>
 
@@ -658,12 +765,12 @@ export default function PantryScreen() {
               borderRadius: BorderRadius.lg,
               borderWidth: 1,
               borderColor: Colors.border,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
+              paddingHorizontal: 16,
+              height: 48,
               gap: 8,
             }}
           >
-            <Search size={16} color={Colors.textSecondary} />
+            <Search size={18} color={Colors.textSecondary} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -681,8 +788,8 @@ export default function PantryScreen() {
           <Pressable
             onPress={() => setShowSortModal(true)}
             style={{
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               borderRadius: BorderRadius.lg,
               backgroundColor: Colors.surface,
               alignItems: 'center',
@@ -713,12 +820,13 @@ export default function PantryScreen() {
                   Haptics.selectionAsync();
                 }}
                 style={{
-                  paddingVertical: 6,
-                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  paddingHorizontal: 16,
                   borderRadius: BorderRadius.full,
                   backgroundColor: isActive ? Colors.green : Colors.surface,
                   borderWidth: 1,
                   borderColor: isActive ? Colors.green : Colors.border,
+                  marginRight: 0,
                 }}
                 testID={`category-chip-${cat}`}
               >
@@ -775,7 +883,7 @@ export default function PantryScreen() {
             />
           }
           ItemSeparatorComponent={() => (
-            <View style={{ height: 1, backgroundColor: 'transparent' }} />
+            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 32 }} />
           )}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
@@ -822,7 +930,8 @@ export default function PantryScreen() {
 
         {/* FAB */}
         <FloatingActionButton
-          onScan={() => router.push('/barcode-scanner')}
+          onBatchScan={() => router.push('/barcode-scanner?mode=rapid')}
+          onSingleScan={() => router.push('/barcode-scanner')}
           onPhoto={() => router.push('/add-pantry-item')}
           onManual={() => router.push('/add-pantry-item')}
         />

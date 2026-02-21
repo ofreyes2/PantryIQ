@@ -16,7 +16,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import { X, Scan } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
@@ -58,6 +58,10 @@ export default function BarcodeScannerScreen() {
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sessionCount, setSessionCount] = useState(0);
+
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const isRapidMode = mode === 'rapid';
 
   const pulseValue = useSharedValue(0);
 
@@ -109,8 +113,15 @@ export default function BarcodeScannerScreen() {
         category: 'Other',
       };
 
+      if (isRapidMode) {
+        params.returnTo = 'scanner';
+        setSessionCount((c) => c + 1);
+      }
+
       setLoading(false);
-      router.replace({ pathname: '/add-pantry-item', params });
+      router.push({ pathname: '/add-pantry-item', params });
+      // Reset scanner after a short delay so it's ready when user returns
+      setTimeout(() => setScanned(false), 300);
     } catch {
       setLoading(false);
       setScanned(false);
@@ -284,14 +295,14 @@ export default function BarcodeScannerScreen() {
                     paddingHorizontal: 32,
                   }}
                 >
-                  Point at a barcode to scan
+                  {isRapidMode ? 'Point at a barcode — scanning continuously' : 'Point at a barcode to scan'}
                 </Text>
               )}
             </View>
           </View>
         </View>
 
-        {/* Cancel button */}
+        {/* Top bar: close + rapid mode counter + done button */}
         <SafeAreaView
           style={{
             position: 'absolute',
@@ -301,7 +312,8 @@ export default function BarcodeScannerScreen() {
           }}
           edges={['top']}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', padding: 16 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
+            {/* Close button (left) */}
             <Pressable
               onPress={() => router.back()}
               style={{
@@ -316,6 +328,64 @@ export default function BarcodeScannerScreen() {
             >
               <X size={20} color="#fff" />
             </Pressable>
+
+            {/* Session counter badge (center, only in rapid mode) */}
+            {isRapidMode ? (
+              <View
+                style={{
+                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  borderRadius: BorderRadius.full,
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderWidth: 1,
+                  borderColor: Colors.green,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 13,
+                    color: Colors.green,
+                  }}
+                  testID="session-count-badge"
+                >
+                  {sessionCount} item{sessionCount !== 1 ? 's' : ''} scanned
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
+
+            {/* Done Scanning button (right, only in rapid mode) */}
+            {isRapidMode ? (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.back();
+                }}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: BorderRadius.full,
+                  backgroundColor: 'rgba(0,0,0,0.5)',
+                  borderWidth: 1,
+                  borderColor: Colors.green,
+                }}
+                testID="done-scanning-button"
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 14,
+                    color: Colors.green,
+                  }}
+                >
+                  Done
+                </Text>
+              </Pressable>
+            ) : (
+              <View style={{ width: 44 }} />
+            )}
           </View>
         </SafeAreaView>
 
@@ -326,7 +396,13 @@ export default function BarcodeScannerScreen() {
         >
           <View style={{ padding: 24, alignItems: 'center' }}>
             <Pressable
-              onPress={() => router.replace('/add-pantry-item')}
+              onPress={() =>
+                router.replace(
+                  isRapidMode
+                    ? { pathname: '/add-pantry-item', params: { returnTo: 'scanner' } }
+                    : '/add-pantry-item'
+                )
+              }
               style={{
                 backgroundColor: 'rgba(255,255,255,0.15)',
                 borderRadius: BorderRadius.lg,
