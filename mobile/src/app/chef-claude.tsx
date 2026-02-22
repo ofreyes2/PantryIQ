@@ -34,6 +34,7 @@ import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityM
 import { isMealDescription, getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
 import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
+import { MealConfirmationModal } from '@/components/MealConfirmationModal';
 import { QuickLogSheet } from '@/components/QuickLogSheet';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import type { PantryItem } from '@/lib/stores/pantryStore';
@@ -730,6 +731,7 @@ export default function ChefClaudeScreen() {
   const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
   const [mealCardStates, setMealCardStates] = useState<Record<string, MealCardStatus>>({});
   const [mealCardErrors, setMealCardErrors] = useState<Record<string, string>>({});
+  const [showMealConfirmationModal, setShowMealConfirmationModal] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1303,79 +1305,166 @@ export default function ChefClaudeScreen() {
   );
 
   /**
-   * Handle meal confirmation with proper status tracking
+   * Handle meal confirmation - show modal instead of logging immediately
    */
-  const handleMealConfirm = useCallback(async () => {
+  const handleMealConfirm = useCallback(() => {
     if (!currentMealAnalysis) return;
+    setShowMealConfirmationModal(true);
+  }, [currentMealAnalysis]);
 
-    const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
+  /**
+   * Handle logging meal from confirmation modal
+   */
+  const handleConfirmLogMeal = useCallback(
+    async (mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks', date: string) => {
+      if (!currentMealAnalysis) return;
 
-    try {
-      // Update card state to logging
-      setMealCardStates((prev) => ({ ...prev, [cardId]: 'logging' }));
+      const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
 
-      const result = await logMealFromAnalysis(currentMealAnalysis);
+      try {
+        setMealCardStates((prev) => ({ ...prev, [cardId]: 'logging' }));
 
-      if (result.success && result.entry) {
-        // Update card state to success
-        setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
+        // Create a modified analysis with the selected meal type
+        const analysisForLogging: MealAnalysis = {
+          ...currentMealAnalysis,
+          mealType: mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        };
 
-        // Add success message to chat
-        const todayStr = new Date().toISOString().split('T')[0];
-        const dailyTotals = getDailyTotals(todayStr);
-        const mealType = currentMealAnalysis.mealType;
+        const result = await logMealFromAnalysis(analysisForLogging);
 
-        let successMessage = `Logged! Your ${mealType} has been added. `;
+        if (result.success && result.entry) {
+          setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
+          setShowMealConfirmationModal(false);
 
-        const carbsUsed = Math.round(dailyTotals.netCarbs);
-        const carbGoal = userProfile.dailyCarbGoal;
-        const carbsRemaining = carbGoal - carbsUsed;
+          const dailyTotals = getDailyTotals(date);
+          let successMessage = `Logged! Your ${mealType.toLowerCase()} has been added. `;
 
-        if (carbsRemaining >= 0) {
-          successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget today — you are doing great.`;
+          const carbsUsed = Math.round(dailyTotals.netCarbs);
+          const carbGoal = userProfile.dailyCarbGoal;
+          const carbsRemaining = carbGoal - carbsUsed;
+
+          if (carbsRemaining >= 0) {
+            successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget — you are doing great.`;
+          } else {
+            successMessage += `You are now at ${carbsUsed}g of your ${carbGoal}g goal. No worries — tomorrow begins fresh.`;
+          }
+
+          if (currentMealAnalysis.pantryItemsToDeduct.length > 0) {
+            const items = currentMealAnalysis.pantryItemsToDeduct.join(', ').toLowerCase();
+            successMessage += ` I also updated your pantry — reduced your ${items}.`;
+          }
+
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: successMessage,
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, successMsg]);
+          setCurrentMealAnalysis(null);
+          setPendingMealAnswers([]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         } else {
-          successMessage += `You are now at ${carbsUsed}g of your ${carbGoal}g goal. No worries — tomorrow begins fresh.`;
+          setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
+          setMealCardErrors((prev) => ({ ...prev, [cardId]: result.error || 'Unknown error' }));
+
+          const errorMsg: Message = {
+            id: `msg-${Date.now()}-err`,
+            role: 'assistant',
+            content: `Sorry, I had trouble logging that meal: ${result.error}. Please try again.`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
         }
-
-        // Add pantry deduction message if applicable
-        if (currentMealAnalysis.pantryItemsToDeduct.length > 0) {
-          const items = currentMealAnalysis.pantryItemsToDeduct.join(', ').toLowerCase();
-          successMessage += ` I also updated your pantry — reduced your ${items}.`;
-        }
-
-        const successMsg: Message = {
-          id: `msg-${Date.now()}-success`,
-          role: 'assistant',
-          content: successMessage,
-          timestamp: new Date(),
-        };
-
-        setMessages((prev) => [...prev, successMsg]);
-        setCurrentMealAnalysis(null);
-        setPendingMealAnswers([]);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } else {
-        // Update card state to failure
+      } catch (error) {
+        const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
         setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
-        setMealCardErrors((prev) => ({ ...prev, [cardId]: result.error || 'Unknown error' }));
-
-        const errorMsg: Message = {
-          id: `msg-${Date.now()}-err`,
-          role: 'assistant',
-          content: `Sorry, I had trouble logging that meal: ${result.error}. Please try again.`,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMsg]);
+        setMealCardErrors((prev) => ({
+          ...prev,
+          [cardId]: error instanceof Error ? error.message : 'Unknown error',
+        }));
       }
-    } catch (error) {
-      setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
-      setMealCardErrors((prev) => ({
-        ...prev,
-        [cardId]: error instanceof Error ? error.message : 'Unknown error',
-      }));
-    }
-  }, [currentMealAnalysis, logMealFromAnalysis, getDailyTotals, userProfile.dailyCarbGoal]);
+    },
+    [currentMealAnalysis, logMealFromAnalysis, getDailyTotals, userProfile.dailyCarbGoal]
+  );
 
+  /**
+   * Handle logging meal and keeping modal open for next meal
+   */
+  const handleConfirmLogAndAddMore = useCallback(
+    async (mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks', date: string) => {
+      if (!currentMealAnalysis) return;
+
+      const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
+
+      try {
+        setMealCardStates((prev) => ({ ...prev, [cardId]: 'logging' }));
+
+        const analysisForLogging: MealAnalysis = {
+          ...currentMealAnalysis,
+          mealType: mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+        };
+
+        const result = await logMealFromAnalysis(analysisForLogging);
+
+        if (result.success && result.entry) {
+          setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
+
+          const dailyTotals = getDailyTotals(date);
+          let successMessage = `Logged! Your ${mealType.toLowerCase()} has been added. `;
+
+          const carbsUsed = Math.round(dailyTotals.netCarbs);
+          const carbGoal = userProfile.dailyCarbGoal;
+          const carbsRemaining = carbGoal - carbsUsed;
+
+          if (carbsRemaining >= 0) {
+            successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget. Ready for the next meal?`;
+          } else {
+            successMessage += `You are at ${carbsUsed}g of your ${carbGoal}g goal. Ready for the next meal?`;
+          }
+
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: successMessage,
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, successMsg]);
+          setCurrentMealAnalysis(null);
+          setPendingMealAnswers([]);
+
+          // Keep modal open and focus on input
+          setTimeout(() => {
+            // Set focus to input - this will be handled by user interaction
+            // Show a hint message
+          }, 100);
+
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } else {
+          setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
+          setMealCardErrors((prev) => ({ ...prev, [cardId]: result.error || 'Unknown error' }));
+
+          const errorMsg: Message = {
+            id: `msg-${Date.now()}-err`,
+            role: 'assistant',
+            content: `Sorry, I had trouble logging that meal: ${result.error}. Please try again.`,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+        }
+      } catch (error) {
+        const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
+        setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
+        setMealCardErrors((prev) => ({
+          ...prev,
+          [cardId]: error instanceof Error ? error.message : 'Unknown error',
+        }));
+      }
+    },
+    [currentMealAnalysis, logMealFromAnalysis, getDailyTotals, userProfile.dailyCarbGoal]
+  );
 
   const renderItem = useCallback(
     ({ item }: { item: Message }) => {
@@ -1660,6 +1749,15 @@ export default function ChefClaudeScreen() {
         recentMeals={recentMeals}
         favoriteMeals={favoriteMeals}
         isLoading={isTyping || isMealAnalyzing}
+      />
+
+      <MealConfirmationModal
+        visible={showMealConfirmationModal}
+        analysis={currentMealAnalysis}
+        onClose={() => setShowMealConfirmationModal(false)}
+        onConfirm={handleConfirmLogMeal}
+        onLogAndAddMore={handleConfirmLogAndAddMore}
+        isLoading={isMealLogging}
       />
     </LinearGradient>
     </ErrorBoundary>

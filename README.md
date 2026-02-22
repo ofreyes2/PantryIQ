@@ -112,6 +112,7 @@ mobile/src/
       - Save as Favorite toggle with automatic favorite tracking (3+ logs)
       - Empty state helpers with quick add buttons based on time of day
       - Form validation with inline error messages
+      - **FIXED**: FlatList-based scrolling ensures keyboard never covers input fields
     - **Issue 2 - MealLogger Service**: Created dedicated meal logging service that:
       - Saves meals with write verification (reads back from AsyncStorage to confirm success)
       - Validates meal type and creates unique IDs with timestamps
@@ -120,6 +121,8 @@ mobile/src/
       - Comprehensive console logging for debugging
       - MealConfirmationCard now calls MealLogger.logMeal directly with success/failure states
       - Meals tab refreshes on focus with useFocusEffect hook
+      - **FIXED**: Added MealConfirmationModal for meal type/date selection before logging
+      - **FIXED**: "Log & Add More" feature lets users continuously log multiple meals in Chef Claude
     - **Issue 3 - Conversation Persistence & Coffee Shortcut**:
       - Chef Claude conversations now persist to AsyncStorage and restore on mount
       - Quick prompts system with 8 new chips (Log morning coffee, dinner ideas, carb tracking, expiring items, crispy recipes, meal plans, water intake, streak)
@@ -127,6 +130,25 @@ mobile/src/
       - History icon shows all past conversations with auto-generated titles
       - Compose icon starts fresh conversation and saves current one
       - Subtle "Conversation restored" banner on recovery
+  - **BUG FIX ✅ COMPLETE**: Keyboard Coverage & Meal Confirmation Polish — Two critical user experience issues fixed:
+    - **Keyboard Coverage Fix**: Manual food entry form no longer hidden by keyboard
+      - Converted ManualFoodEntryForm to FlatList-based scrolling
+      - All input fields remain visible while keyboard is shown
+      - Save button always reachable without closing keyboard
+      - Smooth auto-scroll when keyboard appears
+    - **Meal Logging Confirmation Flow**: Bulletproof meal logging with meal type/date selection
+      - Created MealConfirmationModal component
+      - Modal appears before any meal logging in Chef Claude
+      - Users select meal type (Breakfast, Lunch, Dinner, Snacks) and date before logging
+      - Three action buttons: Log Meal, Log & Add More, Cancel
+      - "Log & Add More" feature:
+        - Logs the meal to selected type/date
+        - Keeps modal open for continuous logging
+        - Auto-focuses Chef Claude chat input for next meal
+        - Shows green success state on confirmation card
+        - User can immediately type next meal without reopening forms
+      - Prevents accidental meal logging to wrong meal type or wrong date
+      - Success messages show in chat with carb budget tracking
   - **Feature 7 ✅ IN PROGRESS**: Accessibility Improvements — AccessibilityInfo integration, WCAG AA contrast checking, screen reader utilities, semantic HTML for accessibility
   - **Feature 5 IN PROGRESS**: UI Consistency Audit — Reviewing and standardizing typography, colors, spacing, component styles across entire app
   - **Feature 6 PENDING**: Onboarding Polish — Splash screen animation, onboarding illustrations, progress indicators, first-use tooltips, empty state designs

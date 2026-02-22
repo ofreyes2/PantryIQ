@@ -366,7 +366,7 @@ export function MealConfirmationCard({
                   color: '#fff',
                 }}
               >
-                {status === 'logging' ? 'Logging...' : 'Log This Meal'}
+                {status === 'logging' ? 'Logging...' : 'Confirm & Select Meal Type'}
               </Text>
             </Pressable>
           </>
