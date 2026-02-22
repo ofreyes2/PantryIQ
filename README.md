@@ -150,6 +150,33 @@ mobile/src/
         - User can immediately type next meal without reopening forms
       - Prevents accidental meal logging to wrong meal type or wrong date
       - Success messages show in chat with carb budget tracking
+  - **ROOT CAUSE FIX ✅ COMPLETE**: Chef Claude Cannot Write to Meal Log — Fixed critical architecture problem:
+    - **The Problem**: Claude API only returns text; it cannot write to AsyncStorage, databases, or any storage. Previous implementation tried to have Claude handle meal logging directly, which is architecturally impossible.
+    - **The Solution - Response Interceptor Pattern**:
+      - Claude now returns conversational responses + hidden structured `<MEAL_DATA>` JSON block at end
+      - App extracts JSON block and removes it from display text (user never sees it)
+      - App handles all persistence to AsyncStorage (Claude just provides data)
+      - Confirmation button only appears when data is valid and ready
+    - **Updated System Prompt**: Chef Claude now:
+      - Includes hidden `<MEAL_DATA>` JSON blocks when user describes food
+      - Never claims it logged anything or that it can't save
+      - Says honest things like "Here's what I have for your breakfast — tap the button below to save it"
+      - Only provides nutrition data; app controls all storage
+    - **Simplified Architecture**:
+      - Removed backend `/api/meals/analyze` endpoint calls
+      - Removed meal analysis functions (Claude does this now)
+      - All responses go directly to Claude API
+      - App parses response, extracts meal data, removes JSON from display
+      - User sees clean conversational response with "Log Meal" button
+    - **End-to-End Flow**:
+      1. User: "I just had 2 eggs with cheese"
+      2. Claude: "Nice! Eggs with cheese is perfect low-carb. [hidden JSON] Tap below to save it to your log."
+      3. App removes JSON, shows only: "Nice! Eggs... [Log Meal] [Edit]"
+      4. User taps "Log Meal"
+      5. Modal shows meal details, user confirms type
+      6. Meal saved to AsyncStorage
+      7. Success: "Logged! Your breakfast has been added..."
+      8. Opens Meals tab → meal is there
   - **Feature 7 ✅ IN PROGRESS**: Accessibility Improvements — AccessibilityInfo integration, WCAG AA contrast checking, screen reader utilities, semantic HTML for accessibility
   - **Feature 5 IN PROGRESS**: UI Consistency Audit — Reviewing and standardizing typography, colors, spacing, component styles across entire app
   - **Feature 6 PENDING**: Onboarding Polish — Splash screen animation, onboarding illustrations, progress indicators, first-use tooltips, empty state designs
