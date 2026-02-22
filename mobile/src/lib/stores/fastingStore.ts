@@ -29,6 +29,8 @@ interface FastingState {
   startFast: (protocol: FastingProtocol, customHours?: number) => void;
   endFast: () => void;
   cancelFast: () => void;
+  deleteSession: (sessionId: string) => void;
+  clearFastingHistory: (date?: string) => void;
   getCurrentPhase: () => { phase: FastingPhase; hoursElapsed: number };
   getHistoryForDate: (date: string) => FastingSession[];
   toggleNotifications: (enabled: boolean) => void;
@@ -89,6 +91,24 @@ export const useFastingStore = create<FastingState>()(
           history: {
             ...state.history,
             currentSession: null,
+          },
+        })),
+
+      deleteSession: (sessionId) =>
+        set((state) => ({
+          history: {
+            ...state.history,
+            completedSessions: state.history.completedSessions.filter((s) => s.id !== sessionId),
+          },
+        })),
+
+      clearFastingHistory: (date?: string) =>
+        set((state) => ({
+          history: {
+            ...state.history,
+            completedSessions: date
+              ? state.history.completedSessions.filter((s) => s.date !== date)
+              : [],
           },
         })),
 

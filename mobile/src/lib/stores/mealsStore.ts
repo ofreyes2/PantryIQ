@@ -43,6 +43,7 @@ interface MealsState {
   addEntry: (entry: Omit<FoodEntry, 'id'>) => void;
   updateEntry: (id: string, updates: Partial<FoodEntry>) => void;
   deleteEntry: (id: string) => void;
+  clearMeals: (date: string) => void;
   getEntriesForDate: (date: string) => FoodEntry[];
   toggleFavorite: (id: string) => void;
   getFavorites: () => FoodEntry[];
@@ -227,6 +228,31 @@ export const useMealsStore = create<MealsState>()(
             });
           }
         }
+      },
+
+      clearMeals: (date: string) => {
+        // Find all entries for this date to potentially restore pantry inventory
+        const entriesToDelete = get().entries.filter((e) => e.date === date);
+
+        set((state) => ({
+          entries: state.entries.filter((e) => e.date !== date),
+          waterIntake: state.waterIntake.filter((w) => w.date !== date),
+        }));
+
+        // Re-stock pantry for all linked entries
+        const pantryStore = usePantryStore.getState();
+        entriesToDelete.forEach((entry) => {
+          if (entry.pantryItemId) {
+            const pantryItem = pantryStore.items.find((i) => i.id === entry.pantryItemId);
+            if (pantryItem) {
+              const spc = pantryItem.servingsPerContainer && pantryItem.servingsPerContainer > 0 ? pantryItem.servingsPerContainer : 1;
+              const restoration = entry.servings / spc;
+              pantryStore.updateItem(entry.pantryItemId, {
+                quantity: Math.round((pantryItem.quantity + restoration) * 1000) / 1000,
+              });
+            }
+          }
+        });
       },
 
       getEntriesForDate: (date: string) => {

@@ -47,6 +47,8 @@ import {
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { useMealsStore, FoodEntry, MealType } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
+import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
+import { useToast } from '@/components/Toast';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -347,13 +349,23 @@ function FoodItemRow({ entry, onDelete, onToggleFavorite }: {
   onToggleFavorite: () => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const { showToast } = useToast();
+
+  const handleDeletePress = () => {
+    setDeleteConfirmVisible(true);
+    swipeRef.current?.close();
+  };
+
+  const handleConfirmDelete = () => {
+    onDelete();
+    setDeleteConfirmVisible(false);
+    showToast(`${entry.name} deleted`, 'success');
+  };
 
   const renderRightActions = () => (
     <Pressable
-      onPress={() => {
-        swipeRef.current?.close();
-        onDelete();
-      }}
+      onPress={handleDeletePress}
       style={{
         backgroundColor: Colors.error,
         justifyContent: 'center',
@@ -370,42 +382,54 @@ function FoodItemRow({ entry, onDelete, onToggleFavorite }: {
   );
 
   return (
-    <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false}>
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        backgroundColor: Colors.navyCard,
-        borderRadius: BorderRadius.md,
-        marginBottom: 6,
-      }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }} numberOfLines={1}>
-            {entry.name}
-          </Text>
-          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 }}>
-            {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
-            {entry.brand ? ` · ${entry.brand}` : null}
-          </Text>
+    <>
+      <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false}>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          backgroundColor: Colors.navyCard,
+          borderRadius: BorderRadius.md,
+          marginBottom: 6,
+        }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }} numberOfLines={1}>
+              {entry.name}
+            </Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 }}>
+              {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
+              {entry.brand ? ` · ${entry.brand}` : null}
+            </Text>
+          </View>
+          <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
+              {Math.round(entry.calories * entry.servings)} cal
+            </Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
+              {Math.round(entry.netCarbs * entry.servings)}g net carbs
+            </Text>
+          </View>
+          <Pressable onPress={onToggleFavorite} testID={`favorite-btn-${entry.id}`} hitSlop={8}>
+            <Heart
+              size={18}
+              color={entry.isFavorite ? Colors.error : Colors.textTertiary}
+              fill={entry.isFavorite ? Colors.error : 'transparent'}
+            />
+          </Pressable>
         </View>
-        <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
-          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
-            {Math.round(entry.calories * entry.servings)} cal
-          </Text>
-          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
-            {Math.round(entry.netCarbs * entry.servings)}g net carbs
-          </Text>
-        </View>
-        <Pressable onPress={onToggleFavorite} testID={`favorite-btn-${entry.id}`} hitSlop={8}>
-          <Heart
-            size={18}
-            color={entry.isFavorite ? Colors.error : Colors.textTertiary}
-            fill={entry.isFavorite ? Colors.error : 'transparent'}
-          />
-        </Pressable>
-      </View>
-    </Swipeable>
+      </Swipeable>
+
+      <DeleteConfirmationModal
+        visible={deleteConfirmVisible}
+        title="Delete Meal Entry?"
+        message="This meal entry will be permanently removed and linked pantry items will be restocked."
+        itemName={entry.name}
+        confirmText="Delete"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteConfirmVisible(false)}
+      />
+    </>
   );
 }
 
@@ -1521,11 +1545,14 @@ export default function MealsScreen() {
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [addFoodModalVisible, setAddFoodModalVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('Breakfast');
+  const [clearConfirmVisible, setClearConfirmVisible] = useState(false);
 
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const addEntry = useMealsStore((s) => s.addEntry);
   const deleteEntry = useMealsStore((s) => s.deleteEntry);
   const toggleFavorite = useMealsStore((s) => s.toggleFavorite);
+  const clearMeals = useMealsStore((s) => s.clearMeals);
+  const { showToast } = useToast();
 
   const calorieGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
@@ -1574,6 +1601,13 @@ export default function MealsScreen() {
   const dateLabel = formatDate(currentDate);
   const fullDateLabel = currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
+  const handleClearMeals = () => {
+    clearMeals(dateStr);
+    setClearConfirmVisible(false);
+    const dateName = isToday ? "today's" : 'that day\'s';
+    showToast(`${dateName} meal log cleared`, 'success');
+  };
+
   return (
     <LinearGradient colors={['#0A1628', '#0B1C35', '#0A1628']} style={{ flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }} edges={['top']} testID="meals-screen">
@@ -1583,6 +1617,25 @@ export default function MealsScreen() {
             <Text style={{ fontFamily: 'PlayfairDisplay_700Bold', fontSize: 28, color: Colors.textPrimary, flex: 1 }}>
               Meals
             </Text>
+            {!!hasEntries && (
+              <Pressable
+                onPress={() => setClearConfirmVisible(true)}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  marginRight: 10,
+                  borderRadius: BorderRadius.md,
+                  backgroundColor: `${Colors.error}20`,
+                  borderWidth: 1,
+                  borderColor: `${Colors.error}40`,
+                }}
+                testID="clear-today-btn"
+              >
+                <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: Colors.error }}>
+                  Clear
+                </Text>
+              </Pressable>
+            )}
             {/* Week/Day toggle */}
             <View style={{
               flexDirection: 'row',
@@ -1758,6 +1811,15 @@ export default function MealsScreen() {
             setAddFoodModalVisible(false);
           }}
           onAddEntry={handleAddEntry}
+        />
+
+        <DeleteConfirmationModal
+          visible={clearConfirmVisible}
+          title="Clear all meals?"
+          message={isToday ? "This will remove all breakfast, lunch, dinner, and snack entries for today. Linked pantry items will be restocked." : "This will remove all meals for this date."}
+          confirmText="Clear All"
+          onConfirm={handleClearMeals}
+          onCancel={() => setClearConfirmVisible(false)}
         />
       </SafeAreaView>
     </LinearGradient>
