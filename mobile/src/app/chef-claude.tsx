@@ -29,11 +29,12 @@ import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
-import { buildPersonalityPrompt } from '@/lib/personalityModes';
+import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
 import { isMealDescription, getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
 import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import { QuickLogSheet } from '@/components/QuickLogSheet';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
 import type { UserProfile } from '@/lib/stores/appStore';
@@ -68,9 +69,10 @@ function buildSystemPrompt(
   kitchenEquipmentSummary: string,
   preferencesSummary: string
 ): string {
+  // Safe personality prompt building with null safety
   const personalityInstructions = buildPersonalityPrompt(
-    userProfile.personalityMode,
-    userProfile.customPersonality
+    userProfile?.personalityMode ?? 'default',
+    userProfile?.customPersonality ?? null
   );
 
   const expiringItems = pantryItems.filter((item) => {
@@ -1180,8 +1182,9 @@ export default function ChefClaudeScreen() {
   }, []);
 
   return (
-    <LinearGradient colors={['#0A1628', '#0B1C35']} style={{ flex: 1 }}>
-      <SafeAreaView testID="chef-claude-screen" style={{ flex: 1 }} edges={['top', 'bottom']}>
+    <ErrorBoundary>
+      <LinearGradient colors={['#0A1628', '#0B1C35']} style={{ flex: 1 }}>
+        <SafeAreaView testID="chef-claude-screen" style={{ flex: 1 }} edges={['top', 'bottom']}>
         {/* Header */}
         <View
           style={{
@@ -1221,7 +1224,7 @@ export default function ChefClaudeScreen() {
                 }}
               >
                 <Text style={{ fontSize: 16 }}>
-                  {userProfile.personalityMode === 'default' ? '👨‍🍳' : userProfile.personalityMode === 'coach' ? '💪' : userProfile.personalityMode === 'gordon-ramsay' ? '🔥' : userProfile.personalityMode === 'scientist' ? '🧪' : userProfile.personalityMode === 'zen' ? '🧘' : '✨'}
+                  {getPersonalityConfig(userProfile?.personalityMode)?.icon ?? '👨‍🍳'}
                 </Text>
               </View>
               <Text
@@ -1242,7 +1245,9 @@ export default function ChefClaudeScreen() {
                 marginTop: 1,
               }}
             >
-              {userProfile.personalityMode === 'default' ? 'Your personal kitchen AI' : userProfile.personalityMode === 'coach' ? 'Coach Mode' : userProfile.personalityMode === 'gordon-ramsay' ? 'Gordon Ramsay Mode' : userProfile.personalityMode === 'scientist' ? 'Scientist Mode' : userProfile.personalityMode === 'zen' ? 'Zen Mode' : 'Custom Mode'}
+              {userProfile?.personalityMode === 'custom' && userProfile?.customPersonality?.description
+                ? 'Custom Mode'
+                : getPersonalityConfig(userProfile?.personalityMode)?.name ?? 'Your personal kitchen AI'}
             </Text>
           </View>
 
@@ -1417,5 +1422,6 @@ export default function ChefClaudeScreen() {
         isLoading={isTyping || isMealAnalyzing}
       />
     </LinearGradient>
+    </ErrorBoundary>
   );
 }

@@ -8,6 +8,17 @@ export interface PersonalityModeConfig {
   example: string;
 }
 
+// Default personality object - always available as fallback
+export const DEFAULT_PERSONALITY_MODE: PersonalityMode = 'default';
+
+export const DEFAULT_PERSONALITY_CONFIG: PersonalityModeConfig = {
+  name: 'Chef Claude',
+  description: 'Friendly, encouraging, knowledgeable. Like a supportive friend who happens to be a nutritionist.',
+  icon: '👨‍🍳',
+  toneInstructions: `You are Chef Claude, a personal AI nutritionist, chef, and pantry manager. You are friendly, encouraging, warm, and deeply knowledgeable about nutrition, cooking, and low carb / keto eating. You speak conversationally — this is a chat, not an essay. Be supportive and motivating without being over the top.`,
+  example: 'You\'re doing great with your carbs this week! For dinner, I\'d suggest the salmon — it\'s perfect for keeping you in ketosis and the asparagus will round out your nutrients nicely.',
+};
+
 export const PERSONALITY_MODES: Record<PersonalityMode, PersonalityModeConfig> = {
   default: {
     name: 'Chef Claude',
@@ -54,15 +65,36 @@ export const PERSONALITY_MODES: Record<PersonalityMode, PersonalityModeConfig> =
 };
 
 export function buildPersonalityPrompt(
-  personalityMode: PersonalityMode,
-  customPersonality: CustomPersonality | null
+  personalityMode: PersonalityMode | null | undefined,
+  customPersonality: CustomPersonality | null | undefined
 ): string {
-  if (personalityMode === 'custom' && customPersonality?.description) {
-    return `${customPersonality.description}
+  try {
+    // Handle custom mode
+    if (personalityMode === 'custom' && customPersonality?.description) {
+      return `${customPersonality.description}
 
 You are integrated into PantryIQ, a personal health and pantry management app. You have access to the user's pantry inventory, meal history, health goals, and cooking equipment. Use this context to provide personalized advice.`;
-  }
+    }
 
-  const config = PERSONALITY_MODES[personalityMode];
-  return config.toneInstructions;
+    // Get config with null safety - fallback to default if mode is invalid
+    const mode = personalityMode ?? DEFAULT_PERSONALITY_MODE;
+    const config = PERSONALITY_MODES[mode] ?? DEFAULT_PERSONALITY_CONFIG;
+
+    return config?.toneInstructions ?? DEFAULT_PERSONALITY_CONFIG.toneInstructions;
+  } catch (error) {
+    console.error('Error building personality prompt:', error);
+    return DEFAULT_PERSONALITY_CONFIG.toneInstructions;
+  }
+}
+
+export function getPersonalityConfig(
+  personalityMode: PersonalityMode | null | undefined
+): PersonalityModeConfig {
+  try {
+    const mode = personalityMode ?? DEFAULT_PERSONALITY_MODE;
+    return PERSONALITY_MODES[mode] ?? DEFAULT_PERSONALITY_CONFIG;
+  } catch (error) {
+    console.error('Error getting personality config:', error);
+    return DEFAULT_PERSONALITY_CONFIG;
+  }
 }
