@@ -40,10 +40,10 @@ const VIEWFINDER = 260;
 // ─── Debug Log ───────────────────────────────────────────────────────────────
 
 interface DebugEntry {
-  api: string;
   barcode: string;
-  status: number | string;
-  found: boolean;
+  off: { status: number | string; found: boolean };
+  goUpc: { status: number | string; found: boolean } | null;
+  claude: { triggered: boolean; found: boolean } | null;
 }
 
 // ─── Animated Viewfinder Corners ─────────────────────────────────────────────
@@ -632,7 +632,8 @@ export default function BarcodeScannerScreen() {
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const lastScannedBarcode = useRef<string | null>(null);
 
-  const usdaApiKey = useAppStore((s) => s.userProfile.usdaApiKey);
+  const claudeApiKey = useAppStore((s) => s.userProfile.claudeApiKey);
+  const goUpcApiKey = useAppStore((s) => s.userProfile.goUpcApiKey);
   const addItem = usePantryStore((s) => s.addItem);
 
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -669,23 +670,21 @@ export default function BarcodeScannerScreen() {
     transform: [{ scale: viewfinderScale.value }],
   }));
 
-  // ─── API Lookup ───────────────────────────────────────────────────────────
+  // ─── API Cascade ──────────────────────────────────────────────────────────
 
   const lookupOpenFoodFacts = async (barcode: string): Promise<ProductData | null> => {
     try {
       const url = `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`;
-      console.log('[Scanner] Fetching Open Food Facts:', url);
+      console.log('[Scanner] API-1 Open Food Facts:', url);
       const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
       const data = await res.json();
-      console.log('[Scanner] OFF response status:', data?.status, 'product:', data?.product?.product_name);
+      const found = data?.status === 1 && !!data?.product?.product_name;
+      console.log('[Scanner] API-1 OFF status:', res.status, '| product found:', found);
 
-      setDebugInfo({ api: 'Open Food Facts', barcode, status: res.status, found: data?.status === 1 });
-
-      if (data?.status !== 1 || !data?.product) return null;
+      if (!found) return null;
 
       const p = data.product;
       const n = p.nutriments ?? {};
-
       return {
         barcode,
         name: p.product_name ?? p.product_name_en ?? '',
@@ -701,53 +700,135 @@ export default function BarcodeScannerScreen() {
         category: 'Other',
       };
     } catch (err) {
-      console.log('[Scanner] OFF error:', err);
-      setDebugInfo({ api: 'Open Food Facts', barcode, status: 'ERROR', found: false });
+      console.log('[Scanner] API-1 OFF error:', err);
       return null;
     }
   };
 
-  const lookupUSDA = async (barcode: string): Promise<ProductData | null> => {
+  const lookupGoUpc = async (barcode: string): Promise<ProductData | null> => {
+    if (!goUpcApiKey) {
+      console.log('[Scanner] API-2 Go-UPC skipped (no key set)');
+      return null;
+    }
     try {
-      const key = usdaApiKey || 'DEMO_KEY';
-      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${barcode}&api_key=${key}&pageSize=1`;
-      console.log('[Scanner] Fetching USDA:', url);
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const url = `https://go-upc.com/api/v1/code/${barcode}`;
+      console.log('[Scanner] API-2 Go-UPC:', url);
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${goUpcApiKey}` },
+        signal: AbortSignal.timeout(8000),
+      });
       const data = await res.json();
-      console.log('[Scanner] USDA response totalHits:', data?.totalHits, 'first:', data?.foods?.[0]?.description);
+      const found = !!data?.product?.name;
+      console.log('[Scanner] API-2 Go-UPC status:', res.status, '| product found:', found, '| name:', data?.product?.name);
 
-      setDebugInfo({ api: 'USDA FoodData Central', barcode, status: res.status, found: (data?.totalHits ?? 0) > 0 });
+      if (!found) return null;
 
-      if (!data?.foods?.length) return null;
-
-      const food = data.foods[0];
-      const getNutrient = (id: number) =>
-        food.foodNutrients?.find((n: { nutrientId: number; value: number }) => n.nutrientId === id)?.value ?? 0;
+      const p = data.product;
+      const nutrients = (p.nutrients ?? []) as Array<{ name: string; value: number; unit: string }>;
+      const getNutrient = (name: string) =>
+        nutrients.find((n) => n.name.toLowerCase().includes(name.toLowerCase()))?.value ?? 0;
 
       return {
         barcode,
-        name: food.description ?? '',
-        brand: food.brandOwner ?? food.brandName ?? '',
-        caloriesPerServing: getNutrient(1008),
-        carbsPerServing: getNutrient(1005),
-        proteinPerServing: getNutrient(1003),
-        fatPerServing: getNutrient(1004),
-        fiberPerServing: getNutrient(1079),
-        sodiumPerServing: getNutrient(1093),
-        servingSize: food.servingSize ? `${food.servingSize}${food.servingSizeUnit ?? ''}` : '',
+        name: p.name ?? '',
+        brand: p.brand ?? '',
+        caloriesPerServing: getNutrient('calories') || getNutrient('energy'),
+        carbsPerServing: getNutrient('carbohydrate') || getNutrient('carbs'),
+        proteinPerServing: getNutrient('protein'),
+        fatPerServing: getNutrient('fat') || getNutrient('total fat'),
+        fiberPerServing: getNutrient('fiber') || getNutrient('dietary fiber'),
+        sodiumPerServing: getNutrient('sodium'),
+        servingSize: '',
+        photoUri: p.imageUrl ?? '',
+        category: 'Other',
+      };
+    } catch (err) {
+      console.log('[Scanner] API-2 Go-UPC error:', err);
+      return null;
+    }
+  };
+
+  const lookupClaude = async (barcode: string): Promise<ProductData | null> => {
+    if (!claudeApiKey) {
+      console.log('[Scanner] API-3 Claude skipped (no API key)');
+      return null;
+    }
+    try {
+      console.log('[Scanner] API-3 Claude fallback triggered for barcode:', barcode);
+      const prompt = `The user scanned barcode number ${barcode}. Based on this UPC code can you identify what product this likely is and provide estimated nutritional information? Many US grocery products have predictable UPC prefixes. Respond ONLY with a JSON object in this exact format (no markdown, no explanation):
+{
+  "identified": true,
+  "name": "Product Name",
+  "brand": "Brand Name",
+  "caloriesPerServing": 0,
+  "carbsPerServing": 0,
+  "proteinPerServing": 0,
+  "fatPerServing": 0,
+  "fiberPerServing": 0,
+  "sodiumPerServing": 0,
+  "servingSize": "1 serving"
+}
+If you cannot identify it, respond with: {"identified": false}`;
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeApiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 256,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+
+      const data = await res.json();
+      console.log('[Scanner] API-3 Claude response status:', res.status);
+
+      const text = data?.content?.[0]?.text ?? '';
+      const parsed = JSON.parse(text) as {
+        identified: boolean;
+        name?: string;
+        brand?: string;
+        caloriesPerServing?: number;
+        carbsPerServing?: number;
+        proteinPerServing?: number;
+        fatPerServing?: number;
+        fiberPerServing?: number;
+        sodiumPerServing?: number;
+        servingSize?: string;
+      };
+      if (!parsed.identified || !parsed.name) {
+        console.log('[Scanner] API-3 Claude: product not identified');
+        return null;
+      }
+
+      console.log('[Scanner] API-3 Claude identified:', parsed.name);
+      return {
+        barcode,
+        name: parsed.name ?? '',
+        brand: parsed.brand ?? '',
+        caloriesPerServing: parsed.caloriesPerServing ?? 0,
+        carbsPerServing: parsed.carbsPerServing ?? 0,
+        proteinPerServing: parsed.proteinPerServing ?? 0,
+        fatPerServing: parsed.fatPerServing ?? 0,
+        fiberPerServing: parsed.fiberPerServing ?? 0,
+        sodiumPerServing: parsed.sodiumPerServing ?? 0,
+        servingSize: parsed.servingSize ?? '',
         photoUri: '',
         category: 'Other',
       };
     } catch (err) {
-      console.log('[Scanner] USDA error:', err);
-      setDebugInfo({ api: 'USDA FoodData Central', barcode, status: 'ERROR', found: false });
+      console.log('[Scanner] API-3 Claude error:', err);
       return null;
     }
   };
 
   const handleBarcodeScan = async ({ data }: { data: string }) => {
     if (scanned || loading) return;
-    // Debounce same barcode
     if (lastScannedBarcode.current === data) return;
     lastScannedBarcode.current = data;
 
@@ -757,37 +838,67 @@ export default function BarcodeScannerScreen() {
     setNotFoundBarcode(null);
     setDebugInfo(null);
 
-    // Haptic + green flash
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFlashOverlay('green');
     setTimeout(() => setFlashOverlay('none'), 300);
 
-    console.log('[Scanner] Barcode scanned:', data);
+    console.log('[Scanner] ──── Barcode scanned:', data, '────');
+
+    const debugEntry: DebugEntry = {
+      barcode: data,
+      off: { status: '...', found: false },
+      goUpc: null,
+      claude: null,
+    };
 
     try {
-      // Try both APIs in parallel, prefer OFF result
-      const [offResult, usdaResult] = await Promise.all([
-        lookupOpenFoodFacts(data),
-        lookupUSDA(data),
-      ]);
+      // ── API 1: Open Food Facts ──
+      const offResult = await lookupOpenFoodFacts(data);
+      debugEntry.off = { status: offResult ? 200 : 'not found', found: !!offResult };
+      setDebugInfo({ ...debugEntry });
 
-      const product = offResult ?? usdaResult;
-
-      if (!product || !product.name) {
-        // Not found
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setFlashOverlay('red');
-        setTimeout(() => setFlashOverlay('none'), 400);
-        setNotFoundBarcode(data);
+      if (offResult) {
+        console.log('[Scanner] SUCCESS via Open Food Facts:', offResult.name);
+        setFoundProduct(offResult);
         setLoading(false);
         return;
       }
 
-      console.log('[Scanner] Product found:', product.name, 'brand:', product.brand);
-      setFoundProduct(product);
+      // ── API 2: Go-UPC ──
+      console.log('[Scanner] OFF failed, trying Go-UPC...');
+      const goUpcResult = await lookupGoUpc(data);
+      debugEntry.goUpc = { status: goUpcResult ? 200 : 'not found', found: !!goUpcResult };
+      setDebugInfo({ ...debugEntry });
+
+      if (goUpcResult) {
+        console.log('[Scanner] SUCCESS via Go-UPC:', goUpcResult.name);
+        setFoundProduct(goUpcResult);
+        setLoading(false);
+        return;
+      }
+
+      // ── API 3: Claude fallback ──
+      console.log('[Scanner] Go-UPC failed, trying Claude fallback...');
+      const claudeResult = await lookupClaude(data);
+      debugEntry.claude = { triggered: true, found: !!claudeResult };
+      setDebugInfo({ ...debugEntry });
+
+      if (claudeResult) {
+        console.log('[Scanner] SUCCESS via Claude fallback:', claudeResult.name);
+        setFoundProduct(claudeResult);
+        setLoading(false);
+        return;
+      }
+
+      // ── All APIs failed ──
+      console.log('[Scanner] All 3 APIs failed for barcode:', data);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFlashOverlay('red');
+      setTimeout(() => setFlashOverlay('none'), 400);
+      setNotFoundBarcode(data);
       setLoading(false);
     } catch (err) {
-      console.log('[Scanner] Lookup error:', err);
+      console.log('[Scanner] Unexpected lookup error:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setFlashOverlay('red');
       setTimeout(() => setFlashOverlay('none'), 400);
@@ -1165,17 +1276,28 @@ export default function BarcodeScannerScreen() {
               bottom: 180,
               left: 12,
               right: 12,
-              backgroundColor: 'rgba(0,0,0,0.75)',
+              backgroundColor: 'rgba(0,0,0,0.8)',
               borderRadius: 8,
-              padding: 8,
+              padding: 10,
+              gap: 3,
             }}
           >
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
-              API: {debugInfo.api} | Status: {debugInfo.status} | Found: {debugInfo.found ? 'YES' : 'NO'}
+            <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: 'rgba(255,255,255,0.9)', marginBottom: 2 }}>
+              Debug — Barcode: {debugInfo.barcode}
             </Text>
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
-              Barcode: {debugInfo.barcode}
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: debugInfo.off.found ? '#22C55E' : 'rgba(255,255,255,0.5)' }}>
+              API-1 Open Food Facts: {String(debugInfo.off.status)} | {debugInfo.off.found ? 'FOUND' : 'not found'}
             </Text>
+            {debugInfo.goUpc !== null ? (
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: debugInfo.goUpc.found ? '#22C55E' : 'rgba(255,255,255,0.5)' }}>
+                API-2 Go-UPC: {String(debugInfo.goUpc.status)} | {debugInfo.goUpc.found ? 'FOUND' : 'not found'}
+              </Text>
+            ) : null}
+            {debugInfo.claude !== null ? (
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: debugInfo.claude.found ? '#22C55E' : 'rgba(255,255,255,0.5)' }}>
+                API-3 Claude: triggered | {debugInfo.claude.found ? 'FOUND' : 'not identified'}
+              </Text>
+            ) : null}
           </View>
         ) : null}
       </CameraView>
