@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import axios from 'axios';
 import { X, Scan } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
@@ -65,6 +65,16 @@ export default function BarcodeScannerScreen() {
 
   const pulseValue = useSharedValue(0);
 
+  // Reset scanner state whenever this screen comes into focus
+  // This handles the case where the user returns from add-pantry-item
+  useFocusEffect(
+    useCallback(() => {
+      setScanned(false);
+      setLoading(false);
+      setErrorMsg(null);
+    }, [])
+  );
+
   useEffect(() => {
     pulseValue.value = withRepeat(
       withSequence(withTiming(1, { duration: 800 }), withTiming(0, { duration: 800 })),
@@ -86,11 +96,12 @@ export default function BarcodeScannerScreen() {
 
     try {
       const response = await axios.get(
-        `https://world.openfoodfacts.org/api/v2/product/${data}.json`
+        `https://world.openfoodfacts.org/api/v2/product/${data}.json`,
+        { validateStatus: (status) => status < 500 }
       );
 
       const product = response.data?.product;
-      if (!product) {
+      if (!product || response.data?.status === 0) {
         setErrorMsg('Product not found. You can add it manually.');
         setLoading(false);
         setScanned(false);
@@ -315,7 +326,11 @@ export default function BarcodeScannerScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
             {/* Close button (left) */}
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => {
+                setScanned(false);
+                setLoading(false);
+                router.back();
+              }}
               style={{
                 width: 44,
                 height: 44,

@@ -33,6 +33,7 @@ import {
   Flame,
 } from 'lucide-react-native';
 import Svg, { Circle, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
+import { useRouter } from 'expo-router';
 import { useAppStore } from '@/lib/stores/appStore';
 import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
 
@@ -545,6 +546,7 @@ function DashboardHeader({ name, streak }: { name: string; streak: number }) {
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 
 export default function DashboardScreen() {
+  const router = useRouter();
   const userName = useAppStore((s) => s.userProfile.name);
   const streak = useAppStore((s) => s.streak.current);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
@@ -608,24 +610,24 @@ export default function DashboardScreen() {
               <QuickAction
                 icon={<Scan size={22} color={Colors.green} />}
                 label="Scan Item"
-                onPress={() => {}}
+                onPress={() => router.push('/barcode-scanner')}
               />
               <QuickAction
                 icon={<Plus size={22} color={Colors.green} />}
                 label="Log Meal"
-                onPress={() => {}}
+                onPress={() => router.push('/(tabs)/meals')}
               />
             </View>
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <QuickAction
                 icon={<Activity size={22} color={Colors.green} />}
                 label="Add Weight"
-                onPress={() => {}}
+                onPress={() => router.push('/(tabs)/health')}
               />
               <QuickAction
                 icon={<ChefHat size={22} color={Colors.green} />}
                 label="Cook Something"
-                onPress={() => {}}
+                onPress={() => router.push('/(tabs)/recipes')}
               />
             </View>
           </View>
