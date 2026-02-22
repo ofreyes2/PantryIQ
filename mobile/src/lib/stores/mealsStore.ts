@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { usePantryStore } from './pantryStore';
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
 
@@ -188,16 +189,18 @@ export const useMealsStore = create<MealsState>()(
         { date: yesterdayStr, glasses: 8 },
       ],
 
-      addEntry: (entry) =>
+      addEntry: (entry) => {
         set((state) => ({
           entries: [
             ...state.entries,
-            {
-              ...entry,
-              id: generateId(),
-            },
+            { ...entry, id: generateId() },
           ],
-        })),
+        }));
+        // Deduct from pantry inventory if linked to a pantry item
+        if (entry.pantryItemId) {
+          usePantryStore.getState().deductServings(entry.pantryItemId, entry.servings);
+        }
+      },
 
       updateEntry: (id, updates) =>
         set((state) => ({
@@ -206,10 +209,25 @@ export const useMealsStore = create<MealsState>()(
           ),
         })),
 
-      deleteEntry: (id) =>
+      deleteEntry: (id) => {
+        // Find the entry before deleting to potentially restore inventory
+        const entry = get().entries.find((e) => e.id === id);
         set((state) => ({
           entries: state.entries.filter((e) => e.id !== id),
-        })),
+        }));
+        // Re-stock pantry if the entry was linked (restore the servings)
+        if (entry?.pantryItemId) {
+          const pantryStore = usePantryStore.getState();
+          const pantryItem = pantryStore.items.find((i) => i.id === entry.pantryItemId);
+          if (pantryItem) {
+            const spc = pantryItem.servingsPerContainer && pantryItem.servingsPerContainer > 0 ? pantryItem.servingsPerContainer : 1;
+            const restoration = entry.servings / spc;
+            pantryStore.updateItem(entry.pantryItemId, {
+              quantity: Math.round((pantryItem.quantity + restoration) * 1000) / 1000,
+            });
+          }
+        }
+      },
 
       getEntriesForDate: (date: string) => {
         return get().entries.filter((e) => e.date === date);

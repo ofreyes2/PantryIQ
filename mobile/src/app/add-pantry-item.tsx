@@ -25,7 +25,7 @@ import {
   Check,
   Scan,
 } from 'lucide-react-native';
-import { usePantryStore, PantryCategory, PantryUnit } from '@/lib/stores/pantryStore';
+import { usePantryStore, PantryCategory, PantryUnit, InventoryUnit, ServingUnit } from '@/lib/stores/pantryStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 
 const CATEGORIES: PantryCategory[] = [
@@ -34,6 +34,8 @@ const CATEGORIES: PantryCategory[] = [
 ];
 
 const UNITS: PantryUnit[] = ['oz', 'lbs', 'count', 'cups', 'g', 'kg', 'ml', 'L'];
+const INVENTORY_UNITS: InventoryUnit[] = ['loaf', 'dozen', 'package', 'bag', 'bottle', 'can', 'box', 'lb', 'oz', 'count', 'other'];
+const SERVING_UNITS: ServingUnit[] = ['slice', 'egg', 'strip', 'piece', 'cup', 'oz', 'tbsp', 'g', 'serving'];
 
 function SectionLabel({ title }: { title: string }) {
   return (
@@ -255,6 +257,9 @@ export default function AddPantryItemScreen() {
     barcode?: string;
     photoUri?: string;
     returnTo?: string;
+    inventoryUnit?: string;
+    servingUnit?: string;
+    servingsPerContainer?: string;
   }>();
 
   const addItem = usePantryStore((s) => s.addItem);
@@ -269,6 +274,9 @@ export default function AddPantryItemScreen() {
   );
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<PantryUnit>('count');
+  const [inventoryUnit, setInventoryUnit] = useState<InventoryUnit>((params.inventoryUnit as InventoryUnit) ?? 'count');
+  const [servingUnit, setServingUnit] = useState<ServingUnit>((params.servingUnit as ServingUnit) ?? 'serving');
+  const [servingsPerContainer, setServingsPerContainer] = useState(params.servingsPerContainer ?? '1');
   const [calories, setCalories] = useState(params.caloriesPerServing ?? '');
   const [carbs, setCarbs] = useState(params.carbsPerServing ?? '');
   const [protein, setProtein] = useState(params.proteinPerServing ?? '');
@@ -327,6 +335,9 @@ export default function AddPantryItemScreen() {
       category,
       quantity: Number(quantity),
       unit,
+      inventoryUnit,
+      servingUnit,
+      servingsPerContainer: Number(servingsPerContainer) || 1,
       lowStockThreshold,
       caloriesPerServing: Number(calories) || 0,
       carbsPerServing: Number(carbs) || 0,
@@ -561,26 +572,71 @@ export default function AddPantryItemScreen() {
               onSelect={(v) => setCategory(v as PantryCategory)}
             />
 
-            {/* Quantity */}
-            <SectionLabel title="Quantity" />
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ flex: 1 }}>
-                <InputField
-                  label="Amount"
-                  value={quantity}
-                  onChangeText={setQuantity}
-                  placeholder="1"
-                  keyboardType="decimal-pad"
-                  required
-                />
+            {/* Quantity & Inventory Unit */}
+            <SectionLabel title="What Are You Adding?" />
+            <View style={{ backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border, padding: 14, marginBottom: 12 }}>
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 13, color: Colors.textSecondary, marginBottom: 10 }}>
+                How many are you adding to your pantry?
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <InputField
+                    label="Quantity"
+                    value={quantity}
+                    onChangeText={setQuantity}
+                    placeholder="1"
+                    keyboardType="decimal-pad"
+                    required
+                  />
+                  {errors.quantity ? (
+                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.error, marginTop: -8, marginBottom: 8 }}>
+                      {errors.quantity}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={{ width: 120 }}>
+                  <PickerRow
+                    label="Inventory Unit"
+                    options={INVENTORY_UNITS}
+                    value={inventoryUnit}
+                    onSelect={(v) => setInventoryUnit(v as InventoryUnit)}
+                  />
+                </View>
               </View>
-              <View style={{ width: 110 }}>
-                <PickerRow
-                  label="Unit"
-                  options={UNITS}
-                  value={unit}
-                  onSelect={(v) => setUnit(v as PantryUnit)}
-                />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, flex: 1 }}>
+                  Servings per {inventoryUnit}:
+                </Text>
+                <View style={{ width: 80 }}>
+                  <InputField
+                    label=""
+                    value={servingsPerContainer}
+                    onChangeText={setServingsPerContainer}
+                    placeholder="1"
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+            </View>
+
+            {/* Serving Unit */}
+            <SectionLabel title="Serving Unit (for meal logging)" />
+            <View style={{ backgroundColor: Colors.surface, borderRadius: BorderRadius.lg, borderWidth: 1, borderColor: Colors.border, padding: 14, marginBottom: 12 }}>
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, marginBottom: 10 }}>
+                How will you measure a serving when logging meals?
+              </Text>
+              <PickerRow
+                label="Serving Unit"
+                options={SERVING_UNITS}
+                value={servingUnit}
+                onSelect={(v) => setServingUnit(v as ServingUnit)}
+              />
+
+              {/* Low Stock threshold uses inventory unit */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, padding: 10, backgroundColor: 'rgba(46,204,113,0.08)', borderRadius: BorderRadius.md, borderWidth: 1, borderColor: 'rgba(46,204,113,0.15)' }}>
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.green, flex: 1 }}>
+                  Alert when below {lowStockThreshold} {inventoryUnit}{lowStockThreshold !== 1 ? 's' : ''}
+                </Text>
               </View>
             </View>
 

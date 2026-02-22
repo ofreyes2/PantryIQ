@@ -67,3 +67,15 @@ mobile/src/
 - Open Food Facts — free, no key
 - USDA FoodData Central — user enters key in Settings
 - Claude API (claude-sonnet-4-6) — user enters key in Settings
+
+## Dual Unit Inventory System
+
+PantryIQ uses a dual unit system that separates how items are stored/tracked (inventory unit) from how they are consumed (serving unit).
+
+- **Inventory Unit**: How you buy and store the item (loaf, dozen, package, bag, bottle, can, box, lb, oz, count, other). Used for replenishment tracking.
+- **Serving Unit**: How you consume the item per meal (slice, egg, strip, piece, cup, oz, tbsp, g, serving). Comes from the nutrition label.
+- **Servings Per Container**: How many serving units fit in one inventory unit (e.g., 18 slices per loaf).
+
+When logging a meal, servings are deducted proportionally from inventory (e.g., 2 slices from a loaf with 18 slices = 2/18 inventory deduction).
+
+Smart unit detection in the barcode scanner automatically suggests the right units based on product name and serving size patterns.

@@ -16,6 +16,30 @@ export type PantryCategory =
 
 export type PantryUnit = 'oz' | 'lbs' | 'count' | 'cups' | 'g' | 'kg' | 'ml' | 'L';
 
+export type InventoryUnit =
+  | 'loaf'
+  | 'dozen'
+  | 'package'
+  | 'bag'
+  | 'bottle'
+  | 'can'
+  | 'box'
+  | 'lb'
+  | 'oz'
+  | 'count'
+  | 'other';
+
+export type ServingUnit =
+  | 'slice'
+  | 'egg'
+  | 'strip'
+  | 'piece'
+  | 'cup'
+  | 'oz'
+  | 'tbsp'
+  | 'g'
+  | 'serving';
+
 export interface PantryItem {
   id: string;
   name: string;
@@ -23,6 +47,9 @@ export interface PantryItem {
   category: PantryCategory;
   quantity: number;
   unit: PantryUnit;
+  inventoryUnit: InventoryUnit;
+  servingUnit: ServingUnit;
+  servingsPerContainer: number;
   lowStockThreshold: number;
   caloriesPerServing: number;
   carbsPerServing: number;
@@ -47,6 +74,7 @@ interface PantryState {
   updateItem: (id: string, updates: Partial<PantryItem>) => void;
   deleteItem: (id: string) => void;
   restockItem: (id: string, quantity: number) => void;
+  deductServings: (id: string, servings: number) => void;
   getLowStockItems: () => PantryItem[];
   getItemsByCategory: (cat: string) => PantryItem[];
 }
@@ -60,7 +88,10 @@ const seedItems: PantryItem[] = [
     brand: 'Organic Valley',
     category: 'Proteins',
     quantity: 2,
-    unit: 'lbs',
+    unit: 'count',
+    inventoryUnit: 'lb',
+    servingUnit: 'oz',
+    servingsPerContainer: 4,
     lowStockThreshold: 3,
     caloriesPerServing: 165,
     carbsPerServing: 0,
@@ -76,10 +107,13 @@ const seedItems: PantryItem[] = [
   {
     id: 'seed-2',
     name: 'Large Eggs',
-    brand: 'Pete and Gerry\'s',
+    brand: "Pete and Gerry's",
     category: 'Dairy',
     quantity: 12,
     unit: 'count',
+    inventoryUnit: 'dozen',
+    servingUnit: 'egg',
+    servingsPerContainer: 12,
     lowStockThreshold: 4,
     caloriesPerServing: 70,
     carbsPerServing: 0,
@@ -99,7 +133,10 @@ const seedItems: PantryItem[] = [
     brand: undefined,
     category: 'Vegetables',
     quantity: 1,
-    unit: 'oz',
+    unit: 'count',
+    inventoryUnit: 'bag',
+    servingUnit: 'cup',
+    servingsPerContainer: 6,
     lowStockThreshold: 3,
     caloriesPerServing: 7,
     carbsPerServing: 1,
@@ -118,8 +155,11 @@ const seedItems: PantryItem[] = [
     name: 'Cheddar Cheese',
     brand: 'Tillamook',
     category: 'Dairy',
-    quantity: 8,
-    unit: 'oz',
+    quantity: 1,
+    unit: 'count',
+    inventoryUnit: 'bag',
+    servingUnit: 'oz',
+    servingsPerContainer: 8,
     lowStockThreshold: 2,
     caloriesPerServing: 110,
     carbsPerServing: 0,
@@ -138,8 +178,11 @@ const seedItems: PantryItem[] = [
     name: 'Raw Almonds',
     brand: 'Blue Diamond',
     category: 'Snacks',
-    quantity: 12,
-    unit: 'oz',
+    quantity: 1,
+    unit: 'count',
+    inventoryUnit: 'bag',
+    servingUnit: 'oz',
+    servingsPerContainer: 12,
     lowStockThreshold: 4,
     caloriesPerServing: 160,
     carbsPerServing: 6,
@@ -157,8 +200,11 @@ const seedItems: PantryItem[] = [
     name: 'Extra Virgin Olive Oil',
     brand: 'California Olive Ranch',
     category: 'Condiments',
-    quantity: 16,
-    unit: 'oz',
+    quantity: 1,
+    unit: 'count',
+    inventoryUnit: 'bottle',
+    servingUnit: 'tbsp',
+    servingsPerContainer: 32,
     lowStockThreshold: 4,
     caloriesPerServing: 120,
     carbsPerServing: 0,
@@ -174,10 +220,13 @@ const seedItems: PantryItem[] = [
   {
     id: 'seed-7',
     name: 'Almond Flour',
-    brand: 'Bob\'s Red Mill',
+    brand: "Bob's Red Mill",
     category: 'Pantry Staples',
-    quantity: 32,
-    unit: 'oz',
+    quantity: 1,
+    unit: 'count',
+    inventoryUnit: 'bag',
+    servingUnit: 'cup',
+    servingsPerContainer: 15,
     lowStockThreshold: 8,
     caloriesPerServing: 160,
     carbsPerServing: 6,
@@ -197,6 +246,9 @@ const seedItems: PantryItem[] = [
     category: 'Dairy',
     quantity: 2,
     unit: 'count',
+    inventoryUnit: 'count',
+    servingUnit: 'serving',
+    servingsPerContainer: 1,
     lowStockThreshold: 3,
     caloriesPerServing: 90,
     carbsPerServing: 6,
@@ -260,6 +312,21 @@ export const usePantryStore = create<PantryState>()(
                 }
               : item
           ),
+        })),
+
+      deductServings: (id, servings) =>
+        set((state) => ({
+          items: state.items.map((item) => {
+            if (item.id !== id) return item;
+            const spc = item.servingsPerContainer && item.servingsPerContainer > 0 ? item.servingsPerContainer : 1;
+            const deduction = servings / spc;
+            const newQty = Math.max(0, item.quantity - deduction);
+            return {
+              ...item,
+              quantity: Math.round(newQty * 1000) / 1000,
+              lastUpdated: new Date().toISOString(),
+            };
+          }),
         })),
 
       getLowStockItems: () => {

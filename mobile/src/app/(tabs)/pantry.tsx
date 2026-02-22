@@ -302,9 +302,14 @@ function PantryItemCard({
                   {item.quantity}
                 </Text>
                 <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary }}>
-                  {item.unit}
+                  {item.inventoryUnit ?? item.unit}
                 </Text>
               </View>
+              {item.servingsPerContainer && item.servingsPerContainer > 1 ? (
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.textTertiary, marginTop: 2 }}>
+                  {item.quantity * item.servingsPerContainer} {item.servingUnit ?? 'serving'}s remaining
+                </Text>
+              ) : null}
 
               {/* Location chip in list view */}
               {showLocation ? (

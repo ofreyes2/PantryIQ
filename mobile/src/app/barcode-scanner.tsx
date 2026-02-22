@@ -10,6 +10,7 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -96,17 +97,84 @@ interface ProductData {
 interface ProductSheetProps {
   product: ProductData;
   visible: boolean;
-  onAddToPantry: (product: ProductData, quantity: number, unit: string) => void;
+  onAddToPantry: (product: ProductData, quantity: number, inventoryUnit: InventoryUnit, servingUnit: ServingUnit, servingsPerContainer: number) => void;
   onScanAnother: () => void;
 }
 
-const UNITS = ['count', 'oz', 'lbs', 'g', 'kg', 'cups', 'ml', 'L'];
+// ─── Smart Unit Detection ─────────────────────────────────────────────────────
+
+type InventoryUnit = 'loaf' | 'dozen' | 'package' | 'bag' | 'bottle' | 'can' | 'box' | 'lb' | 'oz' | 'count' | 'other';
+type ServingUnit = 'slice' | 'egg' | 'strip' | 'piece' | 'cup' | 'oz' | 'tbsp' | 'g' | 'serving';
+
+interface SmartUnits {
+  inventoryUnit: InventoryUnit;
+  servingUnit: ServingUnit;
+  inventoryLabel: string; // human label for quantity question: "How many loaves?"
+}
+
+function detectSmartUnits(productName: string, servingSize: string): SmartUnits {
+  const name = productName.toLowerCase();
+  const serving = servingSize.toLowerCase();
+
+  if (/bread|loaf|loaves/.test(name)) {
+    return { inventoryUnit: 'loaf', servingUnit: 'slice', inventoryLabel: 'How many loaves are you adding?' };
+  }
+  if (/egg/.test(name)) {
+    return { inventoryUnit: 'dozen', servingUnit: 'egg', inventoryLabel: 'How many dozens are you adding?' };
+  }
+  if (/bacon|turkey bacon|ham|deli/.test(name)) {
+    return { inventoryUnit: 'package', servingUnit: 'strip', inventoryLabel: 'How many packages are you adding?' };
+  }
+  if (/shredded cheese|cheese block|cheese bag|parmesan/.test(name)) {
+    return { inventoryUnit: 'bag', servingUnit: 'oz', inventoryLabel: 'How many bags are you adding?' };
+  }
+  if (/ground beef|ground turkey|chicken|meat/.test(name) && !/nugget|strip/.test(name)) {
+    return { inventoryUnit: 'lb', servingUnit: 'oz', inventoryLabel: 'How many lbs are you adding?' };
+  }
+  if (/canned|can /.test(name) || /\bcan\b/.test(name)) {
+    return { inventoryUnit: 'can', servingUnit: 'oz', inventoryLabel: 'How many cans are you adding?' };
+  }
+  if (/bottle|sauce|oil|dressing|vinegar|syrup/.test(name)) {
+    return { inventoryUnit: 'bottle', servingUnit: 'tbsp', inventoryLabel: 'How many bottles are you adding?' };
+  }
+  if (/box|cereal|pasta|crackers|granola/.test(name)) {
+    return { inventoryUnit: 'box', servingUnit: 'cup', inventoryLabel: 'How many boxes are you adding?' };
+  }
+  if (/bag|chips|nuts|almond|walnut|popcorn/.test(name)) {
+    return { inventoryUnit: 'bag', servingUnit: 'oz', inventoryLabel: 'How many bags are you adding?' };
+  }
+
+  // Try to detect from serving size
+  if (/slice/.test(serving)) return { inventoryUnit: 'loaf', servingUnit: 'slice', inventoryLabel: 'How many loaves are you adding?' };
+  if (/egg/.test(serving)) return { inventoryUnit: 'dozen', servingUnit: 'egg', inventoryLabel: 'How many dozens are you adding?' };
+  if (/tbsp|tablespoon/.test(serving)) return { inventoryUnit: 'bottle', servingUnit: 'tbsp', inventoryLabel: 'How many bottles are you adding?' };
+
+  return { inventoryUnit: 'count', servingUnit: 'serving', inventoryLabel: 'How many are you adding?' };
+}
+
+const INVENTORY_UNITS: InventoryUnit[] = ['loaf', 'dozen', 'package', 'bag', 'bottle', 'can', 'box', 'lb', 'oz', 'count', 'other'];
+const SERVING_UNITS: ServingUnit[] = ['slice', 'egg', 'strip', 'piece', 'cup', 'oz', 'tbsp', 'g', 'serving'];
 
 function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: ProductSheetProps) {
+  const smartUnits = detectSmartUnits(product?.name ?? '', product?.servingSize ?? '');
   const [quantity, setQuantity] = useState(1);
-  const [unit, setUnit] = useState('count');
-  const [showUnitPicker, setShowUnitPicker] = useState(false);
+  const [inventoryUnit, setInventoryUnit] = useState<InventoryUnit>(smartUnits.inventoryUnit);
+  const [servingUnit, setServingUnit] = useState<ServingUnit>(smartUnits.servingUnit);
+  const [servingsPerContainer, setServingsPerContainer] = useState('1');
+  const [showInventoryUnitPicker, setShowInventoryUnitPicker] = useState(false);
+  const [showServingUnitPicker, setShowServingUnitPicker] = useState(false);
   const translateY = useSharedValue(SCREEN_HEIGHT);
+
+  // Reset units whenever a new product appears
+  useEffect(() => {
+    if (product) {
+      const detected = detectSmartUnits(product.name, product.servingSize ?? '');
+      setInventoryUnit(detected.inventoryUnit);
+      setServingUnit(detected.servingUnit);
+      setQuantity(1);
+      setServingsPerContainer('1');
+    }
+  }, [product?.name]);
 
   useEffect(() => {
     if (visible) {
@@ -120,16 +188,16 @@ function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: Produc
     transform: [{ translateY: translateY.value }],
   }));
 
-  if (!visible) return null;
+  if (!visible || !product) return null;
+
+  const detectedUnits = detectSmartUnits(product.name, product.servingSize ?? '');
+  const remainingServings = quantity * (Number(servingsPerContainer) || 1);
 
   return (
     <View
       style={{
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.7)',
         justifyContent: 'flex-end',
       }}
@@ -141,7 +209,7 @@ function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: Produc
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
             overflow: 'hidden',
-            maxHeight: SCREEN_HEIGHT * 0.85,
+            maxHeight: SCREEN_HEIGHT * 0.92,
           },
           sheetStyle,
         ]}
@@ -156,74 +224,40 @@ function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: Produc
           {product.photoUri ? (
             <Image
               source={{ uri: product.photoUri }}
-              style={{ width: '100%', height: 180, resizeMode: 'cover' }}
+              style={{ width: '100%', height: 160, resizeMode: 'cover' }}
             />
           ) : (
             <View
               style={{
-                width: '100%',
-                height: 120,
+                width: '100%', height: 80,
                 backgroundColor: Colors.surface,
-                alignItems: 'center',
-                justifyContent: 'center',
+                alignItems: 'center', justifyContent: 'center',
               }}
             >
-              <Scan size={48} color={Colors.textTertiary} />
+              <Scan size={36} color={Colors.textTertiary} />
             </View>
           )}
 
-          <View style={{ padding: 24 }}>
-            {/* Product info */}
-            <View style={{ marginBottom: 16 }}>
+          <View style={{ padding: 20 }}>
+            {/* Product name + brand */}
+            <View style={{ marginBottom: 12 }}>
               {product.brand ? (
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_500Medium',
-                    fontSize: 13,
-                    color: Colors.green,
-                    marginBottom: 4,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.8,
-                  }}
-                >
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.green, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.8 }}>
                   {product.brand}
                 </Text>
               ) : null}
-              <Text
-                style={{
-                  fontFamily: 'PlayfairDisplay_700Bold',
-                  fontSize: 22,
-                  color: Colors.textPrimary,
-                  lineHeight: 28,
-                  marginBottom: 8,
-                }}
-              >
+              <Text style={{ fontFamily: 'PlayfairDisplay_700Bold', fontSize: 20, color: Colors.textPrimary, lineHeight: 26, marginBottom: 4 }}>
                 {product.name || 'Unknown Product'}
               </Text>
               {product.servingSize ? (
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 13,
-                    color: Colors.textSecondary,
-                  }}
-                >
-                  Per serving: {product.servingSize}
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                  Serving size: {product.servingSize}
                 </Text>
               ) : null}
             </View>
 
             {/* Nutrition row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                backgroundColor: Colors.surface,
-                borderRadius: BorderRadius.lg,
-                padding: 16,
-                marginBottom: 20,
-                gap: 0,
-              }}
-            >
+            <View style={{ flexDirection: 'row', backgroundColor: Colors.surface, borderRadius: 12, padding: 12, marginBottom: 16 }}>
               {[
                 { label: 'Cal', value: Math.round(product.caloriesPerServing) },
                 { label: 'Carbs', value: `${Math.round(product.carbsPerServing)}g` },
@@ -233,208 +267,147 @@ function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: Produc
                 <View
                   key={item.label}
                   style={{
-                    flex: 1,
-                    alignItems: 'center',
+                    flex: 1, alignItems: 'center',
                     borderRightWidth: i < arr.length - 1 ? 1 : 0,
                     borderRightColor: Colors.border,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_700Bold',
-                      fontSize: 18,
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {item.value}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_400Regular',
-                      fontSize: 11,
-                      color: Colors.textSecondary,
-                      marginTop: 2,
-                    }}
-                  >
-                    {item.label}
-                  </Text>
+                  <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.textPrimary }}>{item.value}</Text>
+                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: Colors.textSecondary, marginTop: 1 }}>{item.label}</Text>
                 </View>
               ))}
             </View>
 
-            {/* Quantity picker */}
-            <Text
-              style={{
-                fontFamily: 'DMSans_500Medium',
-                fontSize: 14,
-                color: Colors.textSecondary,
-                marginBottom: 10,
-              }}
-            >
-              Quantity to add
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setQuantity(Math.max(1, quantity - 1));
-                }}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: Colors.surface,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Minus size={18} color={Colors.textPrimary} />
-              </Pressable>
-              <Text
-                style={{
-                  fontFamily: 'DMSans_700Bold',
-                  fontSize: 22,
-                  color: Colors.textPrimary,
-                  minWidth: 36,
-                  textAlign: 'center',
-                }}
-              >
-                {quantity}
+            {/* SECTION 1: Inventory (how you buy it) */}
+            <View style={{ backgroundColor: Colors.navyCard, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 12, color: Colors.green, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 12 }}>
+                Adding to Pantry
               </Text>
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setQuantity(quantity + 1);
-                }}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  backgroundColor: Colors.surface,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Plus size={18} color={Colors.textPrimary} />
-              </Pressable>
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 13, color: Colors.textSecondary, marginBottom: 10 }}>
+                {detectedUnits.inventoryLabel}
+              </Text>
 
-              {/* Unit picker */}
-              <Pressable
-                onPress={() => setShowUnitPicker(!showUnitPicker)}
-                style={{
-                  flex: 1,
-                  height: 44,
-                  backgroundColor: Colors.surface,
-                  borderRadius: BorderRadius.md,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 14,
-                }}
-              >
-                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 15, color: Colors.textPrimary }}>
-                  {unit}
+              {/* Quantity + Inventory Unit row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                {/* Minus */}
+                <Pressable
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setQuantity(Math.max(1, quantity - 1)); }}
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Minus size={16} color={Colors.textPrimary} />
+                </Pressable>
+
+                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 24, color: Colors.textPrimary, minWidth: 32, textAlign: 'center' }}>
+                  {quantity}
                 </Text>
-                <ChevronDown size={16} color={Colors.textSecondary} />
-              </Pressable>
+
+                {/* Plus */}
+                <Pressable
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setQuantity(quantity + 1); }}
+                  style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Plus size={16} color={Colors.textPrimary} />
+                </Pressable>
+
+                {/* Inventory Unit Picker */}
+                <Pressable
+                  onPress={() => { setShowInventoryUnitPicker(!showInventoryUnitPicker); setShowServingUnitPicker(false); }}
+                  style={{ flex: 1, height: 40, backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: showInventoryUnitPicker ? Colors.green : Colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12 }}
+                >
+                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 15, color: Colors.textPrimary }}>{inventoryUnit}</Text>
+                  <ChevronDown size={14} color={Colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              {showInventoryUnitPicker ? (
+                <View style={{ backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, overflow: 'hidden' }}>
+                  {INVENTORY_UNITS.map((u) => (
+                    <Pressable
+                      key={u}
+                      onPress={() => { setInventoryUnit(u); setShowInventoryUnitPicker(false); }}
+                      style={{ paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: u === inventoryUnit ? 'rgba(46,204,113,0.1)' : 'transparent' }}
+                    >
+                      <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: u === inventoryUnit ? Colors.green : Colors.textPrimary }}>{u}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Servings per container */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, flex: 1 }}>
+                  Servings per {inventoryUnit}:
+                </Text>
+                <View style={{ backgroundColor: Colors.surface, borderRadius: 8, borderWidth: 1, borderColor: Colors.border, width: 70, height: 36, justifyContent: 'center', alignItems: 'center' }}>
+                  <TextInput
+                    value={servingsPerContainer}
+                    onChangeText={setServingsPerContainer}
+                    keyboardType="numeric"
+                    style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary, textAlign: 'center', width: '100%' }}
+                    placeholderTextColor={Colors.textTertiary}
+                    placeholder="1"
+                  />
+                </View>
+              </View>
             </View>
 
-            {/* Unit picker dropdown */}
-            {showUnitPicker ? (
-              <View
-                style={{
-                  backgroundColor: Colors.surface,
-                  borderRadius: BorderRadius.lg,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  marginBottom: 20,
-                  overflow: 'hidden',
-                }}
-              >
-                {UNITS.map((u) => (
-                  <Pressable
-                    key={u}
-                    onPress={() => {
-                      setUnit(u);
-                      setShowUnitPicker(false);
-                    }}
-                    style={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      borderBottomWidth: 1,
-                      borderBottomColor: Colors.border,
-                      backgroundColor: u === unit ? Colors.greenMuted : 'transparent',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: 'DMSans_500Medium',
-                        fontSize: 15,
-                        color: u === unit ? Colors.green : Colors.textPrimary,
-                      }}
-                    >
-                      {u}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-            ) : null}
+            {/* SECTION 2: Serving info */}
+            <View style={{ backgroundColor: Colors.navyCard, borderRadius: 14, borderWidth: 1, borderColor: Colors.border, padding: 16, marginBottom: 12 }}>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 12, color: Colors.amber, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+                Serving Unit (for meal logging)
+              </Text>
 
-            {/* Action buttons */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, flex: 1 }}>
+                  Deduct per serving:
+                </Text>
+                <Pressable
+                  onPress={() => { setShowServingUnitPicker(!showServingUnitPicker); setShowInventoryUnitPicker(false); }}
+                  style={{ height: 36, backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: showServingUnitPicker ? Colors.amber : Colors.border, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 6, minWidth: 110 }}
+                >
+                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: Colors.textPrimary }}>{servingUnit}</Text>
+                  <ChevronDown size={13} color={Colors.textSecondary} />
+                </Pressable>
+              </View>
+
+              {showServingUnitPicker ? (
+                <View style={{ backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 8, overflow: 'hidden' }}>
+                  {SERVING_UNITS.map((u) => (
+                    <Pressable
+                      key={u}
+                      onPress={() => { setServingUnit(u); setShowServingUnitPicker(false); }}
+                      style={{ paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 1, borderBottomColor: Colors.border, backgroundColor: u === servingUnit ? 'rgba(243,156,18,0.1)' : 'transparent' }}
+                    >
+                      <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: u === servingUnit ? Colors.amber : Colors.textPrimary }}>{u}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+
+              {/* Inventory preview */}
+              <View style={{ backgroundColor: 'rgba(46,204,113,0.08)', borderRadius: 10, padding: 12, marginTop: 4, borderWidth: 1, borderColor: 'rgba(46,204,113,0.2)' }}>
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.green, textAlign: 'center' }}>
+                  {quantity} {inventoryUnit}{quantity > 1 ? 's' : ''} • {remainingServings} {servingUnit}s total
+                </Text>
+              </View>
+            </View>
+
+            {/* Add button */}
             <Pressable
               onPress={() => {
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                onAddToPantry(product, quantity, unit);
+                onAddToPantry(product, quantity, inventoryUnit, servingUnit, Number(servingsPerContainer) || 1);
               }}
-              style={{
-                backgroundColor: Colors.green,
-                borderRadius: BorderRadius.lg,
-                paddingVertical: 16,
-                alignItems: 'center',
-                marginBottom: 12,
-              }}
+              style={{ backgroundColor: Colors.green, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginBottom: 10 }}
             >
-              <Text
-                style={{
-                  fontFamily: 'DMSans_700Bold',
-                  fontSize: 17,
-                  color: '#fff',
-                }}
-              >
-                Add to Pantry
-              </Text>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 17, color: '#fff' }}>Add to Pantry</Text>
             </Pressable>
 
             <Pressable
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                onScanAnother();
-              }}
-              style={{
-                backgroundColor: Colors.navyCard,
-                borderRadius: BorderRadius.lg,
-                paddingVertical: 16,
-                alignItems: 'center',
-                borderWidth: 1,
-                borderColor: Colors.border,
-                marginBottom: 8,
-              }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onScanAnother(); }}
+              style={{ backgroundColor: Colors.navyCard, borderRadius: 14, paddingVertical: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.border, marginBottom: 8 }}
             >
-              <Text
-                style={{
-                  fontFamily: 'DMSans_700Bold',
-                  fontSize: 17,
-                  color: Colors.textPrimary,
-                }}
-              >
-                Scan Another
-              </Text>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 17, color: Colors.textPrimary }}>Scan Another</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -949,13 +922,16 @@ If you cannot identify it, respond with: {"identified": false}`;
     }
   };
 
-  const handleAddToPantry = (product: ProductData, quantity: number, unit: string) => {
+  const handleAddToPantry = (product: ProductData, quantity: number, inventoryUnit: import('@/lib/stores/pantryStore').InventoryUnit, servingUnit: import('@/lib/stores/pantryStore').ServingUnit, servingsPerContainer: number) => {
     addItem({
       name: product.name,
       brand: product.brand,
       category: 'Other',
       quantity,
-      unit: unit as import('@/lib/stores/pantryStore').PantryUnit,
+      unit: 'count',
+      inventoryUnit,
+      servingUnit,
+      servingsPerContainer,
       lowStockThreshold: 1,
       caloriesPerServing: product.caloriesPerServing,
       carbsPerServing: product.carbsPerServing,
