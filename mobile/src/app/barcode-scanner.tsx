@@ -1,10 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   Pressable,
   ActivityIndicator,
   Linking,
+  Modal,
+  Image,
+  ScrollView,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -14,23 +19,42 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  withSpring,
+  runOnJS,
+  FadeIn,
+  FadeOut,
+  SlideInDown,
 } from 'react-native-reanimated';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import axios from 'axios';
-import { X, Scan } from 'lucide-react-native';
+import { X, Scan, CheckCircle, AlertCircle, Plus, Minus, ChevronDown } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
+import { useAppStore } from '@/lib/stores/appStore';
+import { usePantryStore } from '@/lib/stores/pantryStore';
 
-const CORNER_SIZE = 24;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CORNER_SIZE = 28;
 const VIEWFINDER = 260;
 
-function ViewfinderCorners({ pulse }: { pulse: number }) {
-  const color = Colors.green;
+// ─── Debug Log ───────────────────────────────────────────────────────────────
+
+interface DebugEntry {
+  api: string;
+  barcode: string;
+  status: number | string;
+  found: boolean;
+}
+
+// ─── Animated Viewfinder Corners ─────────────────────────────────────────────
+
+function ViewfinderCorners({ scanSuccess }: { scanSuccess: boolean }) {
+  const color = scanSuccess ? '#22C55E' : Colors.green;
   const corners = [
-    { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3 },
-    { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3 },
-    { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3 },
-    { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3 },
+    { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 4 },
+    { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 4 },
+    { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 4 },
+    { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 4 },
   ];
   return (
     <>
@@ -43,7 +67,6 @@ function ViewfinderCorners({ pulse }: { pulse: number }) {
               width: CORNER_SIZE,
               height: CORNER_SIZE,
               borderColor: color,
-              opacity: 0.5 + pulse * 0.5,
             },
             corner,
           ]}
@@ -53,92 +76,765 @@ function ViewfinderCorners({ pulse }: { pulse: number }) {
   );
 }
 
+// ─── Product Result Sheet ─────────────────────────────────────────────────────
+
+interface ProductData {
+  barcode: string;
+  name: string;
+  brand: string;
+  caloriesPerServing: number;
+  carbsPerServing: number;
+  proteinPerServing: number;
+  fatPerServing: number;
+  fiberPerServing: number;
+  sodiumPerServing: number;
+  servingSize: string;
+  photoUri: string;
+  category: string;
+}
+
+interface ProductSheetProps {
+  product: ProductData;
+  visible: boolean;
+  onAddToPantry: (product: ProductData, quantity: number, unit: string) => void;
+  onScanAnother: () => void;
+}
+
+const UNITS = ['count', 'oz', 'lbs', 'g', 'kg', 'cups', 'ml', 'L'];
+
+function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: ProductSheetProps) {
+  const [quantity, setQuantity] = useState(1);
+  const [unit, setUnit] = useState('count');
+  const [showUnitPicker, setShowUnitPicker] = useState(false);
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
+    } else {
+      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 });
+    }
+  }, [visible]);
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'flex-end',
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            backgroundColor: Colors.navy,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            overflow: 'hidden',
+            maxHeight: SCREEN_HEIGHT * 0.85,
+          },
+          sheetStyle,
+        ]}
+      >
+        {/* Handle */}
+        <View style={{ alignItems: 'center', paddingTop: 12, paddingBottom: 4 }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border }} />
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+          {/* Product Image */}
+          {product.photoUri ? (
+            <Image
+              source={{ uri: product.photoUri }}
+              style={{ width: '100%', height: 180, resizeMode: 'cover' }}
+            />
+          ) : (
+            <View
+              style={{
+                width: '100%',
+                height: 120,
+                backgroundColor: Colors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Scan size={48} color={Colors.textTertiary} />
+            </View>
+          )}
+
+          <View style={{ padding: 24 }}>
+            {/* Product info */}
+            <View style={{ marginBottom: 16 }}>
+              {product.brand ? (
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_500Medium',
+                    fontSize: 13,
+                    color: Colors.green,
+                    marginBottom: 4,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.8,
+                  }}
+                >
+                  {product.brand}
+                </Text>
+              ) : null}
+              <Text
+                style={{
+                  fontFamily: 'PlayfairDisplay_700Bold',
+                  fontSize: 22,
+                  color: Colors.textPrimary,
+                  lineHeight: 28,
+                  marginBottom: 8,
+                }}
+              >
+                {product.name || 'Unknown Product'}
+              </Text>
+              {product.servingSize ? (
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  Per serving: {product.servingSize}
+                </Text>
+              ) : null}
+            </View>
+
+            {/* Nutrition row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                backgroundColor: Colors.surface,
+                borderRadius: BorderRadius.lg,
+                padding: 16,
+                marginBottom: 20,
+                gap: 0,
+              }}
+            >
+              {[
+                { label: 'Cal', value: Math.round(product.caloriesPerServing) },
+                { label: 'Carbs', value: `${Math.round(product.carbsPerServing)}g` },
+                { label: 'Protein', value: `${Math.round(product.proteinPerServing)}g` },
+                { label: 'Fat', value: `${Math.round(product.fatPerServing)}g` },
+              ].map((item, i, arr) => (
+                <View
+                  key={item.label}
+                  style={{
+                    flex: 1,
+                    alignItems: 'center',
+                    borderRightWidth: i < arr.length - 1 ? 1 : 0,
+                    borderRightColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_700Bold',
+                      fontSize: 18,
+                      color: Colors.textPrimary,
+                    }}
+                  >
+                    {item.value}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_400Regular',
+                      fontSize: 11,
+                      color: Colors.textSecondary,
+                      marginTop: 2,
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Quantity picker */}
+            <Text
+              style={{
+                fontFamily: 'DMSans_500Medium',
+                fontSize: 14,
+                color: Colors.textSecondary,
+                marginBottom: 10,
+              }}
+            >
+              Quantity to add
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setQuantity(Math.max(1, quantity - 1));
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: Colors.surface,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Minus size={18} color={Colors.textPrimary} />
+              </Pressable>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 22,
+                  color: Colors.textPrimary,
+                  minWidth: 36,
+                  textAlign: 'center',
+                }}
+              >
+                {quantity}
+              </Text>
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setQuantity(quantity + 1);
+                }}
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: Colors.surface,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Plus size={18} color={Colors.textPrimary} />
+              </Pressable>
+
+              {/* Unit picker */}
+              <Pressable
+                onPress={() => setShowUnitPicker(!showUnitPicker)}
+                style={{
+                  flex: 1,
+                  height: 44,
+                  backgroundColor: Colors.surface,
+                  borderRadius: BorderRadius.md,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 14,
+                }}
+              >
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 15, color: Colors.textPrimary }}>
+                  {unit}
+                </Text>
+                <ChevronDown size={16} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Unit picker dropdown */}
+            {showUnitPicker ? (
+              <View
+                style={{
+                  backgroundColor: Colors.surface,
+                  borderRadius: BorderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  marginBottom: 20,
+                  overflow: 'hidden',
+                }}
+              >
+                {UNITS.map((u) => (
+                  <Pressable
+                    key={u}
+                    onPress={() => {
+                      setUnit(u);
+                      setShowUnitPicker(false);
+                    }}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderBottomWidth: 1,
+                      borderBottomColor: Colors.border,
+                      backgroundColor: u === unit ? Colors.greenMuted : 'transparent',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 15,
+                        color: u === unit ? Colors.green : Colors.textPrimary,
+                      }}
+                    >
+                      {u}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+
+            {/* Action buttons */}
+            <Pressable
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                onAddToPantry(product, quantity, unit);
+              }}
+              style={{
+                backgroundColor: Colors.green,
+                borderRadius: BorderRadius.lg,
+                paddingVertical: 16,
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 17,
+                  color: '#fff',
+                }}
+              >
+                Add to Pantry
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                onScanAnother();
+              }}
+              style={{
+                backgroundColor: Colors.navyCard,
+                borderRadius: BorderRadius.lg,
+                paddingVertical: 16,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: Colors.border,
+                marginBottom: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 17,
+                  color: Colors.textPrimary,
+                }}
+              >
+                Scan Another
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── Not Found Sheet ──────────────────────────────────────────────────────────
+
+function NotFoundSheet({
+  barcode,
+  visible,
+  onTryAgain,
+  onAddManually,
+}: {
+  barcode: string;
+  visible: boolean;
+  onTryAgain: () => void;
+  onAddManually: () => void;
+}) {
+  const translateY = useSharedValue(SCREEN_HEIGHT);
+
+  useEffect(() => {
+    if (visible) {
+      translateY.value = withSpring(0, { damping: 18, stiffness: 200 });
+    } else {
+      translateY.value = withTiming(SCREEN_HEIGHT, { duration: 250 });
+    }
+  }, [visible]);
+
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  if (!visible) return null;
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.7)',
+        justifyContent: 'flex-end',
+      }}
+    >
+      <Animated.View
+        style={[
+          {
+            backgroundColor: Colors.navy,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            padding: 24,
+          },
+          sheetStyle,
+        ]}
+      >
+        <View style={{ alignItems: 'center', paddingBottom: 8 }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, marginBottom: 20 }} />
+          <View
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              backgroundColor: 'rgba(239,68,68,0.15)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <AlertCircle size={36} color="#EF4444" />
+          </View>
+          <Text
+            style={{
+              fontFamily: 'PlayfairDisplay_700Bold',
+              fontSize: 22,
+              color: Colors.textPrimary,
+              marginBottom: 8,
+            }}
+          >
+            Product Not Found
+          </Text>
+          <Text
+            style={{
+              fontFamily: 'DMSans_400Regular',
+              fontSize: 15,
+              color: Colors.textSecondary,
+              textAlign: 'center',
+              lineHeight: 22,
+              marginBottom: 8,
+            }}
+          >
+            We couldn't find this barcode in our databases.
+          </Text>
+          {barcode ? (
+            <Text
+              style={{
+                fontFamily: 'DMSans_400Regular',
+                fontSize: 12,
+                color: Colors.textTertiary,
+                marginBottom: 24,
+              }}
+            >
+              Barcode: {barcode}
+            </Text>
+          ) : null}
+        </View>
+
+        <Pressable
+          onPress={onTryAgain}
+          style={{
+            backgroundColor: Colors.green,
+            borderRadius: BorderRadius.lg,
+            paddingVertical: 16,
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 17, color: '#fff' }}>
+            Try Again
+          </Text>
+        </Pressable>
+
+        <Pressable
+          onPress={onAddManually}
+          style={{
+            backgroundColor: Colors.navyCard,
+            borderRadius: BorderRadius.lg,
+            paddingVertical: 16,
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: Colors.border,
+            marginBottom: 16,
+          }}
+        >
+          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 17, color: Colors.textPrimary }}>
+            Add Manually
+          </Text>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
+// ─── Success Toast ────────────────────────────────────────────────────────────
+
+function SuccessToast({ message, visible }: { message: string; visible: boolean }) {
+  if (!visible) return null;
+  return (
+    <Animated.View
+      entering={FadeIn.duration(200)}
+      exiting={FadeOut.duration(300)}
+      style={{
+        position: 'absolute',
+        top: 60,
+        left: 16,
+        right: 16,
+        backgroundColor: '#16A34A',
+        borderRadius: BorderRadius.lg,
+        paddingVertical: 14,
+        paddingHorizontal: 18,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
+        zIndex: 999,
+      }}
+    >
+      <CheckCircle size={22} color="#fff" />
+      <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: '#fff', flex: 1 }}>
+        {message}
+      </Text>
+    </Animated.View>
+  );
+}
+
+// ─── Main Scanner Screen ──────────────────────────────────────────────────────
+
 export default function BarcodeScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [sessionCount, setSessionCount] = useState(0);
+  const [flashOverlay, setFlashOverlay] = useState<'none' | 'green' | 'red'>('none');
+  const [foundProduct, setFoundProduct] = useState<ProductData | null>(null);
+  const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<DebugEntry | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const lastScannedBarcode = useRef<string | null>(null);
+
+  const usdaApiKey = useAppStore((s) => s.userProfile.usdaApiKey);
+  const addItem = usePantryStore((s) => s.addItem);
 
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isRapidMode = mode === 'rapid';
 
   const pulseValue = useSharedValue(0);
+  const viewfinderScale = useSharedValue(1);
 
-  // Reset scanner state whenever this screen comes into focus
-  // This handles the case where the user returns from add-pantry-item
   useFocusEffect(
     useCallback(() => {
       setScanned(false);
       setLoading(false);
-      setErrorMsg(null);
+      setFoundProduct(null);
+      setNotFoundBarcode(null);
+      setFlashOverlay('none');
+      lastScannedBarcode.current = null;
     }, [])
   );
 
   useEffect(() => {
     pulseValue.value = withRepeat(
-      withSequence(withTiming(1, { duration: 800 }), withTiming(0, { duration: 800 })),
+      withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })),
       -1,
       false
     );
-  }, [pulseValue]);
+  }, []);
 
   const pulseStyle = useAnimatedStyle(() => ({
-    opacity: 0.4 + pulseValue.value * 0.6,
+    opacity: 0.5 + pulseValue.value * 0.5,
+    transform: [{ scale: 0.98 + pulseValue.value * 0.04 }],
   }));
+
+  const viewfinderStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: viewfinderScale.value }],
+  }));
+
+  // ─── API Lookup ───────────────────────────────────────────────────────────
+
+  const lookupOpenFoodFacts = async (barcode: string): Promise<ProductData | null> => {
+    try {
+      const url = `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`;
+      console.log('[Scanner] Fetching Open Food Facts:', url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      console.log('[Scanner] OFF response status:', data?.status, 'product:', data?.product?.product_name);
+
+      setDebugInfo({ api: 'Open Food Facts', barcode, status: res.status, found: data?.status === 1 });
+
+      if (data?.status !== 1 || !data?.product) return null;
+
+      const p = data.product;
+      const n = p.nutriments ?? {};
+
+      return {
+        barcode,
+        name: p.product_name ?? p.product_name_en ?? '',
+        brand: p.brands ?? '',
+        caloriesPerServing: Number(n['energy-kcal_serving'] ?? n['energy-kcal_100g'] ?? 0),
+        carbsPerServing: Number(n['carbohydrates_serving'] ?? n['carbohydrates_100g'] ?? 0),
+        proteinPerServing: Number(n['proteins_serving'] ?? n['proteins_100g'] ?? 0),
+        fatPerServing: Number(n['fat_serving'] ?? n['fat_100g'] ?? 0),
+        fiberPerServing: Number(n['fiber_serving'] ?? n['fiber_100g'] ?? 0),
+        sodiumPerServing: Number(n['sodium_serving'] ?? n['sodium_100g'] ?? 0),
+        servingSize: p.serving_size ?? '',
+        photoUri: p.image_url ?? p.image_front_url ?? '',
+        category: 'Other',
+      };
+    } catch (err) {
+      console.log('[Scanner] OFF error:', err);
+      setDebugInfo({ api: 'Open Food Facts', barcode, status: 'ERROR', found: false });
+      return null;
+    }
+  };
+
+  const lookupUSDA = async (barcode: string): Promise<ProductData | null> => {
+    try {
+      const key = usdaApiKey || 'DEMO_KEY';
+      const url = `https://api.nal.usda.gov/fdc/v1/foods/search?query=${barcode}&api_key=${key}&pageSize=1`;
+      console.log('[Scanner] Fetching USDA:', url);
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const data = await res.json();
+      console.log('[Scanner] USDA response totalHits:', data?.totalHits, 'first:', data?.foods?.[0]?.description);
+
+      setDebugInfo({ api: 'USDA FoodData Central', barcode, status: res.status, found: (data?.totalHits ?? 0) > 0 });
+
+      if (!data?.foods?.length) return null;
+
+      const food = data.foods[0];
+      const getNutrient = (id: number) =>
+        food.foodNutrients?.find((n: { nutrientId: number; value: number }) => n.nutrientId === id)?.value ?? 0;
+
+      return {
+        barcode,
+        name: food.description ?? '',
+        brand: food.brandOwner ?? food.brandName ?? '',
+        caloriesPerServing: getNutrient(1008),
+        carbsPerServing: getNutrient(1005),
+        proteinPerServing: getNutrient(1003),
+        fatPerServing: getNutrient(1004),
+        fiberPerServing: getNutrient(1079),
+        sodiumPerServing: getNutrient(1093),
+        servingSize: food.servingSize ? `${food.servingSize}${food.servingSizeUnit ?? ''}` : '',
+        photoUri: '',
+        category: 'Other',
+      };
+    } catch (err) {
+      console.log('[Scanner] USDA error:', err);
+      setDebugInfo({ api: 'USDA FoodData Central', barcode, status: 'ERROR', found: false });
+      return null;
+    }
+  };
 
   const handleBarcodeScan = async ({ data }: { data: string }) => {
     if (scanned || loading) return;
+    // Debounce same barcode
+    if (lastScannedBarcode.current === data) return;
+    lastScannedBarcode.current = data;
+
     setScanned(true);
     setLoading(true);
-    setErrorMsg(null);
+    setFoundProduct(null);
+    setNotFoundBarcode(null);
+    setDebugInfo(null);
+
+    // Haptic + green flash
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setFlashOverlay('green');
+    setTimeout(() => setFlashOverlay('none'), 300);
+
+    console.log('[Scanner] Barcode scanned:', data);
 
     try {
-      const response = await axios.get(
-        `https://world.openfoodfacts.org/api/v2/product/${data}.json`,
-        { validateStatus: (status) => status < 500 }
-      );
+      // Try both APIs in parallel, prefer OFF result
+      const [offResult, usdaResult] = await Promise.all([
+        lookupOpenFoodFacts(data),
+        lookupUSDA(data),
+      ]);
 
-      const product = response.data?.product;
-      if (!product || response.data?.status === 0) {
-        setErrorMsg('Product not found. You can add it manually.');
+      const product = offResult ?? usdaResult;
+
+      if (!product || !product.name) {
+        // Not found
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setFlashOverlay('red');
+        setTimeout(() => setFlashOverlay('none'), 400);
+        setNotFoundBarcode(data);
         setLoading(false);
-        setScanned(false);
         return;
       }
 
-      const nutriments = product.nutriments ?? {};
-      const params: Record<string, string> = {
-        barcode: data,
-        name: product.product_name ?? '',
-        brand: product.brands ?? '',
-        caloriesPerServing: String(
-          nutriments['energy-kcal_serving'] ?? nutriments['energy-kcal_100g'] ?? 0
-        ),
-        carbsPerServing: String(nutriments['carbohydrates_serving'] ?? nutriments['carbohydrates_100g'] ?? 0),
-        proteinPerServing: String(nutriments['proteins_serving'] ?? nutriments['proteins_100g'] ?? 0),
-        fatPerServing: String(nutriments['fat_serving'] ?? nutriments['fat_100g'] ?? 0),
-        servingSize: product.serving_size ?? '',
-        photoUri: product.image_url ?? '',
-        category: 'Other',
-      };
-
-      if (isRapidMode) {
-        params.returnTo = 'scanner';
-        setSessionCount((c) => c + 1);
-      }
-
+      console.log('[Scanner] Product found:', product.name, 'brand:', product.brand);
+      setFoundProduct(product);
       setLoading(false);
-      router.push({ pathname: '/add-pantry-item', params });
-      // Reset scanner after a short delay so it's ready when user returns
-      setTimeout(() => setScanned(false), 300);
-    } catch {
+    } catch (err) {
+      console.log('[Scanner] Lookup error:', err);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setFlashOverlay('red');
+      setTimeout(() => setFlashOverlay('none'), 400);
+      setNotFoundBarcode(data);
       setLoading(false);
-      setScanned(false);
-      setErrorMsg('Could not fetch product data. Try again or add manually.');
     }
   };
+
+  const handleAddToPantry = (product: ProductData, quantity: number, unit: string) => {
+    addItem({
+      name: product.name,
+      brand: product.brand,
+      category: 'Other',
+      quantity,
+      unit: unit as import('@/lib/stores/pantryStore').PantryUnit,
+      lowStockThreshold: 1,
+      caloriesPerServing: product.caloriesPerServing,
+      carbsPerServing: product.carbsPerServing,
+      proteinPerServing: product.proteinPerServing,
+      fatPerServing: product.fatPerServing,
+      servingSize: product.servingSize,
+      photoUri: product.photoUri || undefined,
+      barcode: product.barcode,
+    });
+
+    setSessionCount((c) => c + 1);
+    setFoundProduct(null);
+    setScanned(false);
+    lastScannedBarcode.current = null;
+
+    const toastMsg = `${product.name} added to pantry`;
+    setSuccessToast(toastMsg);
+    setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  const handleScanAnother = () => {
+    setFoundProduct(null);
+    setScanned(false);
+    lastScannedBarcode.current = null;
+  };
+
+  const handleClose = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.back();
+  };
+
+  // ─── Permission not yet loaded ──────────────────────────────────────────
 
   if (!permission) {
     return (
@@ -148,10 +844,12 @@ export default function BarcodeScannerScreen() {
     );
   }
 
+  // ─── Permission denied ──────────────────────────────────────────────────
+
   if (!permission.granted) {
     return (
-      <LinearGradientFallback>
-        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }} testID="barcode-scanner-screen">
+      <View style={{ flex: 1, backgroundColor: Colors.navy }}>
+        <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
           <View
             style={{
               width: 80,
@@ -186,7 +884,7 @@ export default function BarcodeScannerScreen() {
               marginBottom: 32,
             }}
           >
-            PantryIQ needs camera access to scan barcodes and identify food items.
+            PantryIQ needs camera access to scan barcodes and identify your food items so we can track their nutritional information automatically.
           </Text>
           <Pressable
             onPress={requestPermission}
@@ -194,106 +892,95 @@ export default function BarcodeScannerScreen() {
               backgroundColor: Colors.green,
               borderRadius: BorderRadius.lg,
               paddingHorizontal: 28,
-              paddingVertical: 14,
+              paddingVertical: 16,
               marginBottom: 16,
+              minWidth: 200,
+              alignItems: 'center',
             }}
-            testID="request-permission-button"
           >
-            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.navy }}>
-              Grant Permission
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => Linking.openSettings()}>
-            <Text
-              style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textSecondary }}
-            >
-              Open Settings
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: '#fff' }}>
+              Grant Camera Access
             </Text>
           </Pressable>
           <Pressable
-            onPress={() => router.back()}
-            style={{ marginTop: 24 }}
-            testID="cancel-button"
+            onPress={() => Linking.openSettings()}
+            style={{ marginBottom: 12 }}
           >
+            <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textSecondary }}>
+              Open Settings
+            </Text>
+          </Pressable>
+          <Pressable onPress={handleClose} style={{ paddingVertical: 12, paddingHorizontal: 24 }}>
             <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textTertiary }}>
               Cancel
             </Text>
           </Pressable>
         </SafeAreaView>
-      </LinearGradientFallback>
+      </View>
     );
   }
+
+  // ─── Main Scanner UI ────────────────────────────────────────────────────
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }} testID="barcode-scanner-screen">
       <CameraView
         style={{ flex: 1 }}
         facing="back"
-        onBarcodeScanned={scanned ? undefined : handleBarcodeScan}
+        onBarcodeScanned={scanned || foundProduct !== null || notFoundBarcode !== null ? undefined : handleBarcodeScan}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr', 'code128', 'code39'],
+          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'qr', 'code128', 'code39', 'code93', 'itf14'],
         }}
       >
-        {/* Dark overlay with hole */}
+        {/* Dark overlay with clear viewfinder window */}
         <View style={{ flex: 1 }}>
           {/* Top overlay */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }} />
 
-          {/* Middle row */}
+          {/* Middle row with viewfinder */}
           <View style={{ flexDirection: 'row', height: VIEWFINDER }}>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
-            {/* Viewfinder */}
-            <View
-              style={{
-                width: VIEWFINDER,
-                height: VIEWFINDER,
-                position: 'relative',
-              }}
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }} />
+            {/* Clear viewfinder area */}
+            <Animated.View
+              style={[
+                {
+                  width: VIEWFINDER,
+                  height: VIEWFINDER,
+                  position: 'relative',
+                },
+                viewfinderStyle,
+              ]}
             >
               <Animated.View style={[{ flex: 1 }, pulseStyle]}>
-                <ViewfinderCorners pulse={0} />
+                <ViewfinderCorners scanSuccess={flashOverlay === 'green'} />
               </Animated.View>
-            </View>
-            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }} />
+            </Animated.View>
+            <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }} />
           </View>
 
-          {/* Bottom overlay */}
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' }}>
-            <View style={{ alignItems: 'center', paddingTop: 32 }}>
+          {/* Bottom overlay with status */}
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)' }}>
+            <View style={{ alignItems: 'center', paddingTop: 28 }}>
               {loading ? (
                 <View style={{ alignItems: 'center', gap: 12 }}>
                   <ActivityIndicator size="large" color={Colors.green} />
                   <Text
                     style={{
-                      fontFamily: 'DMSans_500Medium',
+                      fontFamily: 'DMSans_600SemiBold',
                       fontSize: 16,
-                      color: Colors.textPrimary,
+                      color: '#fff',
                     }}
                   >
                     Looking up product...
                   </Text>
-                </View>
-              ) : errorMsg ? (
-                <View
-                  style={{
-                    backgroundColor: Colors.errorMuted,
-                    borderRadius: BorderRadius.lg,
-                    paddingHorizontal: 20,
-                    paddingVertical: 12,
-                    marginHorizontal: 32,
-                    borderWidth: 1,
-                    borderColor: Colors.error,
-                  }}
-                >
                   <Text
                     style={{
-                      fontFamily: 'DMSans_500Medium',
-                      fontSize: 14,
-                      color: Colors.error,
-                      textAlign: 'center',
+                      fontFamily: 'DMSans_400Regular',
+                      fontSize: 13,
+                      color: 'rgba(255,255,255,0.6)',
                     }}
                   >
-                    {errorMsg}
+                    Checking multiple databases
                   </Text>
                 </View>
               ) : (
@@ -301,92 +988,80 @@ export default function BarcodeScannerScreen() {
                   style={{
                     fontFamily: 'DMSans_400Regular',
                     fontSize: 15,
-                    color: 'rgba(255,255,255,0.7)',
+                    color: 'rgba(255,255,255,0.8)',
                     textAlign: 'center',
                     paddingHorizontal: 32,
                   }}
                 >
-                  {isRapidMode ? 'Point at a barcode — scanning continuously' : 'Point at a barcode to scan'}
+                  {isRapidMode
+                    ? 'Point at a barcode — tap Done when finished'
+                    : 'Point at a barcode to scan'}
                 </Text>
               )}
             </View>
           </View>
         </View>
 
-        {/* Top bar: close + rapid mode counter + done button */}
+        {/* Flash overlay (green success / red fail) */}
+        {flashOverlay !== 'none' && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor:
+                flashOverlay === 'green' ? 'rgba(34,197,94,0.25)' : 'rgba(239,68,68,0.25)',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+
+        {/* ─── TOP BAR: Close + counter + done ─── */}
         <SafeAreaView
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-          }}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0 }}
           edges={['top']}
         >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16 }}>
-            {/* Close button (left) */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+            }}
+          >
+            {/* CLOSE BUTTON — top right, large tap target */}
             <Pressable
-              onPress={() => {
-                setScanned(false);
-                setLoading(false);
-                router.back();
-              }}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: 'rgba(0,0,0,0.5)',
+              onPress={handleClose}
+              style={({ pressed }) => ({
+                width: 52,
+                height: 52,
+                borderRadius: 26,
+                backgroundColor: pressed ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.6)',
                 alignItems: 'center',
                 justifyContent: 'center',
-              }}
+                borderWidth: 1.5,
+                borderColor: 'rgba(255,255,255,0.3)',
+              })}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               testID="close-scanner-button"
             >
-              <X size={20} color="#fff" />
+              <X size={24} color="#fff" strokeWidth={2.5} />
             </Pressable>
 
-            {/* Session counter badge (center, only in rapid mode) */}
+            {/* Session counter (rapid mode) */}
             {isRapidMode ? (
               <View
                 style={{
-                  backgroundColor: 'rgba(0,0,0,0.6)',
+                  backgroundColor: 'rgba(0,0,0,0.65)',
                   borderRadius: BorderRadius.full,
-                  paddingHorizontal: 14,
-                  paddingVertical: 7,
-                  borderWidth: 1,
-                  borderColor: Colors.green,
-                }}
-              >
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 13,
-                    color: Colors.green,
-                  }}
-                  testID="session-count-badge"
-                >
-                  {sessionCount} item{sessionCount !== 1 ? 's' : ''} scanned
-                </Text>
-              </View>
-            ) : (
-              <View />
-            )}
-
-            {/* Done Scanning button (right, only in rapid mode) */}
-            {isRapidMode ? (
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.back();
-                }}
-                style={{
                   paddingHorizontal: 14,
                   paddingVertical: 8,
-                  borderRadius: BorderRadius.full,
-                  backgroundColor: 'rgba(0,0,0,0.5)',
                   borderWidth: 1,
                   borderColor: Colors.green,
                 }}
-                testID="done-scanning-button"
               >
                 <Text
                   style={{
@@ -394,22 +1069,47 @@ export default function BarcodeScannerScreen() {
                     fontSize: 14,
                     color: Colors.green,
                   }}
+                  testID="session-count-badge"
                 >
+                  {sessionCount} scanned
+                </Text>
+              </View>
+            ) : (
+              <View />
+            )}
+
+            {/* Done button (rapid mode) */}
+            {isRapidMode ? (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.back();
+                }}
+                style={{
+                  paddingHorizontal: 18,
+                  paddingVertical: 10,
+                  borderRadius: BorderRadius.full,
+                  backgroundColor: Colors.green,
+                }}
+                testID="done-scanning-button"
+              >
+                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: '#fff' }}>
                   Done
                 </Text>
               </Pressable>
             ) : (
-              <View style={{ width: 44 }} />
+              <View style={{ width: 52 }} />
             )}
           </View>
         </SafeAreaView>
 
-        {/* Manual entry fallback */}
+        {/* ─── BOTTOM DISMISS BAR ─── */}
         <SafeAreaView
           style={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
           edges={['bottom']}
         >
-          <View style={{ padding: 24, alignItems: 'center' }}>
+          <View style={{ paddingHorizontal: 20, paddingBottom: 16, gap: 12 }}>
+            {/* Manual entry */}
             <Pressable
               onPress={() =>
                 router.replace(
@@ -419,37 +1119,101 @@ export default function BarcodeScannerScreen() {
                 )
               }
               style={{
-                backgroundColor: 'rgba(255,255,255,0.15)',
+                backgroundColor: 'rgba(255,255,255,0.12)',
                 borderRadius: BorderRadius.lg,
-                paddingHorizontal: 24,
-                paddingVertical: 12,
+                paddingVertical: 13,
+                alignItems: 'center',
                 borderWidth: 1,
                 borderColor: 'rgba(255,255,255,0.2)',
               }}
               testID="manual-entry-button"
             >
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 15, color: '#fff' }}>
+                Add Manually Instead
+              </Text>
+            </Pressable>
+
+            {/* Tap to cancel bar */}
+            <Pressable
+              onPress={handleClose}
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.92)',
+                borderRadius: 16,
+                paddingVertical: 16,
+                alignItems: 'center',
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
               <Text
                 style={{
-                  fontFamily: 'DMSans_500Medium',
-                  fontSize: 15,
-                  color: '#fff',
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 17,
+                  color: '#1a1a2e',
                 }}
               >
-                Add Manually Instead
+                Tap to Cancel
               </Text>
             </Pressable>
           </View>
         </SafeAreaView>
-      </CameraView>
-    </View>
-  );
-}
 
-// Small fallback wrapper since we can't import LinearGradient in this module conditionally
-function LinearGradientFallback({ children }: { children: React.ReactNode }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: Colors.navy }}>
-      {children}
+        {/* ─── DEBUG INDICATOR (dev) ─── */}
+        {debugInfo ? (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 180,
+              left: 12,
+              right: 12,
+              backgroundColor: 'rgba(0,0,0,0.75)',
+              borderRadius: 8,
+              padding: 8,
+            }}
+          >
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>
+              API: {debugInfo.api} | Status: {debugInfo.status} | Found: {debugInfo.found ? 'YES' : 'NO'}
+            </Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>
+              Barcode: {debugInfo.barcode}
+            </Text>
+          </View>
+        ) : null}
+      </CameraView>
+
+      {/* ─── PRODUCT FOUND SHEET ─── */}
+      {foundProduct ? (
+        <ProductSheet
+          product={foundProduct}
+          visible={!!foundProduct}
+          onAddToPantry={handleAddToPantry}
+          onScanAnother={handleScanAnother}
+        />
+      ) : null}
+
+      {/* ─── NOT FOUND SHEET ─── */}
+      {notFoundBarcode !== null && !foundProduct ? (
+        <NotFoundSheet
+          barcode={notFoundBarcode}
+          visible
+          onTryAgain={() => {
+            setNotFoundBarcode(null);
+            setScanned(false);
+            lastScannedBarcode.current = null;
+          }}
+          onAddManually={() =>
+            router.replace({
+              pathname: '/add-pantry-item',
+              params: {
+                barcode: notFoundBarcode,
+                returnTo: isRapidMode ? 'scanner' : undefined,
+              },
+            })
+          }
+        />
+      ) : null}
+
+      {/* ─── SUCCESS TOAST ─── */}
+      {successToast !== null ? <SuccessToast message={successToast} visible /> : null}
     </View>
   );
 }
