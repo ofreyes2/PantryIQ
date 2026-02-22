@@ -36,6 +36,7 @@ import Svg, { Circle, Path, Defs, LinearGradient as SvgGradient, Stop } from 're
 import { useRouter, router } from 'expo-router';
 import { useAppStore } from '@/lib/stores/appStore';
 import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
+import { FastingWidget } from '@/components/FastingWidget';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_PADDING = 16;
@@ -650,6 +651,11 @@ export default function DashboardScreen() {
         >
           {/* Header */}
           <DashboardHeader name={userName} streak={streak} />
+
+          {/* Fasting Timer Widget */}
+          <View style={{ paddingHorizontal: CARD_PADDING, marginBottom: 20, marginTop: 16 }}>
+            <FastingWidget />
+          </View>
 
           {/* Daily Progress */}
           <View style={{ paddingHorizontal: CARD_PADDING, marginBottom: 20 }}>

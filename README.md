@@ -23,9 +23,11 @@ mobile/src/
 │   ├── pantry-item-detail.tsx    # Item detail: nutrition, history, edit/delete
 │   ├── add-meal-entry.tsx        # Add food to meal (search, pantry, favorites)
 │   ├── kitchen-locations.tsx     # Kitchen & Storage location manager screen
+│   ├── macro-calculator.tsx      # Macro Calculator (Mifflin-St Jeor formula, 6-step form)
+│   ├── fasting-timer.tsx         # Fasting Timer (protocol selector, phase display, history)
 │   └── (tabs)/
 │       ├── _layout.tsx          # 7-tab navigator (navy theme)
-│       ├── index.tsx            # Dashboard (Phase 1 — complete)
+│       ├── index.tsx            # Dashboard (Phase 1 — complete, now with Fasting Widget)
 │       ├── pantry.tsx           # Pantry — List View + Location View toggle, location chips
 │       ├── meals.tsx            # Meals — full food diary, 4 meal sections, barcode/photo/search, Claude coaching
 │       ├── recipes.tsx          # Recipes (Phase 3)
@@ -35,7 +37,8 @@ mobile/src/
 ├── components/
 │   ├── Toast.tsx                # Toast notification system
 │   ├── ConfettiCelebration.tsx  # Confetti animation
-│   └── LocationPicker.tsx       # Reusable location + sub zone picker bottom sheet
+│   ├── LocationPicker.tsx       # Reusable location + sub zone picker bottom sheet
+│   └── FastingWidget.tsx        # Fasting Timer dashboard widget
 ├── constants/
 │   └── theme.ts                 # Colors, spacing, typography, shadows
 └── lib/
@@ -44,7 +47,14 @@ mobile/src/
         ├── appStore.ts          # User profile, settings, streak, onboarding state
         ├── pantryStore.ts       # Pantry items CRUD with locationId/subZoneId/specificSpot
         ├── mealsStore.ts        # Food diary entries, water intake, favorites, removeWaterEntry
-        └── locationStore.ts     # Kitchen storage locations — 6 defaults, full CRUD + sub zones
+        ├── locationStore.ts     # Kitchen storage locations — 6 defaults, full CRUD + sub zones
+        ├── nutritionStore.ts    # Macro goals, net carb calculations, user metrics (NEW)
+        ├── fastingStore.ts      # Fasting timer sessions, history, phases (NEW)
+        ├── healthStore.ts       # Weight tracking, body composition
+        ├── recipesStore.ts      # Recipe box, favorites, cooking history
+        ├── kitchenStore.ts      # Equipment checklist, cooking preferences
+        ├── kitchenMapStore.ts   # Zone mapping, spotted items
+        └── shoppingStore.ts     # Shopping list, price history, trip tracking
 ```
 
 ## Color Theme
@@ -63,6 +73,9 @@ mobile/src/
 - **Phase 5** (complete): Storage Location System (6 default appliance locations, sub zones, location picker, List/Location view toggle in Pantry, My Kitchen & Storage in Settings) + Meals Tab full build (4 meal sections, day navigation, barcode/photo/search add flow, portion selector, favorites, weekly chart, Claude coaching card, water tracker)
 - **Phase 6** (complete): Kitchen Map — photo-based zone mapping system (onboarding flow, camera photo session with rule-of-thirds grid, Claude AI zone detection with base64 image analysis, interactive zone overlay on photos, zone map display, spotted items detection, mock fallback when no API key)
 - **Phase 7** (complete): Kitchen Equipment Manager + Cooking Intelligence Upgrade — full kitchen equipment checklist (50+ appliances, surfaces, outdoor cooking), cooking preference profile (textures, skill, methods, dietary focus, cuisines), Instant Pot dual-pot strategy, deep fryer crispy techniques, upgraded Chef Claude system prompt with equipment awareness + crispiness priority, recipe card crispiness ratings (🥨 scale), cooking method tags, recipe filter bar (Crispy/Quick/Deep Fried/Instant Pot), 10 new crispy low-carb starter recipes (Crispy Collection folder)
+- **Phase 8** (in progress): Nutrition Intelligence Features (Batch 1)
+  - **Macro Calculator**: Mifflin-St Jeor BMR calculation, personalized daily macro targets, onboarding-style form, beautiful results display with flame/protein/fat cards
+  - **Fasting Timer**: Dashboard widget + full screen, circular progress ring, 6 fasting phases, protocol selector (16:8, 18:6, 20:4, OMAD, 5:2, custom), session history, break fast suggestions
 
 ## APIs (user-provided keys in Settings)
 - Open Food Facts — free, no key
