@@ -30,15 +30,21 @@ import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt } from '@/lib/personalityModes';
+import { isMealDescription, getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
+import { api } from '@/lib/api/api';
+import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
 import type { UserProfile } from '@/lib/stores/appStore';
+import type { MealAnalysis } from '@/lib/mealAnalysis';
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  mealAnalysis?: MealAnalysis;
+  isFollowUpQuestion?: boolean;
 }
 
 const QUICK_PROMPTS = [
@@ -247,9 +253,33 @@ function TypingIndicator() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+function MessageBubble({
+  message,
+  onMealConfirm,
+  isMealLogging,
+}: {
+  message: Message;
+  onMealConfirm?: () => void;
+  isMealLogging?: boolean;
+}) {
   const isUser = message.role === 'user';
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Show meal confirmation card if this message has meal analysis
+  if (message.mealAnalysis && onMealConfirm) {
+    return (
+      <View style={{ marginBottom: 12, paddingHorizontal: 16 }}>
+        <MealConfirmationCard
+          analysis={message.mealAnalysis}
+          onConfirm={onMealConfirm}
+          onEdit={() => {
+            // TODO: Open meal editing modal
+          }}
+          isLoading={isMealLogging}
+        />
+      </View>
+    );
+  }
 
   if (isUser) {
     return (
@@ -569,13 +599,31 @@ export default function ChefClaudeScreen() {
   const userProfile = useAppStore((s) => s.userProfile);
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
+  const addMealEntry = useMealsStore((s) => s.addEntry);
   const getEquipmentSummary = useKitchenStore((s) => s.getEquipmentSummary);
   const getPreferencesSummary = useKitchenStore((s) => s.getPreferencesSummary);
+  const deductPantryServings = usePantryStore((s) => s.deductServings);
+  const findPantryItem = useCallback(
+    (name: string) => {
+      const normalized = name.toLowerCase();
+      return pantryItems.find(
+        (item) =>
+          item.name.toLowerCase() === normalized ||
+          item.name.toLowerCase().includes(normalized) ||
+          normalized.includes(item.name.toLowerCase())
+      );
+    },
+    [pantryItems]
+  );
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [currentMealAnalysis, setCurrentMealAnalysis] = useState<MealAnalysis | null>(null);
+  const [isMealAnalyzing, setIsMealAnalyzing] = useState(false);
+  const [isMealLogging, setIsMealLogging] = useState(false);
+  const [pendingMealAnswers, setPendingMealAnswers] = useState<string[]>([]);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -588,10 +636,174 @@ export default function ChefClaudeScreen() {
     }
   }, [messages.length, isTyping]);
 
+  /**
+   * Analyze a meal description and get structured data
+   */
+  const analyzeMealDescription = useCallback(
+    async (userMessage: string): Promise<MealAnalysis | null> => {
+      if (!isMealDescription(userMessage)) {
+        return null;
+      }
+
+      try {
+        setIsMealAnalyzing(true);
+
+        // Convert pantry items to format expected by backend
+        const pantryForBackend = pantryItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          brand: item.brand,
+          nutrition: {
+            calories: item.caloriesPerServing,
+            carbs: item.carbsPerServing,
+            protein: item.proteinPerServing,
+            fat: item.fatPerServing,
+            fiber: 0,
+            netCarbs: item.carbsPerServing,
+          },
+          servingUnit: item.servingUnit,
+        }));
+
+        const response = await api.post<MealAnalysis>('/api/meals/analyze', {
+          userMessage,
+          pantryItems: pantryForBackend,
+          userProfile: {
+            dailyCarbGoal: userProfile.dailyCarbGoal,
+            dailyCalorieGoal: userProfile.dailyCalorieGoal,
+            personalityMode: userProfile.personalityMode,
+          },
+        });
+
+        return response ?? null;
+      } catch (error) {
+        console.warn('Meal analysis error:', error);
+        return null;
+      } finally {
+        setIsMealAnalyzing(false);
+      }
+    },
+    [pantryItems, userProfile.dailyCarbGoal, userProfile.dailyCalorieGoal, userProfile.personalityMode]
+  );
+
+  /**
+   * Log a meal to the meals store
+   */
+  const logMealFromAnalysis = useCallback(
+    (analysis: MealAnalysis) => {
+      try {
+        setIsMealLogging(true);
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
+          breakfast: 'Breakfast',
+          lunch: 'Lunch',
+          dinner: 'Dinner',
+          snack: 'Snacks',
+        };
+
+        // Combine identified foods into a single entry
+        let totalCalories = 0;
+        let totalCarbs = 0;
+        let totalProtein = 0;
+        let totalFat = 0;
+        let totalFiber = 0;
+        let totalNetCarbs = 0;
+
+        analysis.identifiedFoods.forEach((food) => {
+          totalCalories += food.estimatedCalories;
+          totalNetCarbs += food.estimatedNetCarbs;
+          totalProtein += food.estimatedProtein;
+          totalFat += food.estimatedFat;
+        });
+
+        // Create a descriptive name from foods
+        const foodNames = analysis.identifiedFoods
+          .map((f) => (f.quantity && f.unit ? `${f.quantity} ${f.unit} ${f.name}` : f.name))
+          .join(', ');
+
+        const entry: Omit<FoodEntry, 'id'> = {
+          name: foodNames,
+          mealType: mealTypeMap[analysis.mealType] || 'Snacks',
+          date: todayStr,
+          servings: 1,
+          calories: Math.round(totalCalories),
+          carbs: Math.round(totalCarbs * 10) / 10,
+          protein: Math.round(totalProtein * 10) / 10,
+          fat: Math.round(totalFat * 10) / 10,
+          fiber: totalFiber,
+          netCarbs: Math.round(totalNetCarbs * 10) / 10,
+          isFavorite: false,
+        };
+
+        // Add entry to store
+        addMealEntry(entry);
+
+        // Deduct from pantry items if they exist
+        analysis.pantryItemsToDeduct.forEach((itemName) => {
+          const pantryItem = findPantryItem(itemName);
+          if (pantryItem) {
+            // Deduct one serving of this item
+            deductPantryServings(pantryItem.id, 1);
+          }
+        });
+
+        return true;
+      } catch (error) {
+        console.error('Failed to log meal:', error);
+        return false;
+      } finally {
+        setIsMealLogging(false);
+      }
+    },
+    [addMealEntry, findPantryItem, deductPantryServings]
+  );
+
+  /**
+   * Generate a follow-up response from Chef Claude
+   */
+  const generateFollowUpResponse = useCallback(
+    (analysis: MealAnalysis): string => {
+      const { personalityMode, customPersonality } = userProfile;
+
+      if (analysis.followUpQuestions.length > 0) {
+        // Ask the first follow-up question
+        const firstQuestion = analysis.followUpQuestions[0];
+
+        // Add personality flavor to the question
+        if (personalityMode === 'coach') {
+          return `Got it! Just one quick question to nail this down — ${firstQuestion}`;
+        } else if (personalityMode === 'gordon-ramsay') {
+          return `Interesting! Listen — ${firstQuestion.toLowerCase()}`;
+        } else if (personalityMode === 'scientist') {
+          return `Let me gather more precise data. ${firstQuestion}`;
+        } else if (personalityMode === 'zen') {
+          return `Beautiful meal. Just so I have the complete picture — ${firstQuestion}`;
+        }
+        return firstQuestion;
+      }
+
+      // If no follow-up questions, we can log now
+      const emoji = getMealTypeEmoji(analysis.mealType);
+      if (personalityMode === 'coach') {
+        return `Perfect! Here is what I am going to log for your ${analysis.mealType}:`;
+      } else if (personalityMode === 'gordon-ramsay') {
+        return `Right! That sounds delicious. Here is your ${emoji} ${formatMealType(analysis.mealType)}:`;
+      } else if (personalityMode === 'scientist') {
+        return `Excellent data. Logging your ${analysis.mealType}:`;
+      } else if (personalityMode === 'zen') {
+        return `What a wonderful meal. I am logging your ${emoji} ${formatMealType(analysis.mealType)}:`;
+      }
+
+      return `Perfect! Here is what I am going to log for your ${analysis.mealType}:`;
+    },
+    [userProfile.personalityMode, userProfile.customPersonality]
+  );
+
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isTyping) return;
+      if (!trimmed || isTyping || isMealAnalyzing) return;
 
       const apiKey = userProfile.claudeApiKey;
       if (!apiKey) {
@@ -613,32 +825,69 @@ export default function ChefClaudeScreen() {
       setIsTyping(true);
 
       try {
-        const systemPrompt = buildSystemPrompt(
-          pantryItems,
-          todayEntries,
-          dailyTotals,
-          userProfile,
-          todayStr,
-          getEquipmentSummary().join(', '),
-          getPreferencesSummary()
-        );
+        // Check if this is a meal description
+        const analysis = await analyzeMealDescription(trimmed);
 
-        const conversationHistory = [...messages, userMessage].map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        if (analysis && analysis.isMealDescription) {
+          // This is a meal description - handle specially
+          setCurrentMealAnalysis(analysis);
 
-        const reply = await callClaude(conversationHistory, systemPrompt, apiKey);
+          // Generate a response
+          const responseText = generateFollowUpResponse(analysis);
 
-        const assistantMessage: Message = {
-          id: `msg-${Date.now()}-reply`,
-          role: 'assistant',
-          content: reply,
-          timestamp: new Date(),
-        };
+          // Create the assistant message
+          const assistantMessage: Message = {
+            id: `msg-${Date.now()}-reply`,
+            role: 'assistant',
+            content: responseText,
+            timestamp: new Date(),
+            mealAnalysis: analysis.canLogNow ? analysis : undefined,
+            isFollowUpQuestion: !analysis.canLogNow,
+          };
 
-        setMessages((prev) => [...prev, assistantMessage]);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setMessages((prev) => [...prev, assistantMessage]);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+          // If we need more info, store the pending answers
+          if (!analysis.canLogNow && analysis.followUpQuestions.length > 0) {
+            setPendingMealAnswers(analysis.followUpQuestions);
+          }
+
+          // If we can log now, don't send to Claude
+          if (!analysis.canLogNow) {
+            // User will answer follow-up questions
+            setIsTyping(false);
+            return;
+          }
+        } else {
+          // Not a meal description - send to Claude as normal
+          const systemPrompt = buildSystemPrompt(
+            pantryItems,
+            getEntriesForDate(new Date().toISOString().split('T')[0]),
+            getDailyTotals(new Date().toISOString().split('T')[0]),
+            userProfile,
+            new Date().toISOString().split('T')[0],
+            getEquipmentSummary().join(', '),
+            getPreferencesSummary()
+          );
+
+          const conversationHistory = [...messages, userMessage].map((m) => ({
+            role: m.role,
+            content: m.content,
+          }));
+
+          const reply = await callClaude(conversationHistory, systemPrompt, apiKey);
+
+          const assistantMessage: Message = {
+            id: `msg-${Date.now()}-reply`,
+            role: 'assistant',
+            content: reply,
+            timestamp: new Date(),
+          };
+
+          setMessages((prev) => [...prev, assistantMessage]);
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
       } catch (err: unknown) {
         const errorMessage: Message = {
           id: `msg-${Date.now()}-err`,
@@ -651,12 +900,85 @@ export default function ChefClaudeScreen() {
         setIsTyping(false);
       }
     },
-    [messages, isTyping, pantryItems, todayEntries, dailyTotals, userProfile, todayStr, getEquipmentSummary, getPreferencesSummary]
+    [
+      messages,
+      isTyping,
+      isMealAnalyzing,
+      userProfile,
+      pantryItems,
+      getEntriesForDate,
+      getDailyTotals,
+      getEquipmentSummary,
+      getPreferencesSummary,
+      analyzeMealDescription,
+      generateFollowUpResponse,
+    ]
   );
 
+  /**
+   * Handle meal confirmation
+   */
+  const handleMealConfirm = useCallback(() => {
+    if (!currentMealAnalysis) return;
+
+    const success = logMealFromAnalysis(currentMealAnalysis);
+
+    if (success) {
+      // Add success message to chat
+      const todayStr = new Date().toISOString().split('T')[0];
+      const dailyTotals = getDailyTotals(todayStr);
+      const mealType = currentMealAnalysis.mealType;
+
+      let successMessage = `Logged! Your ${mealType} has been added. `;
+
+      const carbsUsed = Math.round(dailyTotals.netCarbs);
+      const carbGoal = userProfile.dailyCarbGoal;
+      const carbsRemaining = carbGoal - carbsUsed;
+
+      if (carbsRemaining >= 0) {
+        successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget today — you are doing great.`;
+      } else {
+        successMessage += `You are now at ${carbsUsed}g of your ${carbGoal}g goal. No worries — tomorrow begins fresh.`;
+      }
+
+      // Add pantry deduction message if applicable
+      if (currentMealAnalysis.pantryItemsToDeduct.length > 0) {
+        const items = currentMealAnalysis.pantryItemsToDeduct.join(', ').toLowerCase();
+        successMessage += ` I also updated your pantry — reduced your ${items}.`;
+      }
+
+      const successMsg: Message = {
+        id: `msg-${Date.now()}-success`,
+        role: 'assistant',
+        content: successMessage,
+        timestamp: new Date(),
+      };
+
+      setMessages((prev) => [...prev, successMsg]);
+      setCurrentMealAnalysis(null);
+      setPendingMealAnswers([]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      const errorMsg: Message = {
+        id: `msg-${Date.now()}-err`,
+        role: 'assistant',
+        content: 'Sorry, I had trouble logging that meal. Please try again.',
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    }
+  }, [currentMealAnalysis, logMealFromAnalysis, getDailyTotals, userProfile.dailyCarbGoal]);
+
+
   const renderItem = useCallback(
-    ({ item }: { item: Message }) => <MessageBubble message={item} />,
-    []
+    ({ item }: { item: Message }) => (
+      <MessageBubble
+        message={item}
+        onMealConfirm={item.mealAnalysis ? handleMealConfirm : undefined}
+        isMealLogging={isMealLogging}
+      />
+    ),
+    [handleMealConfirm, isMealLogging]
   );
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
