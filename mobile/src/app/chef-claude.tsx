@@ -31,7 +31,7 @@ import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
-import { isMealDescription, getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
+import { getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
 import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import { MealConfirmationModal } from '@/components/MealConfirmationModal';
@@ -177,6 +177,50 @@ When suggesting any recipe, always include:
 - Estimated total cook time
 - Crispiness rating: 🥨 (1) to 🥨🥨🥨🥨🥨 (5)
 - Difficulty rating: ⭐ (1) to ⭐⭐⭐⭐⭐ (5)
+
+MEAL LOGGING PROTOCOL:
+When a user describes eating something, you MUST:
+1. Respond conversationally as normal
+2. At the END of your response, include a hidden JSON block wrapped in these exact tags (the user will never see this):
+
+<MEAL_DATA>
+{
+  "hasMealData": true or false,
+  "mealName": "descriptive name of what was eaten or null",
+  "mealType": "breakfast or lunch or dinner or snacks or unknown",
+  "mealTypeConfidence": "high or medium or low",
+  "foods": [
+    {
+      "name": "food item name",
+      "quantity": "amount or null",
+      "unit": "unit of measurement or null",
+      "calories": number,
+      "netCarbs": number,
+      "protein": number,
+      "fat": number
+    }
+  ],
+  "totalCalories": number,
+  "totalNetCarbs": number,
+  "totalProtein": number,
+  "totalFat": number,
+  "needsMealType": true or false,
+  "missingInfo": "what info is needed or null"
+}
+</MEAL_DATA>
+
+CRITICAL MEAL LOGGING RULES:
+- If the user is NOT describing eating something, set hasMealData to false and skip the JSON block
+- ALWAYS include the JSON block when the user describes food they ate
+- If you cannot determine the meal type (breakfast/lunch/dinner/snacks), set needsMealType to true
+- Set mealTypeConfidence to "low" if unsure
+- The app will parse this JSON automatically — the user never sees it
+- NEVER claim you logged a meal or saved it — you provide the data, the app handles saving
+- NEVER say "I cannot log your meal" — the app handles this, not you
+- When uncertain, ask clarifying questions FIRST, then provide the JSON block after getting answers
+- Always estimate nutrition as accurately as possible from the description
+
+IMPORTANT: When a user asks about logging, NEVER say things like "I have logged your meal" or "I cannot write to the food log". Instead say things like "Here is what I have for your breakfast — tap the button below to save it to your log" or "Let me capture this in the system for you to confirm".
 
 INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
@@ -725,7 +769,6 @@ export default function ChefClaudeScreen() {
   const [isTyping, setIsTyping] = useState(false);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [currentMealAnalysis, setCurrentMealAnalysis] = useState<MealAnalysis | null>(null);
-  const [isMealAnalyzing, setIsMealAnalyzing] = useState(false);
   const [isMealLogging, setIsMealLogging] = useState(false);
   const [pendingMealAnswers, setPendingMealAnswers] = useState<string[]>([]);
   const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
@@ -941,53 +984,76 @@ export default function ChefClaudeScreen() {
   }, [loadConversationFromStorage, getProactiveMealPrompt, userProfile]);
 
   /**
-   * Analyze a meal description and get structured data
+   * Process Claude's raw response and extract meal data if present
+   * Returns the display text (with JSON block removed) and any extracted meal data
    */
-  const analyzeMealDescription = useCallback(
-    async (userMessage: string): Promise<MealAnalysis | null> => {
-      if (!isMealDescription(userMessage)) {
+  const processClaudeResponse = useCallback(
+    (rawResponse: string): { displayText: string; mealData: any | null } => {
+      // Extract the MEAL_DATA JSON block if present
+      const mealDataMatch = rawResponse.match(/<MEAL_DATA>([\s\S]*?)<\/MEAL_DATA>/);
+
+      // Clean display text — remove the JSON block from what user sees
+      const displayText = rawResponse.replace(/<MEAL_DATA>[\s\S]*?<\/MEAL_DATA>/g, '').trim();
+
+      if (mealDataMatch) {
+        try {
+          const mealData = JSON.parse(mealDataMatch[1]);
+          return { displayText, mealData };
+        } catch (parseError) {
+          console.warn('Failed to parse meal data from Claude response:', parseError);
+          return { displayText, mealData: null };
+        }
+      }
+
+      return { displayText, mealData: null };
+    },
+    []
+  );
+
+  /**
+   * Convert Claude's meal data to internal MealAnalysis format
+   */
+  const convertClaudeMealDataToAnalysis = useCallback(
+    (claudeMealData: any): MealAnalysis | null => {
+      if (!claudeMealData || !claudeMealData.hasMealData) {
         return null;
       }
 
       try {
-        setIsMealAnalyzing(true);
-
-        // Convert pantry items to format expected by backend
-        const pantryForBackend = pantryItems.map((item) => ({
-          id: item.id,
-          name: item.name,
-          brand: item.brand,
-          nutrition: {
-            calories: item.caloriesPerServing,
-            carbs: item.carbsPerServing,
-            protein: item.proteinPerServing,
-            fat: item.fatPerServing,
-            fiber: 0,
-            netCarbs: item.carbsPerServing,
-          },
-          servingUnit: item.servingUnit,
-        }));
-
-        const response = await api.post<MealAnalysis>('/api/meals/analyze', {
-          userMessage,
-          pantryItems: pantryForBackend,
-          userProfile: {
-            dailyCarbGoal: userProfile.dailyCarbGoal,
-            dailyCalorieGoal: userProfile.dailyCalorieGoal,
-            personalityMode: userProfile.personalityMode,
-          },
-        });
-
-        return response ?? null;
+        return {
+          isMealDescription: claudeMealData.hasMealData ?? false,
+          identifiedFoods: (claudeMealData.foods || []).map((food: any) => ({
+            name: food.name || '',
+            quantity: food.quantity ? food.quantity.toString() : null,
+            unit: food.unit || null,
+            cookingMethod: null,
+            inPantry: false,
+            estimatedCalories: food.calories || 0,
+            estimatedNetCarbs: food.netCarbs || 0,
+            estimatedProtein: food.protein || 0,
+            estimatedFat: food.fat || 0,
+            confidence: claudeMealData.mealTypeConfidence === 'high' ? 'high' : 'medium',
+          })),
+          mealType: (claudeMealData.mealType || 'unknown').toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'unknown',
+          mealTypeConfidence: claudeMealData.mealTypeConfidence || 'medium',
+          missingInfo: claudeMealData.missingInfo ? [claudeMealData.missingInfo] : [],
+          canLogNow: !claudeMealData.needsMealType && claudeMealData.mealType !== 'unknown',
+          followUpQuestions: [],
+          totalEstimatedCalories: claudeMealData.totalCalories || 0,
+          totalEstimatedNetCarbs: claudeMealData.totalNetCarbs || 0,
+          totalEstimatedProtein: claudeMealData.totalProtein || 0,
+          totalEstimatedFat: claudeMealData.totalFat || 0,
+          pantryItemsToDeduct: [],
+          logConfidenceMessage: '',
+        };
       } catch (error) {
-        console.warn('Meal analysis error:', error);
+        console.warn('Failed to convert Claude meal data:', error);
         return null;
-      } finally {
-        setIsMealAnalyzing(false);
       }
     },
-    [pantryItems, userProfile.dailyCarbGoal, userProfile.dailyCalorieGoal, userProfile.personalityMode]
+    []
   );
+
 
   /**
    * Log a meal to the meals store with verification
@@ -1087,52 +1153,11 @@ export default function ChefClaudeScreen() {
     [addMealEntry, findPantryItem, deductPantryServings, getEntriesForDate, messages, inputText]
   );
 
-  /**
-   * Generate a follow-up response from Chef Claude
-   */
-  const generateFollowUpResponse = useCallback(
-    (analysis: MealAnalysis): string => {
-      const { personalityMode, customPersonality } = userProfile;
-
-      if (analysis.followUpQuestions.length > 0) {
-        // Ask the first follow-up question
-        const firstQuestion = analysis.followUpQuestions[0];
-
-        // Add personality flavor to the question
-        if (personalityMode === 'coach') {
-          return `Got it! Just one quick question to nail this down — ${firstQuestion}`;
-        } else if (personalityMode === 'gordon-ramsay') {
-          return `Interesting! Listen — ${firstQuestion.toLowerCase()}`;
-        } else if (personalityMode === 'scientist') {
-          return `Let me gather more precise data. ${firstQuestion}`;
-        } else if (personalityMode === 'zen') {
-          return `Beautiful meal. Just so I have the complete picture — ${firstQuestion}`;
-        }
-        return firstQuestion;
-      }
-
-      // If no follow-up questions, we can log now
-      const emoji = getMealTypeEmoji(analysis.mealType);
-      if (personalityMode === 'coach') {
-        return `Perfect! Here is what I am going to log for your ${analysis.mealType}:`;
-      } else if (personalityMode === 'gordon-ramsay') {
-        return `Right! That sounds delicious. Here is your ${emoji} ${formatMealType(analysis.mealType)}:`;
-      } else if (personalityMode === 'scientist') {
-        return `Excellent data. Logging your ${analysis.mealType}:`;
-      } else if (personalityMode === 'zen') {
-        return `What a wonderful meal. I am logging your ${emoji} ${formatMealType(analysis.mealType)}:`;
-      }
-
-      return `Perfect! Here is what I am going to log for your ${analysis.mealType}:`;
-    },
-    [userProfile.personalityMode, userProfile.customPersonality]
-  );
-
 
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
-      if (!trimmed || isTyping || isMealAnalyzing) return;
+      if (!trimmed || isTyping) return;
 
       const apiKey = userProfile.claudeApiKey;
       if (!apiKey) {
@@ -1214,69 +1239,47 @@ export default function ChefClaudeScreen() {
       }
 
       try {
-        // Check if this is a meal description
-        const analysis = await analyzeMealDescription(trimmed);
+        // Send all messages to Claude - Claude will handle meal logging detection
+        const systemPrompt = buildSystemPrompt(
+          pantryItems,
+          getEntriesForDate(new Date().toISOString().split('T')[0]),
+          getDailyTotals(new Date().toISOString().split('T')[0]),
+          userProfile,
+          new Date().toISOString().split('T')[0],
+          getEquipmentSummary().join(', '),
+          getPreferencesSummary()
+        );
 
-        if (analysis && analysis.isMealDescription) {
-          // This is a meal description - handle specially
-          setCurrentMealAnalysis(analysis);
+        const conversationHistory = [...messages, userMessage].map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
 
-          // Generate a response
-          const responseText = generateFollowUpResponse(analysis);
+        const rawReply = await callClaude(conversationHistory, systemPrompt, apiKey);
 
-          // Create the assistant message
-          const assistantMessage: Message = {
-            id: `msg-${Date.now()}-reply`,
-            role: 'assistant',
-            content: responseText,
-            timestamp: new Date(),
-            mealAnalysis: analysis.canLogNow ? analysis : undefined,
-            isFollowUpQuestion: !analysis.canLogNow,
-          };
+        // Process the response to extract meal data
+        const { displayText, mealData } = processClaudeResponse(rawReply);
 
-          setMessages((prev) => [...prev, assistantMessage]);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-          // If we need more info, store the pending answers
-          if (!analysis.canLogNow && analysis.followUpQuestions.length > 0) {
-            setPendingMealAnswers(analysis.followUpQuestions);
+        // Check if meal data was extracted
+        let mealAnalysis: MealAnalysis | null = null;
+        if (mealData) {
+          mealAnalysis = convertClaudeMealDataToAnalysis(mealData);
+          if (mealAnalysis) {
+            setCurrentMealAnalysis(mealAnalysis);
           }
-
-          // If we can log now, don't send to Claude
-          if (!analysis.canLogNow) {
-            // User will answer follow-up questions
-            setIsTyping(false);
-            return;
-          }
-        } else {
-          // Not a meal description - send to Claude as normal
-          const systemPrompt = buildSystemPrompt(
-            pantryItems,
-            getEntriesForDate(new Date().toISOString().split('T')[0]),
-            getDailyTotals(new Date().toISOString().split('T')[0]),
-            userProfile,
-            new Date().toISOString().split('T')[0],
-            getEquipmentSummary().join(', '),
-            getPreferencesSummary()
-          );
-
-          const conversationHistory = [...messages, userMessage].map((m) => ({
-            role: m.role,
-            content: m.content,
-          }));
-
-          const reply = await callClaude(conversationHistory, systemPrompt, apiKey);
-
-          const assistantMessage: Message = {
-            id: `msg-${Date.now()}-reply`,
-            role: 'assistant',
-            content: reply,
-            timestamp: new Date(),
-          };
-
-          setMessages((prev) => [...prev, assistantMessage]);
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         }
+
+        // Create the assistant message with extracted meal analysis if present
+        const assistantMessage: Message = {
+          id: `msg-${Date.now()}-reply`,
+          role: 'assistant',
+          content: displayText,
+          timestamp: new Date(),
+          mealAnalysis: mealAnalysis && mealAnalysis.isMealDescription ? mealAnalysis : undefined,
+        };
+
+        setMessages((prev) => [...prev, assistantMessage]);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch (err: unknown) {
         const errorMessage: Message = {
           id: `msg-${Date.now()}-err`,
@@ -1292,15 +1295,14 @@ export default function ChefClaudeScreen() {
     [
       messages,
       isTyping,
-      isMealAnalyzing,
       userProfile,
       pantryItems,
       getEntriesForDate,
       getDailyTotals,
       getEquipmentSummary,
       getPreferencesSummary,
-      analyzeMealDescription,
-      generateFollowUpResponse,
+      processClaudeResponse,
+      convertClaudeMealDataToAnalysis,
     ]
   );
 
@@ -1748,7 +1750,7 @@ export default function ChefClaudeScreen() {
         onSendMessage={sendMessage}
         recentMeals={recentMeals}
         favoriteMeals={favoriteMeals}
-        isLoading={isTyping || isMealAnalyzing}
+        isLoading={isTyping}
       />
 
       <MealConfirmationModal
