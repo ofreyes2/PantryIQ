@@ -449,27 +449,32 @@ function FloatingActionButton({ onBatchScan, onSingleScan, onPhoto, onManual }: 
           </Pressable>
         </Animated.View>
 
-        {/* Option 2: Take Photo */}
+        {/* Option 2: Identify by Photo (AI) */}
         <Animated.View style={[opt2Style, { marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 }]}>
-          <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textPrimary }}>
-            Take Photo
-          </Text>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#9333EA' }}>
+              Identify by Photo
+            </Text>
+            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.textSecondary }}>
+              AI-powered food recognition
+            </Text>
+          </View>
           <Pressable
             onPress={() => { toggle(); onPhoto(); }}
             style={{
               width: 48,
               height: 48,
               borderRadius: 24,
-              backgroundColor: Colors.surface,
+              backgroundColor: 'rgba(147, 51, 234, 0.15)',
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1,
-              borderColor: Colors.border,
+              borderColor: '#9333EA',
               ...Shadows.card,
             }}
-            testID="fab-take-photo"
+            testID="fab-identify-photo"
           >
-            <Camera size={20} color={Colors.textPrimary} />
+            <Camera size={20} color="#9333EA" />
           </Pressable>
         </Animated.View>
 
@@ -932,7 +937,7 @@ export default function PantryScreen() {
         <FloatingActionButton
           onBatchScan={() => router.push('/barcode-scanner?mode=rapid')}
           onSingleScan={() => router.push('/barcode-scanner')}
-          onPhoto={() => router.push('/add-pantry-item')}
+          onPhoto={() => router.push('/photo-recognition')}
           onManual={() => router.push('/add-pantry-item')}
         />
 

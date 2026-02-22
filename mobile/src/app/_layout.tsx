@@ -52,6 +52,7 @@ function RootLayoutNav() {
         <Stack.Screen name="import-recipe" options={{ headerShown: false }} />
         <Stack.Screen name="recipe-box" options={{ headerShown: false }} />
         <Stack.Screen name="shopping-history" options={{ headerShown: false, presentation: 'modal' }} />
+        <Stack.Screen name="photo-recognition" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       </Stack>
     </ThemeProvider>
   );

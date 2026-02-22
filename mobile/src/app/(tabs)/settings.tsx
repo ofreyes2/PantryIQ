@@ -378,6 +378,19 @@ export default function SettingsScreen() {
   const [claudeKey, setClaudeKey] = useState(userProfile.claudeApiKey);
   const [usdaKey, setUsdaKey] = useState(userProfile.usdaApiKey);
 
+  // Photo recognition settings
+  const [photoRecognitionEnabled, setPhotoRecognitionEnabled] = useState<boolean>(true);
+  const [showPhotoTips, setShowPhotoTips] = useState<boolean>(true);
+
+  React.useEffect(() => {
+    AsyncStorage.getItem('pantryiq_photo_recognition_enabled').then((val) => {
+      if (val !== null) setPhotoRecognitionEnabled(val === 'true');
+    });
+    AsyncStorage.getItem('pantryiq_skip_photo_tips').then((val) => {
+      if (val !== null) setShowPhotoTips(val !== 'true');
+    });
+  }, []);
+
   // Notification state
   const [notifMeal, setNotifMeal] = useState(false);
   const [notifWeight, setNotifWeight] = useState(false);
@@ -574,6 +587,26 @@ export default function SettingsScreen() {
               <Pressable style={[styles.saveButton, { marginTop: 12 }]} onPress={saveApiKeys} testID="save-api-keys-btn">
                 <Text style={styles.saveText}>Save API Keys</Text>
               </Pressable>
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Photo Recognition"
+                value={photoRecognitionEnabled}
+                onToggle={(v) => {
+                  setPhotoRecognitionEnabled(v);
+                  AsyncStorage.setItem('pantryiq_photo_recognition_enabled', String(v));
+                }}
+                sublabel="Use Claude AI to identify foods from photos. Requires Claude API key."
+              />
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Show Photo Tips"
+                value={showPhotoTips}
+                onToggle={(v) => {
+                  setShowPhotoTips(v);
+                  AsyncStorage.setItem('pantryiq_skip_photo_tips', String(!v));
+                }}
+                sublabel="Show guidance tips before taking identification photos."
+              />
             </SectionCard>
           </View>
 
