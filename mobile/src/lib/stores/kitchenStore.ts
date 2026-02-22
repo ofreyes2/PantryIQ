@@ -320,3 +320,15 @@ export const useKitchenStore = create<KitchenState>()(
     }
   )
 );
+
+/**
+ * Hydrate the kitchen store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateKitchenStore(): Promise<void> {
+  try {
+    await useKitchenStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate kitchen store:', error);
+  }
+}

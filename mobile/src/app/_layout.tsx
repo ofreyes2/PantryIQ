@@ -17,7 +17,15 @@ import {
   PlayfairDisplay_600SemiBold,
   PlayfairDisplay_700Bold,
 } from '@expo-google-fonts/playfair-display';
-import { useAppStore } from '@/lib/stores/appStore';
+import { useAppStore, hydrateAppStore } from '@/lib/stores/appStore';
+import { hydratePantryStore } from '@/lib/stores/pantryStore';
+import { hydrateMealsStore } from '@/lib/stores/mealsStore';
+import { hydrateLocationStore } from '@/lib/stores/locationStore';
+import { hydrateHealthStore } from '@/lib/stores/healthStore';
+import { hydrateShoppingStore } from '@/lib/stores/shoppingStore';
+import { hydrateRecipesStore } from '@/lib/stores/recipesStore';
+import { hydrateKitchenStore } from '@/lib/stores/kitchenStore';
+import { hydrateKitchenMapStore } from '@/lib/stores/kitchenMapStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -78,6 +86,19 @@ export default function RootLayout() {
 
   const onLayoutRootView = useCallback(async () => {
     if (fontsLoaded) {
+      // Hydrate all Zustand stores from AsyncStorage
+      await Promise.all([
+        hydrateAppStore(),
+        hydratePantryStore(),
+        hydrateMealsStore(),
+        hydrateLocationStore(),
+        hydrateHealthStore(),
+        hydrateShoppingStore(),
+        hydrateRecipesStore(),
+        hydrateKitchenStore(),
+        hydrateKitchenMapStore(),
+      ]);
+
       await SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);

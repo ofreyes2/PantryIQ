@@ -192,3 +192,15 @@ export const useLocationStore = create<LocationState>()(
     }
   )
 );
+
+/**
+ * Hydrate the location store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateLocationStore(): Promise<void> {
+  try {
+    await useLocationStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate location store:', error);
+  }
+}

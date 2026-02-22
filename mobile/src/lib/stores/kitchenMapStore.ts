@@ -88,4 +88,16 @@ export const useKitchenMapStore = create<KitchenMapState>()(
   )
 );
 
+/**
+ * Hydrate the kitchen map store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateKitchenMapStore(): Promise<void> {
+  try {
+    await useKitchenMapStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate kitchen map store:', error);
+  }
+}
+
 export { generateId };

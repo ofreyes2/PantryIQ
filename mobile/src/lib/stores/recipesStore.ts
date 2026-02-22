@@ -824,3 +824,15 @@ export const useRecipesStore = create<RecipesState>()(
     }
   )
 );
+
+/**
+ * Hydrate the recipes store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateRecipesStore(): Promise<void> {
+  try {
+    await useRecipesStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate recipes store:', error);
+  }
+}

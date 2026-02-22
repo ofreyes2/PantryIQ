@@ -97,3 +97,15 @@ export const useAppStore = create<AppState>()(
     }
   )
 );
+
+/**
+ * Hydrate the app store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateAppStore(): Promise<void> {
+  try {
+    await useAppStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate app store:', error);
+  }
+}

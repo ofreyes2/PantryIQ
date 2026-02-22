@@ -346,3 +346,15 @@ export const usePantryStore = create<PantryState>()(
     }
   )
 );
+
+/**
+ * Hydrate the pantry store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydratePantryStore(): Promise<void> {
+  try {
+    await usePantryStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate pantry store:', error);
+  }
+}

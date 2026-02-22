@@ -258,3 +258,15 @@ export const useShoppingStore = create<ShoppingState>()(
     }
   )
 );
+
+/**
+ * Hydrate the shopping store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateShoppingStore(): Promise<void> {
+  try {
+    await useShoppingStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate shopping store:', error);
+  }
+}

@@ -292,3 +292,15 @@ export const useMealsStore = create<MealsState>()(
     }
   )
 );
+
+/**
+ * Hydrate the meals store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateMealsStore(): Promise<void> {
+  try {
+    await useMealsStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate meals store:', error);
+  }
+}

@@ -209,3 +209,15 @@ export const useHealthStore = create<HealthState>()(
     }
   )
 );
+
+/**
+ * Hydrate the health store from AsyncStorage
+ * Call this on app startup to restore persisted state
+ */
+export async function hydrateHealthStore(): Promise<void> {
+  try {
+    await useHealthStore.persist.rehydrate();
+  } catch (error) {
+    console.warn('Failed to hydrate health store:', error);
+  }
+}
