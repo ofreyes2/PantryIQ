@@ -136,6 +136,7 @@ mobile/src/
       - All input fields remain visible while keyboard is shown
       - Save button always reachable without closing keyboard
       - Smooth auto-scroll when keyboard appears
+      - **FIXED**: Resolved VirtualizedList nesting error by moving ManualFoodEntryForm outside ScrollView wrapper in meals.tsx
     - **Meal Logging Confirmation Flow**: Bulletproof meal logging with meal type/date selection
       - Created MealConfirmationModal component
       - Modal appears before any meal logging in Chef Claude

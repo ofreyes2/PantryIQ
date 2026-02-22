@@ -1190,288 +1190,16 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry
               <Text style={{ fontSize: 14 }}>{mealSection.icon}</Text>
             </View>
             <Text style={{ fontFamily: 'PlayfairDisplay_700Bold', fontSize: 20, color: Colors.textPrimary, flex: 1 }}>
-              {view === 'options' ? `Add to ${mealType}` : view === 'search' ? 'Search Foods' : view === 'favorites' ? 'Favorites' : 'Portion Size'}
+              {view === 'options' ? `Add to ${mealType}` : view === 'search' ? 'Search Foods' : view === 'favorites' ? 'Favorites' : view === 'manual' ? 'Enter Food Details' : 'Portion Size'}
             </Text>
             <Pressable onPress={handleClose} testID="close-add-food-modal" hitSlop={8}>
               <X size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: 40 }}
-          >
-            {/* OPTIONS VIEW */}
-            {view === 'options' && (
-              <View style={{ paddingHorizontal: 20, gap: 10 }}>
-                {[
-                  {
-                    icon: <ScanLine size={24} color={Colors.green} />,
-                    title: 'Scan Barcode',
-                    subtitle: 'Scan a product barcode',
-                    bg: Colors.greenMuted,
-                    onPress: () => { handleClose(); router.push('/barcode-scanner'); },
-                    testID: 'scan-barcode-option',
-                  },
-                  {
-                    icon: <Camera size={24} color="#9B59B6" />,
-                    title: 'Identify by Photo',
-                    subtitle: 'Use AI to identify food',
-                    bg: 'rgba(155,89,182,0.15)',
-                    onPress: () => { handleClose(); router.push('/photo-recognition'); },
-                    testID: 'photo-option',
-                  },
-                  {
-                    icon: <Search size={24} color="#3498DB" />,
-                    title: 'Search Food Database',
-                    subtitle: 'Find from 500k+ foods',
-                    bg: 'rgba(52,152,219,0.15)',
-                    onPress: () => setView('search'),
-                    testID: 'search-option',
-                  },
-                  {
-                    icon: <Heart size={24} color={Colors.error} />,
-                    title: 'Choose from Favorites',
-                    subtitle: `${favorites.length} saved items`,
-                    bg: Colors.errorMuted,
-                    onPress: () => setView('favorites'),
-                    testID: 'favorites-option',
-                  },
-                  {
-                    icon: <Edit3 size={24} color="#F39C12" />,
-                    title: 'Enter Manually',
-                    subtitle: 'Fill in details yourself',
-                    bg: 'rgba(243,156,18,0.15)',
-                    onPress: () => setView('manual'),
-                    testID: 'manual-entry-option',
-                  },
-                ].map((opt) => (
-                  <Pressable
-                    key={opt.testID}
-                    onPress={opt.onPress}
-                    testID={opt.testID}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: Colors.surface,
-                      borderRadius: BorderRadius.lg,
-                      padding: 16,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                    }}
-                  >
-                    <View style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: BorderRadius.md,
-                      backgroundColor: opt.bg,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 14,
-                    }}>
-                      {opt.icon}
-                    </View>
-                    <View>
-                      <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
-                        {opt.title}
-                      </Text>
-                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-                        {opt.subtitle}
-                      </Text>
-                    </View>
-                    <ChevronRight size={18} color={Colors.textTertiary} style={{ marginLeft: 'auto' }} />
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            {/* SEARCH VIEW */}
-            {view === 'search' && (
-              <View style={{ paddingHorizontal: 20 }}>
-                <Pressable
-                  onPress={() => setView('options')}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}
-                >
-                  <ChevronLeft size={16} color={Colors.textSecondary} />
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary }}>Back</Text>
-                </Pressable>
-
-                <View style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: Colors.surface,
-                  borderRadius: BorderRadius.lg,
-                  paddingHorizontal: 12,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                }}>
-                  <Search size={16} color={Colors.textTertiary} />
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    placeholder="Search foods..."
-                    placeholderTextColor={Colors.textTertiary}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      paddingHorizontal: 10,
-                      fontFamily: 'DMSans_400Regular',
-                      fontSize: 15,
-                      color: Colors.textPrimary,
-                    }}
-                    autoFocus
-                    testID="food-search-input"
-                  />
-                  {searchQuery.length > 0 && (
-                    <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
-                      <X size={14} color={Colors.textTertiary} />
-                    </Pressable>
-                  )}
-                </View>
-
-                {searchQuery.length === 0 ? (
-                  <View>
-                    <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textSecondary, marginBottom: 8 }}>
-                      RECENT SEARCHES
-                    </Text>
-                    {recentSearches.map((s) => (
-                      <Pressable
-                        key={s}
-                        onPress={() => setSearchQuery(s)}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          paddingVertical: 10,
-                          borderBottomWidth: 1,
-                          borderBottomColor: Colors.borderLight,
-                          gap: 10,
-                        }}
-                      >
-                        <Search size={14} color={Colors.textTertiary} />
-                        <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}>
-                          {s}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                ) : filteredFoods.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingTop: 32 }}>
-                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}>
-                      No results for "{searchQuery}"
-                    </Text>
-                  </View>
-                ) : (
-                  filteredFoods.map((food) => (
-                    <Pressable
-                      key={food.id}
-                      onPress={() => handleSelectFood(food)}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: Colors.borderLight,
-                      }}
-                      testID={`food-result-${food.id}`}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
-                          {food.name}
-                        </Text>
-                        <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-                          {food.brand !== 'Generic' ? food.brand + ' · ' : null}{food.servingDescription}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
-                        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.textPrimary }}>
-                          {food.caloriesPerServing} cal
-                        </Text>
-                        <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
-                          {food.netCarbsPerServing}g carbs
-                        </Text>
-                      </View>
-                      <ChevronRight size={16} color={Colors.textTertiary} />
-                    </Pressable>
-                  ))
-                )}
-              </View>
-            )}
-
-            {/* FAVORITES VIEW */}
-            {view === 'favorites' && (
-              <View style={{ paddingHorizontal: 20 }}>
-                <Pressable
-                  onPress={() => setView('options')}
-                  style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}
-                >
-                  <ChevronLeft size={16} color={Colors.textSecondary} />
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary }}>Back</Text>
-                </Pressable>
-
-                {favorites.length === 0 ? (
-                  <View style={{ alignItems: 'center', paddingTop: 32 }}>
-                    <Heart size={32} color={Colors.textTertiary} />
-                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 12 }}>
-                      No favorites yet
-                    </Text>
-                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4 }}>
-                      Tap the heart on any food to save it
-                    </Text>
-                  </View>
-                ) : (
-                  favorites.map((entry) => (
-                    <Pressable
-                      key={entry.id}
-                      onPress={() => handleSelectFavorite(entry)}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: Colors.borderLight,
-                      }}
-                      testID={`favorite-${entry.id}`}
-                    >
-                      <View style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: BorderRadius.sm,
-                        backgroundColor: Colors.errorMuted,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        marginRight: 12,
-                      }}>
-                        <Heart size={14} color={Colors.error} fill={Colors.error} />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
-                          {entry.name}
-                        </Text>
-                        <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-                          {entry.mealType} · {entry.calories} cal/serving
-                        </Text>
-                      </View>
-                      <ChevronRight size={16} color={Colors.textTertiary} />
-                    </Pressable>
-                  ))
-                )}
-              </View>
-            )}
-
-            {/* PORTION VIEW */}
-            {view === 'portion' && selectedFood ? (
-              <PortionSelector
-                food={selectedFood}
-                mealType={mealType}
-                onLog={handleLog}
-                onCancel={() => setView(selectedFood ? (view === 'portion' ? 'search' : 'options') : 'options')}
-              />
-            ) : null}
-
-            {/* MANUAL ENTRY VIEW */}
-            {view === 'manual' ? (
+          {/* MANUAL ENTRY VIEW - Rendered outside ScrollView */}
+          {view === 'manual' ? (
+            <View style={{ flex: 1 }}>
               <ManualFoodEntryForm
                 onSave={(entry) => {
                   onAddManualEntry?.(entry, mealType);
@@ -1479,8 +1207,282 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry
                 }}
                 onCancel={() => setView('options')}
               />
-            ) : null}
-          </ScrollView>
+            </View>
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 40 }}
+            >
+              {/* OPTIONS VIEW */}
+              {view === 'options' && (
+                <View style={{ paddingHorizontal: 20, gap: 10 }}>
+                  {[
+                    {
+                      icon: <ScanLine size={24} color={Colors.green} />,
+                      title: 'Scan Barcode',
+                      subtitle: 'Scan a product barcode',
+                      bg: Colors.greenMuted,
+                      onPress: () => { handleClose(); router.push('/barcode-scanner'); },
+                      testID: 'scan-barcode-option',
+                    },
+                    {
+                      icon: <Camera size={24} color="#9B59B6" />,
+                      title: 'Identify by Photo',
+                      subtitle: 'Use AI to identify food',
+                      bg: 'rgba(155,89,182,0.15)',
+                      onPress: () => { handleClose(); router.push('/photo-recognition'); },
+                      testID: 'photo-option',
+                    },
+                    {
+                      icon: <Search size={24} color="#3498DB" />,
+                      title: 'Search Food Database',
+                      subtitle: 'Find from 500k+ foods',
+                      bg: 'rgba(52,152,219,0.15)',
+                      onPress: () => setView('search'),
+                      testID: 'search-option',
+                    },
+                    {
+                      icon: <Heart size={24} color={Colors.error} />,
+                      title: 'Choose from Favorites',
+                      subtitle: `${favorites.length} saved items`,
+                      bg: Colors.errorMuted,
+                      onPress: () => setView('favorites'),
+                      testID: 'favorites-option',
+                    },
+                    {
+                      icon: <Edit3 size={24} color="#F39C12" />,
+                      title: 'Enter Manually',
+                      subtitle: 'Fill in details yourself',
+                      bg: 'rgba(243,156,18,0.15)',
+                      onPress: () => setView('manual'),
+                      testID: 'manual-entry-option',
+                    },
+                  ].map((opt) => (
+                    <Pressable
+                      key={opt.testID}
+                      onPress={opt.onPress}
+                      testID={opt.testID}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: Colors.surface,
+                        borderRadius: BorderRadius.lg,
+                        padding: 16,
+                        borderWidth: 1,
+                        borderColor: Colors.border,
+                      }}
+                    >
+                      <View style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: BorderRadius.md,
+                        backgroundColor: opt.bg,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 14,
+                      }}>
+                        {opt.icon}
+                      </View>
+                      <View>
+                        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
+                          {opt.title}
+                        </Text>
+                        <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                          {opt.subtitle}
+                        </Text>
+                      </View>
+                      <ChevronRight size={18} color={Colors.textTertiary} style={{ marginLeft: 'auto' }} />
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* SEARCH VIEW */}
+              {view === 'search' && (
+                <View style={{ paddingHorizontal: 20 }}>
+                  <Pressable
+                    onPress={() => setView('options')}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}
+                  >
+                    <ChevronLeft size={16} color={Colors.textSecondary} />
+                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary }}>Back</Text>
+                  </Pressable>
+
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    backgroundColor: Colors.surface,
+                    borderRadius: BorderRadius.lg,
+                    paddingHorizontal: 12,
+                    marginBottom: 16,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                  }}>
+                    <Search size={16} color={Colors.textTertiary} />
+                    <TextInput
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      placeholder="Search foods..."
+                      placeholderTextColor={Colors.textTertiary}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 12,
+                        paddingHorizontal: 10,
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 15,
+                        color: Colors.textPrimary,
+                      }}
+                      autoFocus
+                      testID="food-search-input"
+                    />
+                    {searchQuery.length > 0 && (
+                      <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+                        <X size={14} color={Colors.textTertiary} />
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {searchQuery.length === 0 ? (
+                    <View>
+                      <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textSecondary, marginBottom: 8 }}>
+                        RECENT SEARCHES
+                      </Text>
+                      {recentSearches.map((s) => (
+                        <Pressable
+                          key={s}
+                          onPress={() => setSearchQuery(s)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingVertical: 10,
+                            borderBottomWidth: 1,
+                            borderBottomColor: Colors.borderLight,
+                            gap: 10,
+                          }}
+                        >
+                          <Search size={14} color={Colors.textTertiary} />
+                          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}>
+                            {s}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  ) : filteredFoods.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingTop: 32 }}>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}>
+                        No results for "{searchQuery}"
+                      </Text>
+                    </View>
+                  ) : (
+                    filteredFoods.map((food) => (
+                      <Pressable
+                        key={food.id}
+                        onPress={() => handleSelectFood(food)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: Colors.borderLight,
+                        }}
+                        testID={`food-result-${food.id}`}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
+                            {food.name}
+                          </Text>
+                          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                            {food.brand !== 'Generic' ? food.brand + ' · ' : null}{food.servingDescription}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+                          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.textPrimary }}>
+                            {food.caloriesPerServing} cal
+                          </Text>
+                          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
+                            {food.netCarbsPerServing}g carbs
+                          </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.textTertiary} />
+                      </Pressable>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {/* FAVORITES VIEW */}
+              {view === 'favorites' && (
+                <View style={{ paddingHorizontal: 20 }}>
+                  <Pressable
+                    onPress={() => setView('options')}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}
+                  >
+                    <ChevronLeft size={16} color={Colors.textSecondary} />
+                    <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary }}>Back</Text>
+                  </Pressable>
+
+                  {favorites.length === 0 ? (
+                    <View style={{ alignItems: 'center', paddingTop: 32 }}>
+                      <Heart size={32} color={Colors.textTertiary} />
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 12 }}>
+                        No favorites yet
+                      </Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 4 }}>
+                        Tap the heart on any food to save it
+                      </Text>
+                    </View>
+                  ) : (
+                    favorites.map((entry) => (
+                      <Pressable
+                        key={entry.id}
+                        onPress={() => handleSelectFavorite(entry)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: Colors.borderLight,
+                        }}
+                        testID={`favorite-${entry.id}`}
+                      >
+                        <View style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: BorderRadius.sm,
+                          backgroundColor: Colors.errorMuted,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginRight: 12,
+                        }}>
+                          <Heart size={14} color={Colors.error} fill={Colors.error} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
+                            {entry.name}
+                          </Text>
+                          <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                            {entry.mealType} · {entry.calories} cal/serving
+                          </Text>
+                        </View>
+                        <ChevronRight size={16} color={Colors.textTertiary} />
+                      </Pressable>
+                    ))
+                  )}
+                </View>
+              )}
+
+              {/* PORTION VIEW */}
+              {view === 'portion' && selectedFood ? (
+                <PortionSelector
+                  food={selectedFood}
+                  mealType={mealType}
+                  onLog={handleLog}
+                  onCancel={() => setView(selectedFood ? (view === 'portion' ? 'search' : 'options') : 'options')}
+                />
+              ) : null}
+            </ScrollView>
+          )}
         </Animated.View>
       </View>
     </Modal>
