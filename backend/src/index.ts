@@ -4,6 +4,8 @@ import { cors } from "hono/cors";
 import "./env";
 import { sampleRouter } from "./routes/sample";
 import { healthRouter } from "./routes/health";
+import { nutritionRouter } from "./routes/nutrition";
+import { fastingRouter } from "./routes/fasting";
 import { logger } from "hono/logger";
 
 const app = new Hono();
@@ -35,6 +37,8 @@ app.route("/api/health", healthRouter);
 
 // Routes
 app.route("/api/sample", sampleRouter);
+app.route("/api/nutrition", nutritionRouter);
+app.route("/api/fasting", fastingRouter);
 
 const port = Number(process.env.PORT) || 3000;
 
@@ -42,3 +46,4 @@ export default {
   port,
   fetch: app.fetch,
 };
+
