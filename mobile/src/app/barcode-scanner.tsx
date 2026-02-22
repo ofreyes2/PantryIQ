@@ -658,7 +658,6 @@ export default function BarcodeScannerScreen() {
   const lastScannedBarcode = useRef<string | null>(null);
 
   const claudeApiKey = useAppStore((s) => s.userProfile.claudeApiKey);
-  const goUpcApiKey = useAppStore((s) => s.userProfile.goUpcApiKey);
   const addItem = usePantryStore((s) => s.addItem);
 
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -736,44 +735,38 @@ export default function BarcodeScannerScreen() {
     }
   };
 
-  const lookupGoUpc = async (barcode: string): Promise<ProductData | null> => {
-    if (!goUpcApiKey) {
-      console.log('[Scanner] API-2 Go-UPC skipped (no key set)');
-      return null;
-    }
+  const lookupUPCitemdb = async (barcode: string): Promise<ProductData | null> => {
     try {
-      const url = `https://go-upc.com/api/v1/code/${barcode}`;
-      console.log('[Scanner] API-2 Go-UPC:', url);
+      const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${barcode}`;
+      console.log('[Scanner] API-2 UPCitemdb:', url);
       const res = await fetchWithTimeout(url, {
-        headers: { Authorization: `Bearer ${goUpcApiKey}` },
+        headers: { 'Content-Type': 'application/json' },
       }, 10000);
       const data = await res.json();
-      const found = !!data?.product?.name;
-      console.log('[Scanner] API-2 Go-UPC status:', res.status, '| product found:', found, '| name:', data?.product?.name);
+      const item = data?.items?.[0];
+      const found = !!item?.title;
+      console.log('[Scanner] API-2 UPCitemdb status:', res.status, '| found:', found, '| title:', item?.title);
 
       if (!found) return null;
 
-      const p = data.product;
-      const nutrients = (p.nutrients ?? []) as Array<{ name: string; value: number; unit: string }>;
-      const getNutrient = (name: string) =>
-        nutrients.find((n) => n.name.toLowerCase().includes(name.toLowerCase()))?.value ?? 0;
-
+      // UPCitemdb nutrition is in item.nutrition object (may not always be present)
+      const n = item.nutrition ?? {};
       return {
         barcode,
-        name: p.name ?? '',
-        brand: p.brand ?? '',
-        caloriesPerServing: getNutrient('calories') || getNutrient('energy'),
-        carbsPerServing: getNutrient('carbohydrate') || getNutrient('carbs'),
-        proteinPerServing: getNutrient('protein'),
-        fatPerServing: getNutrient('fat') || getNutrient('total fat'),
-        fiberPerServing: getNutrient('fiber') || getNutrient('dietary fiber'),
-        sodiumPerServing: getNutrient('sodium'),
-        servingSize: '',
-        photoUri: p.imageUrl ?? '',
+        name: item.title ?? '',
+        brand: item.brand ?? '',
+        caloriesPerServing: Number(n.calories ?? 0),
+        carbsPerServing: Number(n.carbohydrate_g ?? 0),
+        proteinPerServing: Number(n.protein_g ?? 0),
+        fatPerServing: Number(n.fat_g ?? 0),
+        fiberPerServing: Number(n.fiber_g ?? 0),
+        sodiumPerServing: Number(n.sodium_mg ? n.sodium_mg / 1000 : 0),
+        servingSize: item.size ?? '',
+        photoUri: item.images?.[0] ?? '',
         category: 'Other',
       };
     } catch (err) {
-      console.log('[Scanner] API-2 Go-UPC error:', err);
+      console.log('[Scanner] API-2 UPCitemdb error:', err);
       return null;
     }
   };
@@ -899,21 +892,19 @@ If you cannot identify it, respond with: {"identified": false}`;
         return;
       }
 
-      // ── API 2: Go-UPC ──
-      log += goUpcApiKey ? 'API-2 Go-UPC... ' : 'API-2 Go-UPC SKIPPED (no key)\n';
+      // ── API 2: UPCitemdb (free, no key) ──
+      log += 'API-2 UPCitemdb... ';
       setScanDebugLog(log);
-      console.log('[Scanner] OFF failed, trying Go-UPC...');
-      const goUpcResult = await lookupGoUpc(data);
-      if (goUpcApiKey) {
-        debugEntry.goUpc = { status: goUpcResult ? 200 : 'not found', found: !!goUpcResult };
-        log += goUpcResult ? `FOUND: ${goUpcResult.name}\n` : 'not found\n';
-        setScanDebugLog(log);
-        setDebugInfo({ ...debugEntry });
-      }
+      console.log('[Scanner] OFF failed, trying UPCitemdb...');
+      const upcResult = await lookupUPCitemdb(data);
+      debugEntry.goUpc = { status: upcResult ? 200 : 'not found', found: !!upcResult };
+      log += upcResult ? `FOUND: ${upcResult.name}\n` : 'not found\n';
+      setScanDebugLog(log);
+      setDebugInfo({ ...debugEntry });
 
-      if (goUpcResult) {
-        console.log('[Scanner] SUCCESS via Go-UPC:', goUpcResult.name);
-        setFoundProduct(goUpcResult);
+      if (upcResult) {
+        console.log('[Scanner] SUCCESS via UPCitemdb:', upcResult.name);
+        setFoundProduct(upcResult);
         setLoading(false);
         return;
       }
@@ -1341,7 +1332,7 @@ If you cannot identify it, respond with: {"identified": false}`;
             </Text>
             {debugInfo.goUpc !== null ? (
               <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: debugInfo.goUpc.found ? '#22C55E' : 'rgba(255,255,255,0.5)' }}>
-                API-2 Go-UPC: {String(debugInfo.goUpc.status)} | {debugInfo.goUpc.found ? 'FOUND' : 'not found'}
+                API-2 UPCitemdb: {String(debugInfo.goUpc.status)} | {debugInfo.goUpc.found ? 'FOUND' : 'not found'}
               </Text>
             ) : null}
             {debugInfo.claude !== null ? (

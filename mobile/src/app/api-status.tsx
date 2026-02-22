@@ -69,7 +69,6 @@ function KeyStatusRow({
 
 export default function ApiStatusScreen() {
   const claudeApiKey = useAppStore((s) => s.userProfile.claudeApiKey);
-  const goUpcApiKey = useAppStore((s) => s.userProfile.goUpcApiKey);
   const usdaApiKey = useAppStore((s) => s.userProfile.usdaApiKey);
 
   const [testBarcode, setTestBarcode] = useState('073416000469');
@@ -113,31 +112,24 @@ export default function ApiStatusScreen() {
     }
   };
 
-  const testGoUpc = async () => {
+  const testUPCitemdb = async () => {
     if (!testBarcode.trim()) return;
-    if (!goUpcApiKey) {
-      setTestLog('Go-UPC key is NOT SET in Settings. Add your key first.\n');
-      return;
-    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTesting(true);
     setTestTarget('goupc');
-    setTestLog('Testing Go-UPC...\n');
+    setTestLog('Testing UPCitemdb (free, no key needed)...\n');
     try {
-      const url = `https://go-upc.com/api/v1/code/${testBarcode.trim()}`;
+      const url = `https://api.upcitemdb.com/prod/trial/lookup?upc=${testBarcode.trim()}`;
       setTestLog((l) => l + `URL: ${url}\n`);
-      setTestLog((l) => l + `Key (last 4): ...${goUpcApiKey.slice(-4)}\n`);
       const res = await fetchWithTimeout(url, {
-        headers: {
-          Authorization: `Bearer ${goUpcApiKey}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
       }, 10000);
       setTestLog((l) => l + `HTTP Status: ${res.status}\n`);
       const data = await res.json();
-      setTestLog((l) => l + `product.name: ${data?.product?.name ?? 'N/A'}\n`);
-      setTestLog((l) => l + `product.brand: ${data?.product?.brand ?? 'N/A'}\n`);
-      setTestLog((l) => l + `product.imageUrl: ${data?.product?.imageUrl ? 'present' : 'N/A'}\n`);
+      const item = data?.items?.[0];
+      setTestLog((l) => l + `title: ${item?.title ?? 'N/A'}\n`);
+      setTestLog((l) => l + `brand: ${item?.brand ?? 'N/A'}\n`);
+      setTestLog((l) => l + `images: ${item?.images?.length ?? 0} found\n`);
       setTestLog((l) => l + '\nRaw (first 400 chars):\n' + JSON.stringify(data).substring(0, 400));
     } catch (err) {
       setTestLog((l) => l + `ERROR: ${String(err)}\n`);
@@ -209,7 +201,7 @@ export default function ApiStatusScreen() {
               API Key Status
             </Text>
             <KeyStatusRow label="Open Food Facts" value="" always />
-            <KeyStatusRow label="Go-UPC Key" value={goUpcApiKey} />
+            <KeyStatusRow label="UPCitemdb" value="" always />
             <KeyStatusRow label="Claude API Key" value={claudeApiKey} />
             <View style={{ borderBottomWidth: 0 }}>
               <KeyStatusRow label="USDA Key (food name search)" value={usdaApiKey} />
@@ -223,7 +215,7 @@ export default function ApiStatusScreen() {
                 lineHeight: 16,
               }}
             >
-              If Go-UPC or Claude show NOT SET, go back to Settings → API Keys, enter and save your keys.
+              If Claude shows NOT SET, go back to Settings → API Keys, enter and save your key.
             </Text>
           </View>
 
@@ -301,7 +293,7 @@ export default function ApiStatusScreen() {
               </Pressable>
 
               <Pressable
-                onPress={testGoUpc}
+                onPress={testUPCitemdb}
                 disabled={testing}
                 style={({ pressed }) => ({
                   flex: 1,
@@ -313,15 +305,15 @@ export default function ApiStatusScreen() {
                   justifyContent: 'center',
                   gap: 6,
                   borderWidth: 1,
-                  borderColor: goUpcApiKey ? Colors.green : Colors.border,
+                  borderColor: Colors.green,
                   opacity: testing && testTarget !== 'goupc' ? 0.5 : pressed ? 0.85 : 1,
                 })}
               >
                 {testing && testTarget === 'goupc' ? (
                   <ActivityIndicator size="small" color={Colors.green} />
                 ) : null}
-                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: goUpcApiKey ? Colors.green : Colors.textTertiary }}>
-                  Test Go-UPC
+                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.green }}>
+                  Test UPCitemdb
                 </Text>
               </Pressable>
             </View>
@@ -384,7 +376,7 @@ export default function ApiStatusScreen() {
             </Text>
             {[
               { n: '1', name: 'Open Food Facts', note: 'Free, no key needed. Best for global products.' },
-              { n: '2', name: 'Go-UPC', note: 'Best for US grocery. Requires free key from go-upc.com' },
+              { n: '2', name: 'UPCitemdb', note: 'Free, no key needed. Great for US grocery barcodes.' },
               { n: '3', name: 'Claude AI', note: 'Identifies unknown barcodes. Requires Claude API key.' },
             ].map((item) => (
               <View key={item.n} style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>

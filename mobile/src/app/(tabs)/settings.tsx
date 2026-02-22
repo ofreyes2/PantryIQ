@@ -383,7 +383,6 @@ export default function SettingsScreen() {
   // API key state
   const [claudeKey, setClaudeKey] = useState(userProfile.claudeApiKey);
   const [usdaKey, setUsdaKey] = useState(userProfile.usdaApiKey);
-  const [goUpcKey, setGoUpcKey] = useState(userProfile.goUpcApiKey);
 
   // Photo recognition settings
   const [photoRecognitionEnabled, setPhotoRecognitionEnabled] = useState<boolean>(true);
@@ -424,7 +423,7 @@ export default function SettingsScreen() {
   };
 
   const saveApiKeys = () => {
-    setUserProfile({ claudeApiKey: claudeKey, usdaApiKey: usdaKey, goUpcApiKey: goUpcKey });
+    setUserProfile({ claudeApiKey: claudeKey, usdaApiKey: usdaKey });
     showToast('API keys saved', 'success');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
@@ -644,14 +643,6 @@ export default function SettingsScreen() {
                 onChange={setUsdaKey}
                 helpUrl="https://fdc.nal.usda.gov/api-key-signup.html"
                 helpLabel="Get Key"
-              />
-              <View style={styles.divider} />
-              <ApiKeyField
-                label="Go-UPC Key"
-                value={goUpcKey}
-                onChange={setGoUpcKey}
-                helpUrl="https://go-upc.com"
-                helpLabel="Get Free Key"
               />
               <Pressable style={[styles.saveButton, { marginTop: 12 }]} onPress={saveApiKeys} testID="save-api-keys-btn">
                 <Text style={styles.saveText}>Save API Keys</Text>

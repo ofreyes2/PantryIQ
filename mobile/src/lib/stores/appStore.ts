@@ -13,7 +13,6 @@ export interface UserProfile {
   avatarUri: string | null;
   claudeApiKey: string;
   usdaApiKey: string;
-  goUpcApiKey: string;
 }
 
 export interface AppSettings {
@@ -52,7 +51,6 @@ const defaultUserProfile: UserProfile = {
   avatarUri: null,
   claudeApiKey: '',
   usdaApiKey: '',
-  goUpcApiKey: '',
 };
 
 const defaultSettings: AppSettings = {
