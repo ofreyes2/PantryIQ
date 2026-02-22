@@ -33,7 +33,7 @@ import {
   Flame,
 } from 'lucide-react-native';
 import Svg, { Circle, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { useRouter, router } from 'expo-router';
 import { useAppStore } from '@/lib/stores/appStore';
 import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
 
@@ -498,46 +498,112 @@ function DashboardHeader({ name, streak }: { name: string; streak: number }) {
   const pulseStyle = useAnimatedStyle(() => ({ opacity: pulseOpacity.value }));
 
   return (
-    <View style={{ paddingHorizontal: CARD_PADDING, paddingTop: 8, paddingBottom: 20 }}>
-      <Text
-        style={{
-          fontFamily: 'PlayfairDisplay_700Bold',
-          fontSize: 28,
-          color: Colors.textPrimary,
-          lineHeight: 36,
-        }}
-      >
-        {greeting}, {name || 'there'}
-      </Text>
+    <View style={{ paddingBottom: 20 }}>
+      {/* Brand header row */}
       <View
         style={{
           flexDirection: 'row',
-          justifyContent: 'space-between',
           alignItems: 'center',
-          marginTop: 4,
+          justifyContent: 'space-between',
+          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 8,
         }}
       >
-        <Text
-          style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}
-        >
-          {dayName}, {dateStr}
-        </Text>
-        {streak > 0 ? (
-          <Animated.View
-            style={[{ flexDirection: 'row', alignItems: 'center', gap: 4 }, pulseStyle]}
+        {/* Logo + Name */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              backgroundColor: 'rgba(46,204,113,0.15)',
+              borderWidth: 1,
+              borderColor: 'rgba(46,204,113,0.3)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <Text style={{ fontSize: 16 }}>🔥</Text>
-            <Text
-              style={{
-                fontFamily: 'DMSans_700Bold',
-                fontSize: 13,
-                color: Colors.amber,
-              }}
+            <ChefHat size={17} color={Colors.green} />
+          </View>
+          <Text
+            style={{
+              fontFamily: 'PlayfairDisplay_700Bold',
+              fontSize: 20,
+              color: Colors.textPrimary,
+              letterSpacing: -0.3,
+            }}
+          >
+            PantryIQ
+          </Text>
+        </View>
+        {/* Avatar */}
+        <View
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: Colors.greenMuted,
+            borderWidth: 2,
+            borderColor: 'rgba(46,204,113,0.4)',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Text
+            style={{
+              fontFamily: 'DMSans_700Bold',
+              fontSize: 14,
+              color: Colors.green,
+            }}
+          >
+            {(name || 'U')[0].toUpperCase()}
+          </Text>
+        </View>
+      </View>
+
+      {/* Greeting row */}
+      <View style={{ paddingHorizontal: CARD_PADDING, paddingTop: 4 }}>
+        <Text
+          style={{
+            fontFamily: 'PlayfairDisplay_700Bold',
+            fontSize: 28,
+            color: Colors.textPrimary,
+            lineHeight: 36,
+          }}
+        >
+          {greeting}, {name || 'there'}
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 4,
+          }}
+        >
+          <Text
+            style={{ fontFamily: 'DMSans_400Regular', fontSize: 14, color: Colors.textSecondary }}
+          >
+            {dayName}, {dateStr}
+          </Text>
+          {streak > 0 ? (
+            <Animated.View
+              style={[{ flexDirection: 'row', alignItems: 'center', gap: 4 }, pulseStyle]}
             >
-              {streak} day streak
-            </Text>
-          </Animated.View>
-        ) : null}
+              <Text style={{ fontSize: 16 }}>🔥</Text>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 13,
+                  color: Colors.amber,
+                }}
+              >
+                {streak} day streak
+              </Text>
+            </Animated.View>
+          ) : null}
+        </View>
       </View>
     </View>
   );
@@ -956,6 +1022,34 @@ export default function DashboardScreen() {
             </Card>
           </View>
         </ScrollView>
+
+        {/* Chef Claude FAB */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/chef-claude');
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 100,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: Colors.green,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: Colors.green,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 12,
+            elevation: 8,
+            zIndex: 100,
+          }}
+          testID="chef-claude-fab"
+        >
+          <ChefHat size={24} color="#fff" />
+        </Pressable>
       </SafeAreaView>
     </LinearGradient>
   );

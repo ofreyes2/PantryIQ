@@ -144,6 +144,20 @@ function OnboardingFlow({ onComplete }: { onComplete: () => void }) {
       <LinearGradient colors={['#0A1628', '#0F1F38', '#0A1628']} style={{ flex: 1 }}>
         <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom']}>
           <Animated.View style={[{ flex: 1, paddingHorizontal: 24 }, fadeStyle]}>
+            {/* Close button */}
+            <View style={{ alignItems: 'flex-end', paddingTop: 8 }}>
+              <Pressable
+                style={styles.onboardingCloseButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.back();
+                }}
+                testID="onboarding-close-button"
+              >
+                <X size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
             {/* Kitchen Illustration */}
             <View style={styles.kitchenIllustration}>
               {/* Fridge shape */}
@@ -467,7 +481,10 @@ function MappingSessionHub() {
         {/* Header */}
         <View style={styles.hubHeader}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.back();
+            }}
             style={styles.backButton}
             testID="back-button"
           >
@@ -677,6 +694,17 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 
+  onboardingCloseButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+
   // Onboarding - how it works
   onboardingHeader: {
     paddingTop: 16,
@@ -785,9 +813,9 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Colors.surface,
     alignItems: 'center',
     justifyContent: 'center',

@@ -36,6 +36,8 @@ import {
   Trash2,
   Camera,
   Home,
+  Package,
+  Utensils,
 } from 'lucide-react-native';
 import { useAppStore, UserProfile } from '@/lib/stores/appStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
@@ -369,7 +371,9 @@ export default function SettingsScreen() {
   const settings = useAppStore((s) => s.settings);
 
   const pantryItems = usePantryStore((s) => s.items);
+  const deleteItem = usePantryStore((s) => s.deleteItem);
   const mealEntries = useMealsStore((s) => s.entries);
+  const deleteEntry = useMealsStore((s) => s.deleteEntry);
   const weightEntries = useHealthStore((s) => s.weightEntries);
   const recipes = useRecipesStore((s) => s.recipes);
   const shoppingStores = useShoppingStore((s) => s.stores);
@@ -856,8 +860,75 @@ export default function SettingsScreen() {
               />
               <View style={styles.divider} />
               <RowItem
-                label="Clear All Data"
-                onPress={handleClearData}
+                label="Reset Pantry"
+                value="Clear all pantry items"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert(
+                    'Reset Pantry?',
+                    'This will delete all pantry items. Your meals, recipes, and health data will be kept.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset Pantry',
+                        style: 'destructive',
+                        onPress: () => {
+                          pantryItems.forEach((item) => deleteItem(item.id));
+                          Alert.alert('Done', 'Pantry has been cleared.');
+                        },
+                      },
+                    ]
+                  );
+                }}
+                rightElement={<Package size={16} color={Colors.amber} />}
+              />
+              <View style={styles.divider} />
+              <RowItem
+                label="Reset Meal Log"
+                value="Clear all logged meals"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Alert.alert(
+                    'Reset Meal Log?',
+                    'This will delete all logged meals and food entries.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset Meals',
+                        style: 'destructive',
+                        onPress: () => {
+                          mealEntries.forEach((entry) => deleteEntry(entry.id));
+                          Alert.alert('Done', 'Meal log has been cleared.');
+                        },
+                      },
+                    ]
+                  );
+                }}
+                rightElement={<Utensils size={16} color={Colors.amber} />}
+              />
+              <View style={styles.divider} />
+              <RowItem
+                label="Reset Everything"
+                value="Full app reset to factory state"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  Alert.alert(
+                    'Reset Everything?',
+                    'This will delete ALL data including pantry items, meals, health records, and preferences. Your API keys will be kept.\n\nThis cannot be undone.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Reset Everything',
+                        style: 'destructive',
+                        onPress: async () => {
+                          pantryItems.forEach((item) => deleteItem(item.id));
+                          mealEntries.forEach((entry) => deleteEntry(entry.id));
+                          Alert.alert('Done', 'App has been reset. Your API keys were kept.');
+                        },
+                      },
+                    ]
+                  );
+                }}
                 destructive
                 rightElement={<Trash2 size={16} color={Colors.error} />}
               />
