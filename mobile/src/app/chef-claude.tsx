@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,8 +23,8 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { router } from 'expo-router';
-import { ChefHat, ArrowLeft, Send, History, Zap } from 'lucide-react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { ChefHat, ArrowLeft, Send, History, Zap, Edit3 } from 'lucide-react-native';
 import { usePantryStore } from '@/lib/stores/pantryStore';
 import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
@@ -48,6 +49,16 @@ interface Message {
   mealAnalysis?: MealAnalysis;
   isFollowUpQuestion?: boolean;
 }
+
+interface ConversationMetadata {
+  id: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string;
+  messageCount: number;
+}
+
+type MealCardStatus = 'pending' | 'logging' | 'success' | 'failure';
 
 const QUICK_PROMPTS = [
   "What can I make for dinner tonight?",
@@ -260,10 +271,16 @@ function MessageBubble({
   message,
   onMealConfirm,
   isMealLogging,
+  cardStatus,
+  cardError,
+  onRetry,
 }: {
   message: Message;
   onMealConfirm?: () => void;
   isMealLogging?: boolean;
+  cardStatus?: MealCardStatus;
+  cardError?: string;
+  onRetry?: () => void;
 }) {
   const isUser = message.role === 'user';
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -279,6 +296,9 @@ function MessageBubble({
             // TODO: Open meal editing modal
           }}
           isLoading={isMealLogging}
+          status={cardStatus ?? 'pending'}
+          errorMessage={cardError}
+          onRetry={onRetry}
         />
       </View>
     );
@@ -598,6 +618,7 @@ function ApiKeyModal({
 }
 
 export default function ChefClaudeScreen() {
+  const { conversationId: paramConversationId } = useLocalSearchParams<{ conversationId?: string }>();
   const pantryItems = usePantryStore((s) => s.items);
   const userProfile = useAppStore((s) => s.userProfile);
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
@@ -606,6 +627,9 @@ export default function ChefClaudeScreen() {
   const getEquipmentSummary = useKitchenStore((s) => s.getEquipmentSummary);
   const getPreferencesSummary = useKitchenStore((s) => s.getPreferencesSummary);
   const deductPantryServings = usePantryStore((s) => s.deductServings);
+
+  const conversationIdRef = useRef<string>(paramConversationId || `conv-${Date.now()}`);
+
   const findPantryItem = useCallback(
     (name: string) => {
       const normalized = name.toLowerCase();
@@ -619,6 +643,82 @@ export default function ChefClaudeScreen() {
     [pantryItems]
   );
 
+  // Conversation persistence helpers
+  const saveConversationToStorage = useCallback(
+    async (conversationId: string, messagesToSave: Message[]) => {
+      try {
+        const key = `pantryiq_chef_chat_${conversationId}`;
+        const messagesJson = messagesToSave.map((m) => ({
+          ...m,
+          timestamp: m.timestamp.toISOString(),
+          mealAnalysis: m.mealAnalysis ? JSON.stringify(m.mealAnalysis) : undefined,
+        }));
+        await AsyncStorage.setItem(key, JSON.stringify(messagesJson));
+
+        // Update conversation index
+        const indexKey = 'pantryiq_chef_conversations_index';
+        const existingIndex = await AsyncStorage.getItem(indexKey);
+        const conversations: ConversationMetadata[] = existingIndex ? JSON.parse(existingIndex) : [];
+
+        // Get conversation title from first user message
+        const firstUserMsg = messagesToSave.find((m) => m.role === 'user');
+        const title = firstUserMsg?.content?.substring(0, 50) || 'Untitled Conversation';
+
+        const now = new Date().toISOString();
+        const existingIdx = conversations.findIndex((c) => c.id === conversationId);
+
+        if (existingIdx >= 0) {
+          conversations[existingIdx] = {
+            id: conversationId,
+            title,
+            createdAt: conversations[existingIdx].createdAt,
+            lastMessageAt: now,
+            messageCount: messagesToSave.length,
+          };
+        } else {
+          conversations.unshift({
+            id: conversationId,
+            title,
+            createdAt: now,
+            lastMessageAt: now,
+            messageCount: messagesToSave.length,
+          });
+        }
+
+        // Keep last 50 conversations
+        if (conversations.length > 50) {
+          conversations.pop();
+        }
+
+        await AsyncStorage.setItem(indexKey, JSON.stringify(conversations));
+      } catch (error) {
+        console.warn('Failed to save conversation:', error);
+      }
+    },
+    []
+  );
+
+  const loadConversationFromStorage = useCallback(
+    async (conversationId: string): Promise<Message[]> => {
+      try {
+        const key = `pantryiq_chef_chat_${conversationId}`;
+        const data = await AsyncStorage.getItem(key);
+        if (!data) return [];
+
+        const parsed = JSON.parse(data);
+        return parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp),
+          mealAnalysis: m.mealAnalysis ? JSON.parse(m.mealAnalysis) : undefined,
+        }));
+      } catch (error) {
+        console.warn('Failed to load conversation:', error);
+        return [];
+      }
+    },
+    []
+  );
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -628,6 +728,8 @@ export default function ChefClaudeScreen() {
   const [isMealLogging, setIsMealLogging] = useState(false);
   const [pendingMealAnswers, setPendingMealAnswers] = useState<string[]>([]);
   const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
+  const [mealCardStates, setMealCardStates] = useState<Record<string, MealCardStatus>>({});
+  const [mealCardErrors, setMealCardErrors] = useState<Record<string, string>>({});
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -650,163 +752,6 @@ export default function ChefClaudeScreen() {
     return allEntries.filter((m) => m.isFavorite).slice(0, 5);
   }, [allEntries]);
 
-  useEffect(() => {
-    if (messages.length > 0 || isTyping) {
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
-    }
-  }, [messages.length, isTyping]);
-
-  /**
-   * Check for proactive meal prompts when screen loads
-   */
-  useEffect(() => {
-    const prompt = getProactiveMealPrompt();
-    if (prompt && messages.length === 0) {
-      // Only show if this is the first load (no messages yet)
-      const assistantMessage: Message = {
-        id: `msg-${Date.now()}-proactive`,
-        role: 'assistant',
-        content: prompt.message,
-        timestamp: new Date(),
-      };
-      setMessages([assistantMessage]);
-
-      // Mark this prompt as shown today
-      const setUserProfile = useAppStore.getState().setUserProfile;
-      const shown = userProfile.shownMealTimePrompts;
-      if (!shown.includes(prompt.mealType)) {
-        setUserProfile({
-          shownMealTimePrompts: [...shown, prompt.mealType],
-        });
-      }
-    }
-  }, []);
-
-  /**
-   * Analyze a meal description and get structured data
-   */
-  const analyzeMealDescription = useCallback(
-    async (userMessage: string): Promise<MealAnalysis | null> => {
-      if (!isMealDescription(userMessage)) {
-        return null;
-      }
-
-      try {
-        setIsMealAnalyzing(true);
-
-        // Convert pantry items to format expected by backend
-        const pantryForBackend = pantryItems.map((item) => ({
-          id: item.id,
-          name: item.name,
-          brand: item.brand,
-          nutrition: {
-            calories: item.caloriesPerServing,
-            carbs: item.carbsPerServing,
-            protein: item.proteinPerServing,
-            fat: item.fatPerServing,
-            fiber: 0,
-            netCarbs: item.carbsPerServing,
-          },
-          servingUnit: item.servingUnit,
-        }));
-
-        const response = await api.post<MealAnalysis>('/api/meals/analyze', {
-          userMessage,
-          pantryItems: pantryForBackend,
-          userProfile: {
-            dailyCarbGoal: userProfile.dailyCarbGoal,
-            dailyCalorieGoal: userProfile.dailyCalorieGoal,
-            personalityMode: userProfile.personalityMode,
-          },
-        });
-
-        return response ?? null;
-      } catch (error) {
-        console.warn('Meal analysis error:', error);
-        return null;
-      } finally {
-        setIsMealAnalyzing(false);
-      }
-    },
-    [pantryItems, userProfile.dailyCarbGoal, userProfile.dailyCalorieGoal, userProfile.personalityMode]
-  );
-
-  /**
-   * Log a meal to the meals store
-   */
-  const logMealFromAnalysis = useCallback(
-    (analysis: MealAnalysis) => {
-      try {
-        setIsMealLogging(true);
-
-        const todayStr = new Date().toISOString().split('T')[0];
-        const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
-          breakfast: 'Breakfast',
-          lunch: 'Lunch',
-          dinner: 'Dinner',
-          snack: 'Snacks',
-        };
-
-        // Combine identified foods into a single entry
-        let totalCalories = 0;
-        let totalCarbs = 0;
-        let totalProtein = 0;
-        let totalFat = 0;
-        let totalFiber = 0;
-        let totalNetCarbs = 0;
-
-        analysis.identifiedFoods.forEach((food) => {
-          totalCalories += food.estimatedCalories;
-          totalNetCarbs += food.estimatedNetCarbs;
-          totalProtein += food.estimatedProtein;
-          totalFat += food.estimatedFat;
-        });
-
-        // Create a descriptive name from foods
-        const foodNames = analysis.identifiedFoods
-          .map((f) => (f.quantity && f.unit ? `${f.quantity} ${f.unit} ${f.name}` : f.name))
-          .join(', ');
-
-        const entry: Omit<FoodEntry, 'id'> = {
-          name: foodNames,
-          mealType: mealTypeMap[analysis.mealType] || 'Snacks',
-          date: todayStr,
-          servings: 1,
-          calories: Math.round(totalCalories),
-          carbs: Math.round(totalCarbs * 10) / 10,
-          protein: Math.round(totalProtein * 10) / 10,
-          fat: Math.round(totalFat * 10) / 10,
-          fiber: totalFiber,
-          netCarbs: Math.round(totalNetCarbs * 10) / 10,
-          isFavorite: false,
-        };
-
-        // Add entry to store
-        addMealEntry(entry);
-
-        // Deduct from pantry items if they exist
-        analysis.pantryItemsToDeduct.forEach((itemName) => {
-          const pantryItem = findPantryItem(itemName);
-          if (pantryItem) {
-            // Deduct one serving of this item
-            deductPantryServings(pantryItem.id, 1);
-          }
-        });
-
-        return true;
-      } catch (error) {
-        console.error('Failed to log meal:', error);
-        return false;
-      } finally {
-        setIsMealLogging(false);
-      }
-    },
-    [addMealEntry, findPantryItem, deductPantryServings]
-  );
-
-  /**
-   * Generate a follow-up response from Chef Claude
-   */
   /**
    * Check if we should show a proactive meal prompt
    */
@@ -953,6 +898,196 @@ export default function ChefClaudeScreen() {
     return null;
   }, [userProfile.proactiveMealPrompts, userProfile.personalityMode, getEntriesForDate, userProfile.shownMealTimePrompts]);
 
+  useEffect(() => {
+    if (messages.length > 0 || isTyping) {
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  }, [messages.length, isTyping]);
+
+  // Load existing conversation on mount
+  useEffect(() => {
+    const loadConversation = async () => {
+      const conversationId = conversationIdRef.current;
+      const loadedMessages = await loadConversationFromStorage(conversationId);
+
+      if (loadedMessages.length > 0) {
+        setMessages(loadedMessages);
+      } else {
+        // Show proactive prompt only if this is a new conversation
+        const prompt = getProactiveMealPrompt();
+        if (prompt) {
+          const assistantMessage: Message = {
+            id: `msg-${Date.now()}-proactive`,
+            role: 'assistant',
+            content: prompt.message,
+            timestamp: new Date(),
+          };
+          setMessages([assistantMessage]);
+
+          const setUserProfile = useAppStore.getState().setUserProfile;
+          const shown = userProfile.shownMealTimePrompts;
+          if (!shown.includes(prompt.mealType)) {
+            setUserProfile({
+              shownMealTimePrompts: [...shown, prompt.mealType],
+            });
+          }
+        }
+      }
+    };
+
+    loadConversation();
+  }, [loadConversationFromStorage, getProactiveMealPrompt, userProfile]);
+
+  /**
+   * Analyze a meal description and get structured data
+   */
+  const analyzeMealDescription = useCallback(
+    async (userMessage: string): Promise<MealAnalysis | null> => {
+      if (!isMealDescription(userMessage)) {
+        return null;
+      }
+
+      try {
+        setIsMealAnalyzing(true);
+
+        // Convert pantry items to format expected by backend
+        const pantryForBackend = pantryItems.map((item) => ({
+          id: item.id,
+          name: item.name,
+          brand: item.brand,
+          nutrition: {
+            calories: item.caloriesPerServing,
+            carbs: item.carbsPerServing,
+            protein: item.proteinPerServing,
+            fat: item.fatPerServing,
+            fiber: 0,
+            netCarbs: item.carbsPerServing,
+          },
+          servingUnit: item.servingUnit,
+        }));
+
+        const response = await api.post<MealAnalysis>('/api/meals/analyze', {
+          userMessage,
+          pantryItems: pantryForBackend,
+          userProfile: {
+            dailyCarbGoal: userProfile.dailyCarbGoal,
+            dailyCalorieGoal: userProfile.dailyCalorieGoal,
+            personalityMode: userProfile.personalityMode,
+          },
+        });
+
+        return response ?? null;
+      } catch (error) {
+        console.warn('Meal analysis error:', error);
+        return null;
+      } finally {
+        setIsMealAnalyzing(false);
+      }
+    },
+    [pantryItems, userProfile.dailyCarbGoal, userProfile.dailyCalorieGoal, userProfile.personalityMode]
+  );
+
+  /**
+   * Log a meal to the meals store with verification
+   */
+  const logMealFromAnalysis = useCallback(
+    async (analysis: MealAnalysis): Promise<{ success: boolean; entry: FoodEntry | null; error: string | null }> => {
+      try {
+        setIsMealLogging(true);
+
+        const todayStr = new Date().toISOString().split('T')[0];
+        const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
+          breakfast: 'Breakfast',
+          lunch: 'Lunch',
+          dinner: 'Dinner',
+          snack: 'Snacks',
+        };
+
+        // Combine identified foods into a single entry
+        let totalCalories = 0;
+        let totalCarbs = 0;
+        let totalProtein = 0;
+        let totalFat = 0;
+        let totalFiber = 0;
+        let totalNetCarbs = 0;
+
+        analysis.identifiedFoods.forEach((food) => {
+          totalCalories += food.estimatedCalories;
+          totalNetCarbs += food.estimatedNetCarbs;
+          totalProtein += food.estimatedProtein;
+          totalFat += food.estimatedFat;
+        });
+
+        // Create a descriptive name from foods
+        const foodNames = analysis.identifiedFoods
+          .map((f) => (f.quantity && f.unit ? `${f.quantity} ${f.unit} ${f.name}` : f.name))
+          .join(', ');
+
+        const entry: Omit<FoodEntry, 'id'> = {
+          name: foodNames,
+          mealType: mealTypeMap[analysis.mealType] || 'Snacks',
+          date: todayStr,
+          servings: 1,
+          calories: Math.round(totalCalories),
+          carbs: Math.round(totalCarbs * 10) / 10,
+          protein: Math.round(totalProtein * 10) / 10,
+          fat: Math.round(totalFat * 10) / 10,
+          fiber: totalFiber,
+          netCarbs: Math.round(totalNetCarbs * 10) / 10,
+          isFavorite: false,
+        };
+
+        // Add entry to store
+        addMealEntry(entry);
+
+        // Verify the entry was actually saved by reading back from store
+        const savedEntries = getEntriesForDate(todayStr);
+        const verifiedEntry = savedEntries.find((e) => e.name === entry.name && e.mealType === entry.mealType);
+
+        if (!verifiedEntry) {
+          return {
+            success: false,
+            entry: null,
+            error: 'Meal was not saved. Please try again.',
+          };
+        }
+
+        // Deduct from pantry items if they exist
+        analysis.pantryItemsToDeduct.forEach((itemName) => {
+          const pantryItem = findPantryItem(itemName);
+          if (pantryItem) {
+            deductPantryServings(pantryItem.id, 1);
+          }
+        });
+
+        // Persist conversation to AsyncStorage
+        if (messages.length > 0 || inputText.trim()) {
+          const currentConversationId = conversationIdRef.current;
+          await saveConversationToStorage(currentConversationId, messages);
+        }
+
+        return {
+          success: true,
+          entry: verifiedEntry,
+          error: null,
+        };
+      } catch (error) {
+        console.error('Failed to log meal:', error);
+        return {
+          success: false,
+          entry: null,
+          error: error instanceof Error ? error.message : 'Unknown error occurred',
+        };
+      } finally {
+        setIsMealLogging(false);
+      }
+    },
+    [addMealEntry, findPantryItem, deductPantryServings, getEntriesForDate, messages, inputText]
+  );
+
+  /**
+   * Generate a follow-up response from Chef Claude
+   */
   const generateFollowUpResponse = useCallback(
     (analysis: MealAnalysis): string => {
       const { personalityMode, customPersonality } = userProfile;
@@ -1108,69 +1243,95 @@ export default function ChefClaudeScreen() {
   );
 
   /**
-   * Handle meal confirmation
+   * Handle meal confirmation with proper status tracking
    */
-  const handleMealConfirm = useCallback(() => {
+  const handleMealConfirm = useCallback(async () => {
     if (!currentMealAnalysis) return;
 
-    const success = logMealFromAnalysis(currentMealAnalysis);
+    const cardId = `card-${currentMealAnalysis.mealType}-${Date.now()}`;
 
-    if (success) {
-      // Add success message to chat
-      const todayStr = new Date().toISOString().split('T')[0];
-      const dailyTotals = getDailyTotals(todayStr);
-      const mealType = currentMealAnalysis.mealType;
+    try {
+      // Update card state to logging
+      setMealCardStates((prev) => ({ ...prev, [cardId]: 'logging' }));
 
-      let successMessage = `Logged! Your ${mealType} has been added. `;
+      const result = await logMealFromAnalysis(currentMealAnalysis);
 
-      const carbsUsed = Math.round(dailyTotals.netCarbs);
-      const carbGoal = userProfile.dailyCarbGoal;
-      const carbsRemaining = carbGoal - carbsUsed;
+      if (result.success && result.entry) {
+        // Update card state to success
+        setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
 
-      if (carbsRemaining >= 0) {
-        successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget today — you are doing great.`;
+        // Add success message to chat
+        const todayStr = new Date().toISOString().split('T')[0];
+        const dailyTotals = getDailyTotals(todayStr);
+        const mealType = currentMealAnalysis.mealType;
+
+        let successMessage = `Logged! Your ${mealType} has been added. `;
+
+        const carbsUsed = Math.round(dailyTotals.netCarbs);
+        const carbGoal = userProfile.dailyCarbGoal;
+        const carbsRemaining = carbGoal - carbsUsed;
+
+        if (carbsRemaining >= 0) {
+          successMessage += `You have used ${carbsUsed} of your ${carbGoal}g carb budget today — you are doing great.`;
+        } else {
+          successMessage += `You are now at ${carbsUsed}g of your ${carbGoal}g goal. No worries — tomorrow begins fresh.`;
+        }
+
+        // Add pantry deduction message if applicable
+        if (currentMealAnalysis.pantryItemsToDeduct.length > 0) {
+          const items = currentMealAnalysis.pantryItemsToDeduct.join(', ').toLowerCase();
+          successMessage += ` I also updated your pantry — reduced your ${items}.`;
+        }
+
+        const successMsg: Message = {
+          id: `msg-${Date.now()}-success`,
+          role: 'assistant',
+          content: successMessage,
+          timestamp: new Date(),
+        };
+
+        setMessages((prev) => [...prev, successMsg]);
+        setCurrentMealAnalysis(null);
+        setPendingMealAnswers([]);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        successMessage += `You are now at ${carbsUsed}g of your ${carbGoal}g goal. No worries — tomorrow begins fresh.`;
+        // Update card state to failure
+        setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
+        setMealCardErrors((prev) => ({ ...prev, [cardId]: result.error || 'Unknown error' }));
+
+        const errorMsg: Message = {
+          id: `msg-${Date.now()}-err`,
+          role: 'assistant',
+          content: `Sorry, I had trouble logging that meal: ${result.error}. Please try again.`,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMsg]);
       }
-
-      // Add pantry deduction message if applicable
-      if (currentMealAnalysis.pantryItemsToDeduct.length > 0) {
-        const items = currentMealAnalysis.pantryItemsToDeduct.join(', ').toLowerCase();
-        successMessage += ` I also updated your pantry — reduced your ${items}.`;
-      }
-
-      const successMsg: Message = {
-        id: `msg-${Date.now()}-success`,
-        role: 'assistant',
-        content: successMessage,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, successMsg]);
-      setCurrentMealAnalysis(null);
-      setPendingMealAnswers([]);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } else {
-      const errorMsg: Message = {
-        id: `msg-${Date.now()}-err`,
-        role: 'assistant',
-        content: 'Sorry, I had trouble logging that meal. Please try again.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
+    } catch (error) {
+      setMealCardStates((prev) => ({ ...prev, [cardId]: 'failure' }));
+      setMealCardErrors((prev) => ({
+        ...prev,
+        [cardId]: error instanceof Error ? error.message : 'Unknown error',
+      }));
     }
   }, [currentMealAnalysis, logMealFromAnalysis, getDailyTotals, userProfile.dailyCarbGoal]);
 
 
   const renderItem = useCallback(
-    ({ item }: { item: Message }) => (
-      <MessageBubble
-        message={item}
-        onMealConfirm={item.mealAnalysis ? handleMealConfirm : undefined}
-        isMealLogging={isMealLogging}
-      />
-    ),
-    [handleMealConfirm, isMealLogging]
+    ({ item }: { item: Message }) => {
+      const cardKey = `card-${item.mealAnalysis?.mealType}-${item.id}`;
+      return (
+        <MessageBubble
+          message={item}
+          onMealConfirm={item.mealAnalysis ? handleMealConfirm : undefined}
+          isMealLogging={isMealLogging}
+          cardStatus={mealCardStates[cardKey]}
+          cardError={mealCardErrors[cardKey]}
+          onRetry={item.mealAnalysis ? handleMealConfirm : undefined}
+        />
+      );
+    },
+    [handleMealConfirm, isMealLogging, mealCardStates, mealCardErrors]
   );
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
@@ -1252,9 +1413,28 @@ export default function ChefClaudeScreen() {
           </View>
 
           <Pressable
+            testID="new-conversation-button"
+            onPress={() => {
+              conversationIdRef.current = `conv-${Date.now()}`;
+              setMessages([]);
+              setInputText('');
+            }}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: Colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Edit3 size={18} color={Colors.textSecondary} />
+          </Pressable>
+
+          <Pressable
             testID="history-button"
             onPress={() => {
-              // History feature placeholder
+              router.push('/chef-claude-history' as never);
             }}
             style={{
               width: 40,

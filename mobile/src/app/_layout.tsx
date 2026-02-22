@@ -69,6 +69,7 @@ function RootLayoutNav() {
         <Stack.Screen name="zone-map" options={{ headerShown: false }} />
         <Stack.Screen name="api-status" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="chef-claude" options={{ headerShown: false }} />
+        <Stack.Screen name="chef-claude-history" options={{ headerShown: false }} />
         <Stack.Screen name="kitchen-equipment" options={{ headerShown: false }} />
         <Stack.Screen name="fasting-timer" options={{ headerShown: false }} />
         <Stack.Screen name="macro-calculator" options={{ headerShown: false }} />
