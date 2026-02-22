@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -633,8 +633,20 @@ export default function ChefClaudeScreen() {
   const dailyTotals = getDailyTotals(todayStr);
 
   // Get recent meals and favorites for quick log sheet
-  const recentMeals = useMealsStore((s) => s.entries);
-  const favoriteMeals = useMealsStore((s) => s.getFavorites());
+  const allEntries = useMealsStore((s) => s.entries);
+  const recentMeals = useMemo(() => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .split('T')[0];
+    return allEntries
+      .filter((m) => m.date >= sevenDaysAgo && !m.isFavorite)
+      .slice(-5)
+      .reverse();
+  }, [allEntries]);
+
+  const favoriteMeals = useMemo(() => {
+    return allEntries.filter((m) => m.isFavorite).slice(0, 5);
+  }, [allEntries]);
 
   useEffect(() => {
     if (messages.length > 0 || isTyping) {
