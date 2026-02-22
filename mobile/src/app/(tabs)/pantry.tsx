@@ -1010,6 +1010,23 @@ export default function PantryScreen() {
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {/* Kitchen Map button */}
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/kitchen-map' as never);
+              }}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: Colors.surface,
+                alignItems: 'center', justifyContent: 'center',
+                borderWidth: 1, borderColor: Colors.border,
+              }}
+              testID="pantry-kitchen-map-button"
+            >
+              <MapPin size={20} color={Colors.textPrimary} />
+            </Pressable>
+
             {/* View Mode Toggle */}
             <View
               style={{

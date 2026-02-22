@@ -44,6 +44,7 @@ import { useHealthStore } from '@/lib/stores/healthStore';
 import { useShoppingStore } from '@/lib/stores/shoppingStore';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { useLocationStore } from '@/lib/stores/locationStore';
+import { useKitchenMapStore } from '@/lib/stores/kitchenMapStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { Toast, useToast } from '@/components/Toast';
@@ -373,6 +374,8 @@ export default function SettingsScreen() {
   const recipes = useRecipesStore((s) => s.recipes);
   const shoppingStores = useShoppingStore((s) => s.stores);
   const locations = useLocationStore((s) => s.locations);
+  const kitchenMappedAreas = useKitchenMapStore((s) => s.mappedAreas);
+  const kitchenMapOnboarding = useKitchenMapStore((s) => s.onboardingComplete);
 
   const { toast, showToast, hideToast } = useToast();
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -524,6 +527,39 @@ export default function SettingsScreen() {
           {/* My Kitchen & Storage */}
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <SectionCard title="My Kitchen & Storage" icon={<Home size={18} color={Colors.green} />}>
+              <RowItem
+                label="Kitchen Map"
+                value={kitchenMapOnboarding ? `${kitchenMappedAreas.length} area${kitchenMappedAreas.length !== 1 ? 's' : ''} mapped` : 'Not set up'}
+                onPress={() => router.push('/kitchen-map' as never)}
+                rightElement={
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={[
+                      {
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 999,
+                        backgroundColor: kitchenMapOnboarding && kitchenMappedAreas.length > 0
+                          ? Colors.greenMuted
+                          : Colors.surface,
+                      }
+                    ]}>
+                      <Text style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 11,
+                        color: kitchenMapOnboarding && kitchenMappedAreas.length > 0
+                          ? Colors.green
+                          : Colors.textTertiary,
+                      }}>
+                        {kitchenMapOnboarding && kitchenMappedAreas.length > 0
+                          ? `${kitchenMappedAreas.length} mapped`
+                          : 'Set up'}
+                      </Text>
+                    </View>
+                    <ChevronRight size={16} color={Colors.textTertiary} />
+                  </View>
+                }
+              />
+              <View style={styles.divider} />
               <RowItem
                 label="Storage Locations"
                 value={`${locations.length} location${locations.length !== 1 ? 's' : ''}`}

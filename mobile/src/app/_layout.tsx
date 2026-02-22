@@ -54,6 +54,9 @@ function RootLayoutNav() {
         <Stack.Screen name="shopping-history" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="photo-recognition" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
         <Stack.Screen name="kitchen-locations" options={{ headerShown: false }} />
+        <Stack.Screen name="kitchen-map" options={{ headerShown: false }} />
+        <Stack.Screen name="kitchen-photo-session" options={{ headerShown: false }} />
+        <Stack.Screen name="zone-map" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
