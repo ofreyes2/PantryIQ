@@ -35,6 +35,7 @@ import {
   Download,
   Trash2,
   Camera,
+  Home,
 } from 'lucide-react-native';
 import { useAppStore, UserProfile } from '@/lib/stores/appStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
@@ -42,6 +43,7 @@ import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useHealthStore } from '@/lib/stores/healthStore';
 import { useShoppingStore } from '@/lib/stores/shoppingStore';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
+import { useLocationStore } from '@/lib/stores/locationStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { Toast, useToast } from '@/components/Toast';
@@ -370,6 +372,7 @@ export default function SettingsScreen() {
   const weightEntries = useHealthStore((s) => s.weightEntries);
   const recipes = useRecipesStore((s) => s.recipes);
   const shoppingStores = useShoppingStore((s) => s.stores);
+  const locations = useLocationStore((s) => s.locations);
 
   const { toast, showToast, hideToast } = useToast();
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -401,6 +404,9 @@ export default function SettingsScreen() {
   // Family sync state
   const [familySync, setFamilySync] = useState(false);
   const [familyCode, setFamilyCode] = useState<string | null>(null);
+
+  // Kitchen settings
+  const [locationBrowsing, setLocationBrowsing] = useState(false);
 
   // Goals state
   const [carbGoal, setCarbGoal] = useState(userProfile.dailyCarbGoal.toString());
@@ -512,6 +518,24 @@ export default function SettingsScreen() {
                   <Text style={styles.editProfileText}>Edit</Text>
                 </Pressable>
               </View>
+            </SectionCard>
+          </View>
+
+          {/* My Kitchen & Storage */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <SectionCard title="My Kitchen & Storage" icon={<Home size={18} color={Colors.green} />}>
+              <RowItem
+                label="Storage Locations"
+                value={`${locations.length} location${locations.length !== 1 ? 's' : ''}`}
+                onPress={() => router.push('/kitchen-locations' as never)}
+              />
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Location-Based Browsing"
+                value={locationBrowsing}
+                onToggle={setLocationBrowsing}
+                sublabel="Group pantry items by storage location in the Pantry tab."
+              />
             </SectionCard>
           </View>
 

@@ -36,6 +36,9 @@ export interface PantryItem {
   lastUpdated: string;
   addedBy?: string;
   restockHistory: { date: string; quantity: number }[];
+  locationId?: string;
+  subZoneId?: string;
+  specificSpot?: string;
 }
 
 interface PantryState {
@@ -67,6 +70,8 @@ const seedItems: PantryItem[] = [
     dateAdded: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
     restockHistory: [],
+    locationId: 'loc-1',
+    subZoneId: 'Lower Shelf',
   },
   {
     id: 'seed-2',
@@ -85,6 +90,8 @@ const seedItems: PantryItem[] = [
     lastUpdated: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     restockHistory: [],
+    locationId: 'loc-1',
+    subZoneId: 'Middle Shelf',
   },
   {
     id: 'seed-3',
@@ -103,6 +110,8 @@ const seedItems: PantryItem[] = [
     lastUpdated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     expiryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     restockHistory: [],
+    locationId: 'loc-1',
+    subZoneId: 'Crisper Drawer Left',
   },
   {
     id: 'seed-4',
@@ -121,6 +130,8 @@ const seedItems: PantryItem[] = [
     lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     expiryDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     restockHistory: [],
+    locationId: 'loc-1',
+    subZoneId: 'Deli Drawer',
   },
   {
     id: 'seed-5',
@@ -138,6 +149,8 @@ const seedItems: PantryItem[] = [
     dateAdded: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     restockHistory: [],
+    locationId: 'loc-6',
+    subZoneId: 'Eye Level Shelf',
   },
   {
     id: 'seed-6',
@@ -155,6 +168,8 @@ const seedItems: PantryItem[] = [
     dateAdded: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
     restockHistory: [],
+    locationId: 'loc-5',
+    subZoneId: 'Lower Cabinets',
   },
   {
     id: 'seed-7',
@@ -172,6 +187,8 @@ const seedItems: PantryItem[] = [
     dateAdded: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
     restockHistory: [],
+    locationId: 'loc-6',
+    subZoneId: 'Mid Shelf',
   },
   {
     id: 'seed-8',
@@ -190,6 +207,8 @@ const seedItems: PantryItem[] = [
     lastUpdated: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
     expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     restockHistory: [],
+    locationId: 'loc-1',
+    subZoneId: 'Upper Shelf',
   },
 ];
 

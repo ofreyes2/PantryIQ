@@ -46,6 +46,7 @@ interface MealsState {
   toggleFavorite: (id: string) => void;
   getFavorites: () => FoodEntry[];
   logWater: (date: string) => void;
+  removeWaterEntry: (date: string) => void;
   getWaterForDate: (date: string) => number;
   getDailyTotals: (date: string) => DailyTotals;
 }
@@ -239,6 +240,13 @@ export const useMealsStore = create<MealsState>()(
             waterIntake: [...state.waterIntake, { date, glasses: 1 }],
           };
         }),
+
+      removeWaterEntry: (date: string) =>
+        set((state) => ({
+          waterIntake: state.waterIntake.map((w) =>
+            w.date === date ? { ...w, glasses: Math.max(0, w.glasses - 1) } : w
+          ),
+        })),
 
       getWaterForDate: (date: string) => {
         const entry = get().waterIntake.find((w) => w.date === date);
