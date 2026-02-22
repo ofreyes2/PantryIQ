@@ -108,8 +108,8 @@ function PantryItemCard({
         justifyContent: 'center',
         alignItems: 'center',
         width: 72,
-        marginVertical: 6,
-        borderRadius: BorderRadius.xl,
+        marginVertical: 4,
+        borderRadius: 12,
         marginLeft: 4,
       }}
       testID={`delete-item-${item.id}`}
@@ -134,8 +134,8 @@ function PantryItemCard({
         justifyContent: 'center',
         alignItems: 'center',
         width: 72,
-        marginVertical: 6,
-        borderRadius: BorderRadius.xl,
+        marginVertical: 4,
+        borderRadius: 12,
         marginRight: 4,
       }}
       testID={`restock-item-${item.id}`}
@@ -161,9 +161,9 @@ function PantryItemCard({
         <View
           style={{
             backgroundColor: Colors.navyCard,
-            borderRadius: BorderRadius.xl,
+            borderRadius: 12,
             marginHorizontal: 16,
-            marginVertical: 6,
+            marginVertical: 4,
             padding: 16,
             borderWidth: 1,
             borderColor: Colors.border,
@@ -236,7 +236,7 @@ function PantryItemCard({
                   color: Colors.textPrimary,
                   marginBottom: 4,
                 }}
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {item.name}
               </Text>
@@ -809,45 +809,47 @@ export default function PantryScreen() {
         </View>
 
         {/* Category filter chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 4 }}
-          style={{ flexGrow: 0, marginBottom: 8 }}
-        >
-          {ALL_CATEGORIES.map((cat) => {
-            const isActive = selectedCategory === cat;
-            return (
-              <Pressable
-                key={cat}
-                onPress={() => {
-                  setSelectedCategory(cat as PantryCategory | 'All');
-                  Haptics.selectionAsync();
-                }}
-                style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 16,
-                  borderRadius: BorderRadius.full,
-                  backgroundColor: isActive ? Colors.green : Colors.surface,
-                  borderWidth: 1,
-                  borderColor: isActive ? Colors.green : Colors.border,
-                  marginRight: 0,
-                }}
-                testID={`category-chip-${cat}`}
-              >
-                <Text
-                  style={{
-                    fontFamily: isActive ? 'DMSans_700Bold' : 'DMSans_400Regular',
-                    fontSize: 13,
-                    color: isActive ? Colors.navy : Colors.textSecondary,
+        <View style={{ flexGrow: 0, marginBottom: 8 }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 4, paddingRight: 32 }}
+            style={{ flexGrow: 0 }}
+          >
+            {ALL_CATEGORIES.map((cat, index) => {
+              const isActive = selectedCategory === cat;
+              return (
+                <Pressable
+                  key={cat}
+                  onPress={() => {
+                    setSelectedCategory(cat as PantryCategory | 'All');
+                    Haptics.selectionAsync();
                   }}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: BorderRadius.full,
+                    backgroundColor: isActive ? Colors.green : Colors.surface,
+                    borderWidth: 1,
+                    borderColor: isActive ? Colors.green : Colors.border,
+                    marginRight: index < ALL_CATEGORIES.length - 1 ? 8 : 0,
+                  }}
+                  testID={`category-chip-${cat}`}
                 >
-                  {cat}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={{
+                      fontFamily: isActive ? 'DMSans_700Bold' : 'DMSans_400Regular',
+                      fontSize: 13,
+                      color: isActive ? Colors.navy : Colors.textSecondary,
+                    }}
+                  >
+                    {cat}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Item count */}
         <View style={{ paddingHorizontal: 16, marginBottom: 8 }}>
@@ -878,7 +880,7 @@ export default function PantryScreen() {
               onPress={() => router.push({ pathname: '/pantry-item-detail', params: { itemId: item.id } })}
             />
           )}
-          contentContainerStyle={{ paddingBottom: 180 }}
+          contentContainerStyle={{ paddingBottom: 200, paddingTop: 4 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -887,9 +889,6 @@ export default function PantryScreen() {
               tintColor={Colors.green}
             />
           }
-          ItemSeparatorComponent={() => (
-            <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.06)', marginHorizontal: 32 }} />
-          )}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', paddingTop: 60, paddingHorizontal: 40 }}>
               <View
