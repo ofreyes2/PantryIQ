@@ -23,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
-import { ChefHat, ArrowLeft, Send, History } from 'lucide-react-native';
+import { ChefHat, ArrowLeft, Send, History, Zap } from 'lucide-react-native';
 import { usePantryStore } from '@/lib/stores/pantryStore';
 import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
@@ -33,6 +33,7 @@ import { buildPersonalityPrompt } from '@/lib/personalityModes';
 import { isMealDescription, getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
 import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
+import { QuickLogSheet } from '@/components/QuickLogSheet';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
 import type { UserProfile } from '@/lib/stores/appStore';
@@ -624,17 +625,48 @@ export default function ChefClaudeScreen() {
   const [isMealAnalyzing, setIsMealAnalyzing] = useState(false);
   const [isMealLogging, setIsMealLogging] = useState(false);
   const [pendingMealAnswers, setPendingMealAnswers] = useState<string[]>([]);
+  const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEntries = getEntriesForDate(todayStr);
   const dailyTotals = getDailyTotals(todayStr);
 
+  // Get recent meals and favorites for quick log sheet
+  const recentMeals = useMealsStore((s) => s.entries);
+  const favoriteMeals = useMealsStore((s) => s.getFavorites());
+
   useEffect(() => {
     if (messages.length > 0 || isTyping) {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages.length, isTyping]);
+
+  /**
+   * Check for proactive meal prompts when screen loads
+   */
+  useEffect(() => {
+    const prompt = getProactiveMealPrompt();
+    if (prompt && messages.length === 0) {
+      // Only show if this is the first load (no messages yet)
+      const assistantMessage: Message = {
+        id: `msg-${Date.now()}-proactive`,
+        role: 'assistant',
+        content: prompt.message,
+        timestamp: new Date(),
+      };
+      setMessages([assistantMessage]);
+
+      // Mark this prompt as shown today
+      const setUserProfile = useAppStore.getState().setUserProfile;
+      const shown = userProfile.shownMealTimePrompts;
+      if (!shown.includes(prompt.mealType)) {
+        setUserProfile({
+          shownMealTimePrompts: [...shown, prompt.mealType],
+        });
+      }
+    }
+  }, []);
 
   /**
    * Analyze a meal description and get structured data
@@ -761,6 +793,152 @@ export default function ChefClaudeScreen() {
   /**
    * Generate a follow-up response from Chef Claude
    */
+  /**
+   * Check if we should show a proactive meal prompt
+   */
+  const getProactiveMealPrompt = useCallback((): { mealType: string; message: string } | null => {
+    if (!userProfile.proactiveMealPrompts) return null;
+
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const todayStr = now.toISOString().split('T')[0];
+    const todayEntries = getEntriesForDate(todayStr);
+    const { personalityMode } = userProfile;
+
+    // Check if we've already shown a prompt today for each meal
+    const alreadyShown = userProfile.shownMealTimePrompts;
+
+    const getMessageForMode = (
+      messages: Record<string, string>,
+      mode: string
+    ): string => {
+      if (mode in messages) {
+        return messages[mode];
+      }
+      return messages.default;
+    };
+
+    // Breakfast: 6 AM - 10 AM
+    if (hour >= 6 && hour < 10 && !alreadyShown.includes('breakfast')) {
+      const hasBreakfast = todayEntries.some((e) => e.mealType === 'Breakfast');
+      if (!hasBreakfast) {
+        const messages: Record<string, string> = {
+          default: "Hey — it's around breakfast time and you haven't logged yet. What did you have?",
+          coach: "It's breakfast time. What did you eat? Let's start the day on track.",
+          'gordon-ramsay': "Morning! What did you eat? Let's make sure it was brilliant.",
+          scientist: "It's breakfast time. What did you consume? Log it for me.",
+          zen: "Good morning — did you nourish yourself this morning? Tell me what you had.",
+        };
+        return {
+          mealType: 'breakfast',
+          message: getMessageForMode(messages, personalityMode),
+        };
+      }
+    }
+
+    // Lunch: 11:30 AM - 1:30 PM
+    if (hour === 11 && minute >= 30) {
+      // 11:30 AM onwards
+      if (!alreadyShown.includes('lunch')) {
+        const hasLunch = todayEntries.some((e) => e.mealType === 'Lunch');
+        if (!hasLunch) {
+          const messages: Record<string, string> = {
+            default: "It's around lunchtime and you haven't logged yet. What did you have for lunch?",
+            coach: "Lunch time is here. What did you eat? Keep your carbs in check.",
+            'gordon-ramsay': "It's lunchtime. What did you prepare for yourself?",
+            scientist: "Lunchtime data collection time. What did you eat?",
+            zen: "Mindful eating time — what did you nourish yourself with at lunch?",
+          };
+          return {
+            mealType: 'lunch',
+            message: getMessageForMode(messages, personalityMode),
+          };
+        }
+      }
+    } else if (hour === 12 || hour === 13) {
+      // 12 PM - 1:30 PM
+      if (hour === 13 && minute > 30) {
+        // Past 1:30 PM
+      } else if (!alreadyShown.includes('lunch')) {
+        const hasLunch = todayEntries.some((e) => e.mealType === 'Lunch');
+        if (!hasLunch) {
+          const messages: Record<string, string> = {
+            default: "It's around lunchtime and you haven't logged yet. What did you have for lunch?",
+            coach: "Lunch time is here. What did you eat? Keep your carbs in check.",
+            'gordon-ramsay': "It's lunchtime. What did you prepare for yourself?",
+            scientist: "Lunchtime data collection time. What did you eat?",
+            zen: "Mindful eating time — what did you nourish yourself with at lunch?",
+          };
+          return {
+            mealType: 'lunch',
+            message: getMessageForMode(messages, personalityMode),
+          };
+        }
+      }
+    }
+
+    // Snack 1: 3 PM - 4 PM
+    if (hour === 15 && !alreadyShown.includes('snack-1')) {
+      const hasSnack = todayEntries.some((e) => e.mealType === 'Snacks');
+      if (!hasSnack) {
+        const messages: Record<string, string> = {
+          default: "Snack time — did you have anything? Just let me know what you ate.",
+          coach: "Snack time. Watch your portions and tell me what you had.",
+          'gordon-ramsay': "A little snack, perhaps? Tell me what you enjoyed.",
+          scientist: "Afternoon snack data. What did you consume?",
+          zen: "A moment of nourishment — did you have a snack?",
+        };
+        return {
+          mealType: 'snack-1',
+          message: getMessageForMode(messages, personalityMode),
+        };
+      }
+    }
+
+    // Dinner: 5:30 PM - 8 PM
+    if (hour >= 17 && hour < 20 && !alreadyShown.includes('dinner')) {
+      if (hour === 17 && minute < 30) {
+        // Before 5:30 PM
+      } else {
+        const hasDinner = todayEntries.some((e) => e.mealType === 'Dinner');
+        if (!hasDinner) {
+          const messages: Record<string, string> = {
+            default: "It's around dinner time — did you have dinner yet? Tell me what you ate.",
+            coach: "Dinner time. What did you eat? Final push to hit your goals today.",
+            'gordon-ramsay': "Dinner time. What culinary masterpiece did you create?",
+            scientist: "Evening meal time. What did you prepare?",
+            zen: "It's dinner time — what beautiful meal did you prepare?",
+          };
+          return {
+            mealType: 'dinner',
+            message: getMessageForMode(messages, personalityMode),
+          };
+        }
+      }
+    }
+
+    // Snack 2: 8 PM - 9 PM
+    if (hour === 20 && !alreadyShown.includes('snack-2')) {
+      const hasSnack = todayEntries.some((e) => e.mealType === 'Snacks');
+      if (!hasSnack) {
+        const messages: Record<string, string> = {
+          default: "Evening snack time — did you have anything? Let me know what you ate.",
+          coach: "Snack time. Light and smart — what did you have?",
+          'gordon-ramsay': "A light evening treat? What did you enjoy?",
+          scientist: "Evening snack data. What did you consume?",
+          zen: "A gentle evening nourishment — what did you have?",
+        };
+        return {
+          mealType: 'snack-2',
+          message: getMessageForMode(messages, personalityMode),
+        };
+      }
+    }
+
+    return null;
+  }, [userProfile.proactiveMealPrompts, userProfile.personalityMode, getEntriesForDate, userProfile.shownMealTimePrompts]);
+
   const generateFollowUpResponse = useCallback(
     (analysis: MealAnalysis): string => {
       const { personalityMode, customPersonality } = userProfile;
@@ -1173,6 +1351,21 @@ export default function ChefClaudeScreen() {
               />
             </View>
             <Pressable
+              testID="quick-log-button"
+              onPress={() => setShowQuickLogSheet(true)}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: Colors.surface,
+                alignItems: 'center',
+                justifyContent: 'center',
+                ...Shadows.card,
+              }}
+            >
+              <Zap size={18} color={Colors.green} />
+            </Pressable>
+            <Pressable
               testID="send-button"
               onPress={() => sendMessage(inputText)}
               disabled={!inputText.trim() || isTyping}
@@ -1201,6 +1394,15 @@ export default function ChefClaudeScreen() {
         visible={showApiKeyModal}
         onClose={() => setShowApiKeyModal(false)}
         onGoToSettings={handleGoToSettings}
+      />
+
+      <QuickLogSheet
+        visible={showQuickLogSheet}
+        onClose={() => setShowQuickLogSheet(false)}
+        onSendMessage={sendMessage}
+        recentMeals={recentMeals}
+        favoriteMeals={favoriteMeals}
+        isLoading={isTyping || isMealAnalyzing}
       />
     </LinearGradient>
   );

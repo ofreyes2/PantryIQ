@@ -27,6 +27,13 @@ export interface UserProfile {
   usdaApiKey: string;
   personalityMode: PersonalityMode;
   customPersonality: CustomPersonality | null;
+  naturalLanguageMealLogging: boolean;
+  autoDetectMealDescriptions: boolean;
+  confirmationRequired: boolean;
+  pantryAutoDeduct: boolean;
+  proactiveMealPrompts: boolean;
+  maxFollowupQuestions: 1 | 2 | 3;
+  shownMealTimePrompts: string[];
 }
 
 export interface AppSettings {
@@ -67,6 +74,13 @@ const defaultUserProfile: UserProfile = {
   usdaApiKey: '',
   personalityMode: 'default',
   customPersonality: null,
+  naturalLanguageMealLogging: true,
+  autoDetectMealDescriptions: true,
+  confirmationRequired: true,
+  pantryAutoDeduct: true,
+  proactiveMealPrompts: true,
+  maxFollowupQuestions: 2,
+  shownMealTimePrompts: [],
 };
 
 const defaultSettings: AppSettings = {

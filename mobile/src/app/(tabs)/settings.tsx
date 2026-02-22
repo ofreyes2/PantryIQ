@@ -793,6 +793,85 @@ export default function SettingsScreen() {
                   </Pressable>
                 </>
               )}
+
+              <View style={styles.divider} />
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textTertiary, marginBottom: 12, marginTop: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Meal Logging Features
+              </Text>
+
+              <ToggleRow
+                label="Natural Language Meal Logging"
+                value={userProfile.naturalLanguageMealLogging}
+                onToggle={(v) => setUserProfile({ naturalLanguageMealLogging: v })}
+                sublabel="Automatically detect and log meals from descriptions"
+              />
+
+              {userProfile.naturalLanguageMealLogging ? (
+                <>
+                  <View style={styles.divider} />
+                  <ToggleRow
+                    label="Auto-detect Meal Descriptions"
+                    value={userProfile.autoDetectMealDescriptions}
+                    onToggle={(v) => setUserProfile({ autoDetectMealDescriptions: v })}
+                    sublabel="Chef Claude recognizes when you describe eating something"
+                  />
+                </>
+              ) : null}
+
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Confirmation Required"
+                value={userProfile.confirmationRequired}
+                onToggle={(v) => setUserProfile({ confirmationRequired: v })}
+                sublabel="Show confirmation before logging meals"
+              />
+
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Pantry Auto-Deduct"
+                value={userProfile.pantryAutoDeduct}
+                onToggle={(v) => setUserProfile({ pantryAutoDeduct: v })}
+                sublabel="Reduce pantry quantities when meals are logged"
+              />
+
+              <View style={styles.divider} />
+              <ToggleRow
+                label="Proactive Meal Prompts"
+                value={userProfile.proactiveMealPrompts}
+                onToggle={(v) => setUserProfile({ proactiveMealPrompts: v })}
+                sublabel="Reminders to log meals at typical meal times"
+              />
+
+              <View style={styles.divider} />
+              <View style={styles.rowItem}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.rowLabel}>Max Follow-up Questions</Text>
+                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 2 }}>
+                    Higher = more accuracy, longer conversation
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {([1, 2, 3] as const).map((num) => (
+                    <Pressable
+                      key={num}
+                      style={[
+                        styles.sizeChip,
+                        userProfile.maxFollowupQuestions === num && styles.sizeChipActive,
+                      ]}
+                      onPress={() => setUserProfile({ maxFollowupQuestions: num })}
+                    >
+                      <Text
+                        style={[
+                          styles.sizeChipText,
+                          userProfile.maxFollowupQuestions === num && styles.sizeChipTextActive,
+                        ]}
+                      >
+                        {num}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             </SectionCard>
           </View>
 
