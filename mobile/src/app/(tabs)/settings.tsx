@@ -38,6 +38,7 @@ import {
   Home,
   Package,
   Utensils,
+  UtensilsCrossed,
 } from 'lucide-react-native';
 import { useAppStore, UserProfile } from '@/lib/stores/appStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
@@ -47,6 +48,7 @@ import { useShoppingStore } from '@/lib/stores/shoppingStore';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { useLocationStore } from '@/lib/stores/locationStore';
 import { useKitchenMapStore } from '@/lib/stores/kitchenMapStore';
+import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { useRouter } from 'expo-router';
 import { Toast, useToast } from '@/components/Toast';
@@ -380,6 +382,8 @@ export default function SettingsScreen() {
   const locations = useLocationStore((s) => s.locations);
   const kitchenMappedAreas = useKitchenMapStore((s) => s.mappedAreas);
   const kitchenMapOnboarding = useKitchenMapStore((s) => s.onboardingComplete);
+  const getEquipmentSummary = useKitchenStore((s) => s.getEquipmentSummary);
+  const equipmentSummary = getEquipmentSummary();
 
   const { toast, showToast, hideToast } = useToast();
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -525,6 +529,17 @@ export default function SettingsScreen() {
                   <Text style={styles.editProfileText}>Edit</Text>
                 </Pressable>
               </View>
+            </SectionCard>
+          </View>
+
+          {/* My Kitchen */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <SectionCard title="My Kitchen" icon={<UtensilsCrossed size={18} color={Colors.green} />}>
+              <RowItem
+                label="Kitchen Equipment & Preferences"
+                value={equipmentSummary.length > 0 ? `${equipmentSummary.length} active` : 'Not configured'}
+                onPress={() => router.push('/kitchen-equipment' as never)}
+              />
             </SectionCard>
           </View>
 

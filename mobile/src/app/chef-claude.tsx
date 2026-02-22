@@ -27,6 +27,7 @@ import { ChefHat, ArrowLeft, Send, History } from 'lucide-react-native';
 import { usePantryStore } from '@/lib/stores/pantryStore';
 import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
+import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
@@ -44,10 +45,10 @@ const QUICK_PROMPTS = [
   "Am I on track with my carbs today?",
   "What's expiring soon that I should use?",
   "Give me a low carb meal plan for tomorrow",
-  "How many carbs are in my pantry staples?",
+  "What's the crispiest thing I can make tonight?",
   "What should I eat to hit my protein goal?",
   "Suggest a recipe using my chicken",
-  "Is this a good low carb day so far?",
+  "Show me a double-fry recipe for tonight",
 ];
 
 function buildSystemPrompt(
@@ -55,7 +56,9 @@ function buildSystemPrompt(
   todayEntries: FoodEntry[],
   dailyTotals: DailyTotals,
   userProfile: UserProfile,
-  todayStr: string
+  todayStr: string,
+  kitchenEquipmentSummary: string,
+  preferencesSummary: string
 ): string {
   const expiringItems = pantryItems.filter((item) => {
     if (!item.expiryDate) return false;
@@ -102,6 +105,51 @@ PANTRY INVENTORY (${pantryItems.length} items):
 ${pantryList || 'Pantry is empty'}
 
 ${expiringItems.length > 0 ? `EXPIRING WITHIN 3 DAYS:\n${expiringItems.map((i) => `- ${i.name}: expires ${i.expiryDate}`).join('\n')}` : 'No items expiring soon.'}
+
+KITCHEN EQUIPMENT AVAILABLE:
+${kitchenEquipmentSummary || 'No equipment configured'}
+
+COOKING PREFERENCES:
+${preferencesSummary || 'No preferences set'}
+
+CRISPY FOOD PRIORITY RULE: This user has a strong preference for crispy, crunchy textures. Whenever possible, suggest cooking methods that maximize crispiness. Always mention when a technique will produce a crunchy result. Proactively suggest pork rind coatings, parmesan crusts, double-fry techniques, broiler finishing, and air-fry finishing. When the user asks what to make for dinner, always LEAD with the crispiest, most satisfying option first.
+
+TWO INSTANT POT STRATEGY: This user has both a 3qt and 8qt Instant Pot. When suggesting meals, proactively recommend using both simultaneously when it would reduce cook time or improve the meal. Always specify which size to use for which component.
+
+DEEP FRYER AWARENESS: User has a deep fryer available. For proteins and vegetables where deep frying produces exceptional results, always offer it as an option with low-carb coating suggestions (pork rinds, parmesan, almond flour, coconut flour).
+
+LOW-CARB CRISPY TECHNIQUES (reference these proactively):
+- Pork rind breading: crush fine, coat protein, fry/bake — zero carbs, insanely crunchy
+- Parmesan crust: grated parmesan pressed onto surface before frying or broiling — hard cheesy crust
+- Almond flour breading: great for deep frying, similar to regular breading but low carb
+- Coconut flour coating: light and crispy, works well for fish and shrimp
+- Direct deep fry (no coating): chicken wings, pork belly, cauliflower — naturally crispy
+- Air fryer finishing: pressure cook in Instant Pot first, then air fry 5 min for crispy exterior + juicy interior
+- Broiler finishing: last 3 min under broiler transforms any roasted protein to crispy perfection
+- Cast iron sear: screaming hot cast iron with avocado oil creates restaurant-quality crust
+
+INSTANT POT TIMING REFERENCE:
+- Chicken thighs boneless: 10 min high pressure
+- Chicken thighs bone-in: 15 min high pressure
+- Chicken breast: 8 min high pressure
+- Ground beef: 5 min high pressure
+- Beef chuck roast: 60-90 min high pressure
+- Pork shoulder: 90 min high pressure
+- Ribs: 25 min high pressure
+- Eggs hard boiled: 5-5-5 method (5 min HP, 5 min natural release, 5 min ice bath)
+- Broccoli: 0 min high pressure, immediate release
+- Cauliflower whole: 3 min high pressure
+- Bone broth: 120 min high pressure
+
+DOUBLE FRY TECHNIQUE: For maximum crunch — fry once at 325°F to cook through, rest 5 min, fry again at 375°F for the crunch. This is Chef's secret weapon.
+
+EQUIPMENT MATCHING RULE: Never suggest a cooking method that requires equipment the user does not have. Always match suggestions to available equipment. When multiple methods are possible, rank them by which produces the crispiest result first.
+
+When suggesting any recipe, always include:
+- Which specific equipment to use and why
+- Estimated total cook time
+- Crispiness rating: 🥨 (1) to 🥨🥨🥨🥨🥨 (5)
+- Difficulty rating: ⭐ (1) to ⭐⭐⭐⭐⭐ (5)
 
 INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
@@ -515,6 +563,8 @@ export default function ChefClaudeScreen() {
   const userProfile = useAppStore((s) => s.userProfile);
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
+  const getEquipmentSummary = useKitchenStore((s) => s.getEquipmentSummary);
+  const getPreferencesSummary = useKitchenStore((s) => s.getPreferencesSummary);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
@@ -562,7 +612,9 @@ export default function ChefClaudeScreen() {
           todayEntries,
           dailyTotals,
           userProfile,
-          todayStr
+          todayStr,
+          getEquipmentSummary().join(', '),
+          getPreferencesSummary()
         );
 
         const conversationHistory = [...messages, userMessage].map((m) => ({
@@ -593,7 +645,7 @@ export default function ChefClaudeScreen() {
         setIsTyping(false);
       }
     },
-    [messages, isTyping, pantryItems, todayEntries, dailyTotals, userProfile, todayStr]
+    [messages, isTyping, pantryItems, todayEntries, dailyTotals, userProfile, todayStr, getEquipmentSummary, getPreferencesSummary]
   );
 
   const renderItem = useCallback(

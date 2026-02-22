@@ -70,6 +70,14 @@ function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPr
   const handlePressIn = () => { scale.value = withSpring(0.96); };
   const handlePressOut = () => { scale.value = withSpring(1); };
 
+  // Build crispiness string
+  const crispinessStr = recipe.crispinessRating && recipe.crispinessRating > 0
+    ? '🥨'.repeat(recipe.crispinessRating)
+    : null;
+
+  // Determine badge top offset based on whether pantryMatchBadge is present
+  const cookingMethodTop = pantryMatchBadge ? 34 : 10;
+
   return (
     <Animated.View style={[animStyle, { width, height, marginRight: 12 }]}>
       <Pressable
@@ -111,6 +119,27 @@ function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPr
             </View>
           ) : null}
 
+          {/* Cooking method badge */}
+          {recipe.cookingMethod ? (
+            <View
+              style={{
+                position: 'absolute',
+                top: cookingMethodTop,
+                left: 10,
+                backgroundColor: 'rgba(0,0,0,0.45)',
+                borderRadius: BorderRadius.full,
+                paddingHorizontal: 7,
+                paddingVertical: 3,
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.15)',
+              }}
+            >
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 9, color: 'rgba(255,255,255,0.9)' }}>
+                {recipe.cookingMethod}
+              </Text>
+            </View>
+          ) : null}
+
           {/* Favorite heart */}
           <Pressable
             onPress={() => {
@@ -144,7 +173,7 @@ function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPr
             >
               {recipe.title}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
                 <Clock size={10} color="rgba(255,255,255,0.7)" />
                 <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
@@ -166,6 +195,12 @@ function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPr
                   />
                 ))}
               </View>
+              {crispinessStr ? (
+                <>
+                  <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.4)' }} />
+                  <Text style={{ fontSize: 9, lineHeight: 12 }}>{crispinessStr}</Text>
+                </>
+              ) : null}
             </View>
           </View>
         </LinearGradient>
@@ -191,11 +226,90 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle?: string }
   );
 }
 
+// ─── Filter Bar ───────────────────────────────────────────────────────────────
+
+interface FilterChip {
+  label: string;
+  key: string;
+}
+
+const FILTER_CHIPS: FilterChip[] = [
+  { label: 'All', key: 'All' },
+  { label: 'Crispy', key: 'Crispy' },
+  { label: 'Quick', key: 'Quick' },
+  { label: 'Deep Fried', key: 'Deep Fried' },
+  { label: 'Instant Pot', key: 'Instant Pot' },
+];
+
+interface FilterBarProps {
+  activeFilter: string;
+  onFilterChange: (key: string) => void;
+}
+
+function FilterBar({ activeFilter, onFilterChange }: FilterBarProps) {
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: Spacing.md, gap: 8, paddingBottom: 4 }}
+      style={{ flexGrow: 0, marginBottom: 8 }}
+    >
+      {FILTER_CHIPS.map((chip) => {
+        const isActive = activeFilter === chip.key;
+        return (
+          <Pressable
+            key={chip.key}
+            onPress={() => {
+              Haptics.selectionAsync();
+              onFilterChange(chip.key);
+            }}
+            style={{
+              paddingHorizontal: 14,
+              paddingVertical: 7,
+              borderRadius: BorderRadius.full,
+              backgroundColor: isActive ? Colors.green : Colors.surface,
+              borderWidth: 1,
+              borderColor: isActive ? Colors.green : Colors.border,
+            }}
+            testID={`filter-chip-${chip.key.toLowerCase().replace(' ', '-')}`}
+          >
+            <Text
+              style={{
+                fontFamily: 'DMSans_500Medium',
+                fontSize: 13,
+                color: isActive ? Colors.navy : Colors.textSecondary,
+              }}
+            >
+              {chip.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
+
+function applyFilter(recipes: Recipe[], filter: string): Recipe[] {
+  switch (filter) {
+    case 'Crispy':
+      return recipes.filter((r) => r.crispinessRating !== undefined && r.crispinessRating >= 4);
+    case 'Quick':
+      return recipes.filter((r) => r.prepTime + r.cookTime <= 30);
+    case 'Deep Fried':
+      return recipes.filter((r) => r.cookingMethod === 'Deep Fried');
+    case 'Instant Pot':
+      return recipes.filter((r) => r.cookingMethod === 'Instant Pot');
+    default:
+      return recipes;
+  }
+}
 
 export default function RecipesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState<string>('All');
   const [fabOpen, setFabOpen] = useState(false);
   const [longPressRecipe, setLongPressRecipe] = useState<Recipe | null>(null);
 
@@ -268,6 +382,7 @@ export default function RecipesScreen() {
     setFabOpen(true);
   };
 
+  // Search results (takes priority)
   const filteredRecipes = searchQuery.trim()
     ? recipes.filter(
         (r) =>
@@ -276,6 +391,18 @@ export default function RecipesScreen() {
           r.category.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : null;
+
+  // Filter results (when no search query and filter is not All)
+  const filterResults = !searchQuery.trim() && activeFilter !== 'All'
+    ? applyFilter(recipes, activeFilter)
+    : null;
+
+  const filterLabel: Record<string, string> = {
+    Crispy: 'Crispy recipes (crispiness 4+)',
+    Quick: 'Quick recipes (under 30 min)',
+    'Deep Fried': 'Deep Fried recipes',
+    'Instant Pot': 'Instant Pot recipes',
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: Colors.navy }} testID="recipes-screen">
@@ -335,7 +462,7 @@ export default function RecipesScreen() {
         <View
           style={{
             marginHorizontal: Spacing.md,
-            marginBottom: 8,
+            marginBottom: 10,
             flexDirection: 'row',
             alignItems: 'center',
             backgroundColor: Colors.surface,
@@ -368,8 +495,12 @@ export default function RecipesScreen() {
           ) : null}
         </View>
 
+        {/* Filter Bar */}
+        <FilterBar activeFilter={activeFilter} onFilterChange={setActiveFilter} />
+
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
           {filteredRecipes ? (
+            // Search results grid
             <View style={{ paddingHorizontal: Spacing.md, paddingTop: 8 }}>
               <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textSecondary, marginBottom: 12 }}>
                 {filteredRecipes.length} result{filteredRecipes.length !== 1 ? 's' : ''}
@@ -386,6 +517,34 @@ export default function RecipesScreen() {
                   />
                 ))}
               </View>
+            </View>
+          ) : filterResults ? (
+            // Active filter grid
+            <View style={{ paddingHorizontal: Spacing.md, paddingTop: 8 }}>
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 14, color: Colors.textSecondary, marginBottom: 12 }}>
+                {filterResults.length} {filterLabel[activeFilter] ?? `${activeFilter} recipes`}
+              </Text>
+              {filterResults.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingVertical: 48 }}>
+                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 15, color: Colors.textTertiary }}>
+                    No recipes found for this filter.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                  {filterResults.map((recipe) => (
+                    <RecipeCard
+                      key={recipe.id}
+                      recipe={recipe}
+                      width={(SCREEN_WIDTH - 44) / 2}
+                      height={200}
+                      pantryMatchBadge={getPantryMatch(recipe)}
+                      onPress={() => handleRecipePress(recipe)}
+                      onLongPress={() => handleLongPress(recipe)}
+                    />
+                  ))}
+                </View>
+              )}
             </View>
           ) : (
             <>

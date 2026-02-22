@@ -60,6 +60,7 @@ function RootLayoutNav() {
         <Stack.Screen name="zone-map" options={{ headerShown: false }} />
         <Stack.Screen name="api-status" options={{ headerShown: false, presentation: 'modal' }} />
         <Stack.Screen name="chef-claude" options={{ headerShown: false }} />
+        <Stack.Screen name="kitchen-equipment" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
