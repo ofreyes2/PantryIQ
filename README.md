@@ -43,7 +43,10 @@ mobile/src/
 │   ├── FastingWidget.tsx        # Fasting Timer dashboard widget
 │   ├── ErrorBoundary.tsx        # Global error boundary for crash prevention
 │   ├── MealConfirmationCard.tsx # Meal confirmation preview card with macro display
-│   └── QuickLogSheet.tsx        # Quick Log bottom sheet (recent meals, favorites)
+│   ├── MealConfirmationModal.tsx # Meal type/date selection modal
+│   ├── QuickLogSheet.tsx        # Quick Log bottom sheet (recent meals, favorites)
+│   ├── RecipeCaptureCard.tsx    # Recipe save card that appears in Chef Claude chat
+│   └── RecipeCreationModal.tsx  # Recipe/tip editor with auto-filled fields from conversation
 ├── constants/
 │   └── theme.ts                 # Colors, spacing, typography, shadows
 ├── lib/
@@ -52,6 +55,7 @@ mobile/src/
     ├── toastHelper.ts           # Toast helper functions for delete/clear operations
     ├── personalityModes.ts      # Chef Claude personality mode definitions and utilities
     ├── mealAnalysis.ts          # Meal detection patterns and analysis utilities
+    ├── foodExplorationUtil.ts   # Food exploration triggers, ingredient extraction, positive response detection
     ├── errorHandling.ts         # Global error handling, API retry logic, validation
     ├── accessibility.ts         # Accessibility utilities, WCAG compliance
     └── stores/
@@ -62,7 +66,8 @@ mobile/src/
         ├── nutritionStore.ts    # Macro goals, net carb calculations, user metrics
         ├── fastingStore.ts      # Fasting timer sessions, history, phases
         ├── healthStore.ts       # Weight tracking, body composition
-        ├── recipesStore.ts      # Recipe box, favorites, cooking history
+        ├── recipesStore.ts      # Recipe box, ChefTip interface, Herbed Cream Cheese seed recipe
+        ├── chefPreferencesStore.ts # Learned food preferences, exploration mode, conversation context
         ├── kitchenStore.ts      # Equipment checklist, cooking preferences
         ├── kitchenMapStore.ts   # Zone mapping, spotted items
         └── shoppingStore.ts     # Shopping list, price history, trip tracking
@@ -87,6 +92,15 @@ mobile/src/
 - **Phase 8** (complete): Nutrition Intelligence Features (Batch 1)
   - **Macro Calculator**: Mifflin-St Jeor BMR calculation, personalized daily macro targets, onboarding-style form, beautiful results display with flame/protein/fat cards
   - **Fasting Timer**: Dashboard widget + full screen, circular progress ring, 6 fasting phases, protocol selector (16:8, 18:6, 20:4, OMAD, 5:2, custom), session history, break fast suggestions
+- **Phase 9** (complete): Chef Claude Natural Food Conversation & Recipe Capture (Batch 5, Feature 11)
+  - **Part 1 - Exploration Mode**: Recognizes food pairing/elevation questions, cross-references pantry items, builds context for intelligent suggestions with low-carb awareness
+  - **Part 2 - Recipe Capture from Conversation**: RecipeCaptureCard appears when user responds positively to suggestions, pre-fills recipe modal with name/ingredients/instructions/nutrition auto-extracted from chat
+  - **Part 3 - Mid-Conversation Save**: Bookmark icons on Chef Claude messages enable saving any suggestion mid-conversation without waiting for end
+  - **Part 4 - Photo to Recipe Flow**: Vision API ready to identify food in photos and offer exploration chips (What pairs well, How do I elevate, Make it a meal, Log this, Add to pantry)
+  - **Part 5 - Saved Tips Section**: ChefTip interface for shorter advice cards, tips section in Recipes tab, dual save options (Full Recipe vs Quick Tip)
+  - **Part 6 - Conversation to Shopping List**: Inline [+ Add to List] buttons appear next to ingredients user doesn't have, adds to shopping list with toast confirmation
+  - **Part 7 - Remembered Preferences**: Learns from conversations (flavor preferences, ingredient affinities, brand preferences), stored in AsyncStorage, included in system prompt for personalization
+  - **Part 8 - Pre-built Herbed Cream Cheese Recipe**: Zero-carb Italian dip recipe ready in Recipe Box as demo + reference
 - **Batch 5 Features** (in progress):
   - **Feature 1 ✅ COMPLETE**: Chef Claude Personality Modes — 6 personality modes (Default, Coach, Gordon Ramsay, Scientist, Zen, Custom) with dynamic system prompts, personality selector in Settings, personality mode indicator in Chef Claude header
   - **Feature 8 ✅ COMPLETE**: App Store Preparation — Complete privacy policy, terms of service, app store description, keywords, screenshots specifications, app icon design brief, TestFlight instructions

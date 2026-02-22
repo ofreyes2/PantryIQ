@@ -29,6 +29,15 @@ import { usePantryStore } from '@/lib/stores/pantryStore';
 import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
+import { useChefPreferencesStore } from '@/lib/stores/chefPreferencesStore';
+import {
+  detectExplorationTrigger,
+  extractFoodsFromMessage,
+  crossReferencePantryItems,
+  buildExplorationContext,
+  detectPositiveResponse,
+  extractRecipeFromResponse,
+} from '@/lib/foodExplorationUtil';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
 import { getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
@@ -36,6 +45,8 @@ import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import { MealConfirmationModal } from '@/components/MealConfirmationModal';
 import { QuickLogSheet } from '@/components/QuickLogSheet';
+import { RecipeCaptureCard } from '@/components/RecipeCaptureCard';
+import { RecipeCreationModal } from '@/components/RecipeCreationModal';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
@@ -775,6 +786,15 @@ export default function ChefClaudeScreen() {
   const [mealCardStates, setMealCardStates] = useState<Record<string, MealCardStatus>>({});
   const [mealCardErrors, setMealCardErrors] = useState<Record<string, string>>({});
   const [showMealConfirmationModal, setShowMealConfirmationModal] = useState(false);
+  const [showRecipeCapture, setShowRecipeCapture] = useState(false);
+  const [recipeToCapture, setRecipeToCapture] = useState<{
+    name: string;
+    servingTime?: string;
+    netCarbs: number;
+    description: string;
+    foods: string[];
+    instructions: string[];
+  } | null>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1239,8 +1259,30 @@ export default function ChefClaudeScreen() {
       }
 
       try {
+        // Check for food exploration triggers
+        const explorationTrigger = detectExplorationTrigger(trimmed);
+        const mentionedFoods = extractFoodsFromMessage(trimmed);
+        const { available: availableFoods, missing: missingFoods } = crossReferencePantryItems(
+          mentionedFoods,
+          pantryItems
+        );
+
+        const preferencesStore = useChefPreferencesStore.getState();
+        const preferencesSummary = preferencesStore.getPreferenceSummary();
+
+        // Build exploration context if applicable
+        let explorationContextStr = '';
+        if (explorationTrigger.isExploration) {
+          explorationContextStr = buildExplorationContext(
+            explorationTrigger,
+            availableFoods,
+            missingFoods,
+            preferencesSummary
+          );
+        }
+
         // Send all messages to Claude - Claude will handle meal logging detection
-        const systemPrompt = buildSystemPrompt(
+        let systemPrompt = buildSystemPrompt(
           pantryItems,
           getEntriesForDate(new Date().toISOString().split('T')[0]),
           getDailyTotals(new Date().toISOString().split('T')[0]),
@@ -1249,6 +1291,11 @@ export default function ChefClaudeScreen() {
           getEquipmentSummary().join(', '),
           getPreferencesSummary()
         );
+
+        // Append exploration context if applicable
+        if (explorationContextStr) {
+          systemPrompt += explorationContextStr;
+        }
 
         const conversationHistory = [...messages, userMessage].map((m) => ({
           role: m.role,
@@ -1267,6 +1314,28 @@ export default function ChefClaudeScreen() {
           if (mealAnalysis) {
             setCurrentMealAnalysis(mealAnalysis);
           }
+        }
+
+        // Check for recipe in response and positive user response
+        const hasPositiveResponse = detectPositiveResponse(trimmed);
+        const lastAssistantMsg = messages.filter((m) => m.role === 'assistant').pop();
+        const recipeData = extractRecipeFromResponse(lastAssistantMsg?.content || '');
+
+        // Show recipe capture card if:
+        // 1. User gave positive response to a suggestion
+        // 2. Claude's previous message contained recipe instructions
+        // 3. Current message is exploration related
+        if (hasPositiveResponse && recipeData.hasRecipe && explorationTrigger.isExploration) {
+          const mealName = explorationTrigger.detectedFoods?.[0] || 'New Recipe';
+          setRecipeToCapture({
+            name: mealName,
+            servingTime: recipeData.servingTime,
+            netCarbs: 0,
+            description: displayText.substring(0, 100),
+            foods: mentionedFoods,
+            instructions: recipeData.instructions || [],
+          });
+          setShowRecipeCapture(true);
         }
 
         // Create the assistant message with extracted meal analysis if present
@@ -1303,6 +1372,7 @@ export default function ChefClaudeScreen() {
       getPreferencesSummary,
       processClaudeResponse,
       convertClaudeMealDataToAnalysis,
+      todayStr,
     ]
   );
 
@@ -1760,6 +1830,46 @@ export default function ChefClaudeScreen() {
         onConfirm={handleConfirmLogMeal}
         onLogAndAddMore={handleConfirmLogAndAddMore}
         isLoading={isMealLogging}
+      />
+
+      {recipeToCapture ? (
+        <RecipeCaptureCard
+          recipeName={recipeToCapture.name}
+          servingTime={recipeToCapture.servingTime}
+          netCarbs={recipeToCapture.netCarbs}
+          description={recipeToCapture.description}
+          onSaveRecipe={() => {
+            setShowRecipeCapture(true);
+          }}
+          onSaveTip={() => {
+            setShowRecipeCapture(true);
+          }}
+          onNotNow={() => {
+            setRecipeToCapture(null);
+            setShowRecipeCapture(false);
+          }}
+        />
+      ) : null}
+
+      <RecipeCreationModal
+        visible={showRecipeCapture}
+        onClose={() => {
+          setShowRecipeCapture(false);
+          setRecipeToCapture(null);
+        }}
+        initialData={
+          recipeToCapture
+            ? {
+                recipeName: recipeToCapture.name,
+                description: recipeToCapture.description,
+                ingredients: recipeToCapture.foods,
+                instructions: recipeToCapture.instructions,
+                servingTime: recipeToCapture.servingTime,
+                netCarbs: recipeToCapture.netCarbs,
+              }
+            : undefined
+        }
+        saveAsType="recipe"
       />
     </LinearGradient>
     </ErrorBoundary>

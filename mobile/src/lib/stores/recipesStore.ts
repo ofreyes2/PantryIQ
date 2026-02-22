@@ -47,9 +47,20 @@ export interface RecipeFolder {
   recipeCount: number;
 }
 
+export interface ChefTip {
+  id: string;
+  title: string;
+  content: string; // One paragraph of advice
+  quickList?: string[]; // Optional bulleted list
+  tags: string[];
+  createdAt: string;
+  isFromConversation: boolean;
+}
+
 interface RecipesState {
   recipes: Recipe[];
   folders: RecipeFolder[];
+  tips: ChefTip[];
   recentlyViewed: string[];
   addRecipe: (recipe: Omit<Recipe, 'id' | 'dateAdded'>) => void;
   updateRecipe: (id: string, updates: Partial<Recipe>) => void;
@@ -62,6 +73,9 @@ interface RecipesState {
   getFavorites: () => Recipe[];
   getByFolder: (folderId: string) => Recipe[];
   getRecentlyViewed: () => Recipe[];
+  addTip: (tip: Omit<ChefTip, 'id' | 'createdAt'>) => void;
+  deleteTip: (id: string) => void;
+  getTips: () => ChefTip[];
 }
 
 const generateId = () => `recipe-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -721,6 +735,45 @@ const seedRecipes: Recipe[] = [
     cookingMethod: 'Broiled',
     equipmentNeeded: ['Standard Oven', 'Broiler'],
   },
+  {
+    id: 'chef-r1',
+    title: 'Herbed Cream Cheese Dip for Italian Charcuterie',
+    description: 'Whipped cream cheese elevated with Italian herbs and garlic — the ultimate zero carb dip for cured Italian meats. Ready in 2 minutes with pantry staples.',
+    prepTime: 2,
+    cookTime: 0,
+    servings: 4,
+    difficulty: 1,
+    netCarbsPerServing: 1,
+    caloriesPerServing: 95,
+    proteinPerServing: 2,
+    fatPerServing: 10,
+    category: 'Dips and Sauces',
+    tags: ['keto', 'zero carb', 'Italian', 'dip', 'snack', 'quick', 'no cook', 'cream cheese', 'charcuterie'],
+    ingredients: [
+      { name: 'Whipped cream cheese', quantity: '4', unit: 'oz' },
+      { name: 'Italian seasoning', quantity: '1', unit: 'teaspoon' },
+      { name: 'Garlic powder', quantity: '1/2', unit: 'teaspoon' },
+      { name: 'Red pepper flakes', quantity: '1/4', unit: 'teaspoon' },
+      { name: 'Black pepper', quantity: '1/4', unit: 'teaspoon' },
+      { name: 'Salt', quantity: 'pinch', unit: 'to taste' },
+    ],
+    instructions: [
+      'Remove cream cheese from refrigerator 10 minutes before preparing to soften slightly for easier mixing.',
+      'Add Italian seasoning, garlic powder, red pepper flakes, black pepper, and salt to the cream cheese.',
+      'Mix vigorously with a fork until all spices are fully and evenly incorporated.',
+      'Taste and adjust — more red pepper flakes for heat, more Italian seasoning for herb flavor.',
+      'Serve immediately alongside Formaggio Artisan Wraps or any Italian cured meats.',
+      'Can be stuffed inside each meat roll or used as a side dip.',
+    ],
+    notes: 'Variations — Everything Bagel Seasoning is an outstanding alternative to the Italian herb blend. Fold in a teaspoon of Dijon mustard for a tangy dimension. A few drops of Worcestershire sauce adds incredible savory depth. Sriracha swirled on top adds visual appeal and heat. Best pairings — coppa, salami, ham, soppressata, pepperoncini peppers, sharp provolone, roasted red peppers.',
+    isFavorite: false,
+    isUserCreated: false,
+    folderId: 'folder-1',
+    dateAdded: new Date().toISOString(),
+    crispinessRating: 1,
+    cookingMethod: 'No Cook',
+    equipmentNeeded: [],
+  },
 ];
 
 export const useRecipesStore = create<RecipesState>()(
@@ -728,6 +781,7 @@ export const useRecipesStore = create<RecipesState>()(
     (set, get) => ({
       recipes: seedRecipes,
       folders: seedFolders,
+      tips: [],
       recentlyViewed: [],
 
       addRecipe: (recipe) =>
@@ -816,6 +870,28 @@ export const useRecipesStore = create<RecipesState>()(
         return recentlyViewed
           .map((id) => recipes.find((r) => r.id === id))
           .filter((r): r is Recipe => r !== undefined);
+      },
+
+      addTip: (tip) =>
+        set((state) => ({
+          tips: [
+            ...state.tips,
+            {
+              ...tip,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        })),
+
+      deleteTip: (id) =>
+        set((state) => ({
+          tips: state.tips.filter((t) => t.id !== id),
+        })),
+
+      getTips: () => {
+        const { tips } = get();
+        return tips.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       },
     }),
     {
