@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import "./env";
 import { sampleRouter } from "./routes/sample";
+import { healthRouter } from "./routes/health";
 import { logger } from "hono/logger";
 
 const app = new Hono();
@@ -30,7 +31,7 @@ app.use(
 app.use("*", logger());
 
 // Health check endpoint
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.route("/api/health", healthRouter);
 
 // Routes
 app.route("/api/sample", sampleRouter);
