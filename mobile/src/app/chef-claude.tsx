@@ -29,6 +29,7 @@ import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
+import { buildPersonalityPrompt } from '@/lib/personalityModes';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
 import type { UserProfile } from '@/lib/stores/appStore';
@@ -60,6 +61,11 @@ function buildSystemPrompt(
   kitchenEquipmentSummary: string,
   preferencesSummary: string
 ): string {
+  const personalityInstructions = buildPersonalityPrompt(
+    userProfile.personalityMode,
+    userProfile.customPersonality
+  );
+
   const expiringItems = pantryItems.filter((item) => {
     if (!item.expiryDate) return false;
     const expiry = new Date(item.expiryDate);
@@ -81,7 +87,7 @@ function buildSystemPrompt(
     )
     .join('\n');
 
-  return `You are Chef Claude, a personal AI nutritionist, chef, and pantry manager integrated into PantryIQ. You are friendly, encouraging, warm, and deeply knowledgeable about nutrition, cooking, and low carb / keto eating. You speak conversationally — this is a chat, not an essay. Keep responses concise and practical.
+  return `${personalityInstructions}
 
 Today's date: ${todayStr}
 User name: ${userProfile.name || 'there'}
@@ -155,7 +161,7 @@ INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
 - Flag missing ingredients clearly
 - Be specific with carb counts when asked
-- Use friendly, encouraging tone
+- Use conversational tone that matches your personality mode
 - Keep responses concise (3-5 sentences max unless a detailed recipe is requested)
 - When suggesting meals, always mention net carb count per serving
 - If the user is over their carb goal, be tactful but honest`;
@@ -702,7 +708,9 @@ export default function ChefClaudeScreen() {
                   justifyContent: 'center',
                 }}
               >
-                <ChefHat size={15} color={Colors.green} />
+                <Text style={{ fontSize: 16 }}>
+                  {userProfile.personalityMode === 'default' ? '👨‍🍳' : userProfile.personalityMode === 'coach' ? '💪' : userProfile.personalityMode === 'gordon-ramsay' ? '🔥' : userProfile.personalityMode === 'scientist' ? '🧪' : userProfile.personalityMode === 'zen' ? '🧘' : '✨'}
+                </Text>
               </View>
               <Text
                 style={{
@@ -722,7 +730,7 @@ export default function ChefClaudeScreen() {
                 marginTop: 1,
               }}
             >
-              Your personal kitchen AI
+              {userProfile.personalityMode === 'default' ? 'Your personal kitchen AI' : userProfile.personalityMode === 'coach' ? 'Coach Mode' : userProfile.personalityMode === 'gordon-ramsay' ? 'Gordon Ramsay Mode' : userProfile.personalityMode === 'scientist' ? 'Scientist Mode' : userProfile.personalityMode === 'zen' ? 'Zen Mode' : 'Custom Mode'}
             </Text>
           </View>
 

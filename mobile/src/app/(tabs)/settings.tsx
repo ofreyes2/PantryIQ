@@ -39,6 +39,7 @@ import {
   Package,
   Utensils,
   UtensilsCrossed,
+  ChefHat,
 } from 'lucide-react-native';
 import { useAppStore, UserProfile } from '@/lib/stores/appStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
@@ -396,6 +397,11 @@ export default function SettingsScreen() {
   const [photoRecognitionEnabled, setPhotoRecognitionEnabled] = useState<boolean>(true);
   const [showPhotoTips, setShowPhotoTips] = useState<boolean>(true);
 
+  // Chef Claude personality settings
+  const [customPersonalityDesc, setCustomPersonalityDesc] = useState(
+    userProfile.customPersonality?.description ?? ''
+  );
+
   React.useEffect(() => {
     AsyncStorage.getItem('pantryiq_photo_recognition_enabled').then((val) => {
       if (val !== null) setPhotoRecognitionEnabled(val === 'true');
@@ -701,6 +707,92 @@ export default function SettingsScreen() {
                 }}
                 sublabel="Show guidance tips before taking identification photos."
               />
+            </SectionCard>
+          </View>
+
+          {/* Chef Claude Personality */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <SectionCard title="Chef Claude" icon={<ChefHat size={18} color={Colors.green} />}>
+              <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textTertiary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Personality Mode
+              </Text>
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                {(['default', 'coach', 'gordon-ramsay', 'scientist', 'zen', 'custom'] as const).map((mode) => (
+                  <Pressable
+                    key={mode}
+                    onPress={() => setUserProfile({ personalityMode: mode })}
+                    style={{
+                      backgroundColor: userProfile.personalityMode === mode ? Colors.green : Colors.surface,
+                      borderRadius: BorderRadius.md,
+                      borderWidth: userProfile.personalityMode === mode ? 0 : 1,
+                      borderColor: Colors.border,
+                      paddingVertical: 12,
+                      paddingHorizontal: 14,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                    }}
+                  >
+                    <Text style={{ fontSize: 20 }}>
+                      {mode === 'default' ? '👨‍🍳' : mode === 'coach' ? '💪' : mode === 'gordon-ramsay' ? '🔥' : mode === 'scientist' ? '🧪' : mode === 'zen' ? '🧘' : '✨'}
+                    </Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: userProfile.personalityMode === mode ? '#fff' : Colors.textPrimary }}>
+                        {mode === 'default' ? 'Chef Claude' : mode === 'coach' ? 'Coach Mode' : mode === 'gordon-ramsay' ? 'Gordon Ramsay' : mode === 'scientist' ? 'Scientist' : mode === 'zen' ? 'Zen' : 'Custom'}
+                      </Text>
+                      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: userProfile.personalityMode === mode ? 'rgba(255,255,255,0.7)' : Colors.textTertiary, marginTop: 2 }}>
+                        {mode === 'default' ? 'Friendly & encouraging' : mode === 'coach' ? 'Direct & results-focused' : mode === 'gordon-ramsay' ? 'Passionate & dramatic' : mode === 'scientist' ? 'Data-driven' : mode === 'zen' ? 'Calm & mindful' : 'Your custom style'}
+                      </Text>
+                    </View>
+                    {userProfile.personalityMode === mode && <Check size={16} color="#fff" />}
+                  </Pressable>
+                ))}
+              </View>
+              {userProfile.personalityMode === 'custom' && (
+                <>
+                  <View style={styles.divider} />
+                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginBottom: 8 }}>
+                    Describe your ideal assistant:
+                  </Text>
+                  <TextInput
+                    style={{
+                      backgroundColor: Colors.surface,
+                      borderRadius: BorderRadius.md,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      fontFamily: 'DMSans_400Regular',
+                      fontSize: 13,
+                      color: Colors.textPrimary,
+                      minHeight: 80,
+                      textAlignVertical: 'top',
+                    }}
+                    multiline
+                    placeholder="e.g., Be like a supportive Italian grandmother who knows about nutrition"
+                    placeholderTextColor={Colors.textTertiary}
+                    value={customPersonalityDesc}
+                    onChangeText={setCustomPersonalityDesc}
+                  />
+                  <Pressable
+                    style={{
+                      backgroundColor: Colors.green,
+                      borderRadius: BorderRadius.full,
+                      paddingVertical: 12,
+                      alignItems: 'center',
+                      marginTop: 12,
+                    }}
+                    onPress={() => {
+                      setUserProfile({
+                        customPersonality: { description: customPersonalityDesc },
+                      });
+                      showToast('Custom personality saved', 'success');
+                    }}
+                  >
+                    <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#fff' }}>Save Custom Personality</Text>
+                  </Pressable>
+                </>
+              )}
             </SectionCard>
           </View>
 

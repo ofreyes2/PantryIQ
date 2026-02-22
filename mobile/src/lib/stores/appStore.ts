@@ -2,6 +2,18 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export type PersonalityMode =
+  | 'default'
+  | 'coach'
+  | 'gordon-ramsay'
+  | 'scientist'
+  | 'zen'
+  | 'custom';
+
+export interface CustomPersonality {
+  description: string;
+}
+
 export interface UserProfile {
   name: string;
   age: number | null;
@@ -13,6 +25,8 @@ export interface UserProfile {
   avatarUri: string | null;
   claudeApiKey: string;
   usdaApiKey: string;
+  personalityMode: PersonalityMode;
+  customPersonality: CustomPersonality | null;
 }
 
 export interface AppSettings {
@@ -51,6 +65,8 @@ const defaultUserProfile: UserProfile = {
   avatarUri: null,
   claudeApiKey: '',
   usdaApiKey: '',
+  personalityMode: 'default',
+  customPersonality: null,
 };
 
 const defaultSettings: AppSettings = {

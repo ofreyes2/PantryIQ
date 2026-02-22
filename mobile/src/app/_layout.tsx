@@ -26,6 +26,7 @@ import { hydrateShoppingStore } from '@/lib/stores/shoppingStore';
 import { hydrateRecipesStore } from '@/lib/stores/recipesStore';
 import { hydrateKitchenStore } from '@/lib/stores/kitchenStore';
 import { hydrateKitchenMapStore } from '@/lib/stores/kitchenMapStore';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -113,8 +114,10 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <KeyboardProvider>
-          <StatusBar style="light" />
-          <RootLayoutNav />
+          <ErrorBoundary>
+            <StatusBar style="light" />
+            <RootLayoutNav />
+          </ErrorBoundary>
         </KeyboardProvider>
       </GestureHandlerRootView>
     </QueryClientProvider>
