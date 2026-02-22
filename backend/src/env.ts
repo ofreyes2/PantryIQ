@@ -8,6 +8,8 @@ const envSchema = z.object({
   // Server Configuration
   PORT: z.string().optional().default("3000"),
   NODE_ENV: z.string().optional(),
+  // API Keys
+  ANTHROPIC_API_KEY: z.string().optional(),
 });
 
 /**
@@ -51,3 +53,4 @@ declare global {
     interface ProcessEnv extends z.infer<typeof envSchema> {}
   }
 }
+

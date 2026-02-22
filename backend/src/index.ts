@@ -6,6 +6,7 @@ import { sampleRouter } from "./routes/sample";
 import { healthRouter } from "./routes/health";
 import { nutritionRouter } from "./routes/nutrition";
 import { fastingRouter } from "./routes/fasting";
+import { mealsRouter } from "./routes/meals";
 import { logger } from "hono/logger";
 
 const app = new Hono();
@@ -39,6 +40,7 @@ app.route("/api/health", healthRouter);
 app.route("/api/sample", sampleRouter);
 app.route("/api/nutrition", nutritionRouter);
 app.route("/api/fasting", fastingRouter);
+app.route("/api/meals", mealsRouter);
 
 const port = Number(process.env.PORT) || 3000;
 
