@@ -10,6 +10,7 @@ import {
   useFonts,
   DMSans_400Regular,
   DMSans_500Medium,
+  DMSans_600SemiBold,
   DMSans_700Bold,
 } from '@expo-google-fonts/dm-sans';
 import {
@@ -57,6 +58,7 @@ function RootLayoutNav() {
         <Stack.Screen name="kitchen-map" options={{ headerShown: false }} />
         <Stack.Screen name="kitchen-photo-session" options={{ headerShown: false }} />
         <Stack.Screen name="zone-map" options={{ headerShown: false }} />
+        <Stack.Screen name="api-status" options={{ headerShown: false, presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
@@ -66,6 +68,7 @@ export default function RootLayout() {
   const [fontsLoaded] = useFonts({
     DMSans_400Regular,
     DMSans_500Medium,
+    DMSans_600SemiBold,
     DMSans_700Bold,
     PlayfairDisplay_600SemiBold,
     PlayfairDisplay_700Bold,

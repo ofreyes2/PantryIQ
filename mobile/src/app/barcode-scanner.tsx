@@ -450,11 +450,13 @@ function NotFoundSheet({
   visible,
   onTryAgain,
   onAddManually,
+  debugLog,
 }: {
   barcode: string;
   visible: boolean;
   onTryAgain: () => void;
   onAddManually: () => void;
+  debugLog?: string;
 }) {
   const translateY = useSharedValue(SCREEN_HEIGHT);
 
@@ -570,13 +572,35 @@ function NotFoundSheet({
             alignItems: 'center',
             borderWidth: 1,
             borderColor: Colors.border,
-            marginBottom: 16,
+            marginBottom: debugLog ? 12 : 16,
           }}
         >
           <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 17, color: Colors.textPrimary }}>
             Add Manually
           </Text>
         </Pressable>
+
+        {debugLog ? (
+          <View
+            style={{
+              backgroundColor: 'rgba(0,0,0,0.4)',
+              borderRadius: 8,
+              padding: 10,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: Colors.border,
+            }}
+          >
+            <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 10, color: Colors.textTertiary, marginBottom: 4 }}>
+              API Debug Log
+            </Text>
+            <ScrollView style={{ maxHeight: 90 }} showsVerticalScrollIndicator={false}>
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 10, color: 'rgba(255,255,255,0.55)', lineHeight: 16 }}>
+                {debugLog}
+              </Text>
+            </ScrollView>
+          </View>
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -629,6 +653,7 @@ export default function BarcodeScannerScreen() {
   const [foundProduct, setFoundProduct] = useState<ProductData | null>(null);
   const [notFoundBarcode, setNotFoundBarcode] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<DebugEntry | null>(null);
+  const [scanDebugLog, setScanDebugLog] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const lastScannedBarcode = useRef<string | null>(null);
 
@@ -672,11 +697,17 @@ export default function BarcodeScannerScreen() {
 
   // ─── API Cascade ──────────────────────────────────────────────────────────
 
+  const fetchWithTimeout = (url: string, options: RequestInit = {}, ms = 10000): Promise<Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    return fetch(url, { ...options, signal: controller.signal }).finally(() => clearTimeout(timer));
+  };
+
   const lookupOpenFoodFacts = async (barcode: string): Promise<ProductData | null> => {
     try {
       const url = `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`;
       console.log('[Scanner] API-1 Open Food Facts:', url);
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const res = await fetchWithTimeout(url, {}, 10000);
       const data = await res.json();
       const found = data?.status === 1 && !!data?.product?.product_name;
       console.log('[Scanner] API-1 OFF status:', res.status, '| product found:', found);
@@ -713,10 +744,9 @@ export default function BarcodeScannerScreen() {
     try {
       const url = `https://go-upc.com/api/v1/code/${barcode}`;
       console.log('[Scanner] API-2 Go-UPC:', url);
-      const res = await fetch(url, {
+      const res = await fetchWithTimeout(url, {
         headers: { Authorization: `Bearer ${goUpcApiKey}` },
-        signal: AbortSignal.timeout(8000),
-      });
+      }, 10000);
       const data = await res.json();
       const found = !!data?.product?.name;
       console.log('[Scanner] API-2 Go-UPC status:', res.status, '| product found:', found, '| name:', data?.product?.name);
@@ -770,7 +800,7 @@ export default function BarcodeScannerScreen() {
 }
 If you cannot identify it, respond with: {"identified": false}`;
 
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -782,8 +812,7 @@ If you cannot identify it, respond with: {"identified": false}`;
           max_tokens: 256,
           messages: [{ role: 'user', content: prompt }],
         }),
-        signal: AbortSignal.timeout(12000),
-      });
+      }, 12000);
 
       const data = await res.json();
       console.log('[Scanner] API-3 Claude response status:', res.status);
@@ -837,12 +866,15 @@ If you cannot identify it, respond with: {"identified": false}`;
     setFoundProduct(null);
     setNotFoundBarcode(null);
     setDebugInfo(null);
+    setScanDebugLog('');
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFlashOverlay('green');
     setTimeout(() => setFlashOverlay('none'), 300);
 
     console.log('[Scanner] ──── Barcode scanned:', data, '────');
+
+    let log = `Barcode: ${data}\n`;
 
     const debugEntry: DebugEntry = {
       barcode: data,
@@ -853,8 +885,11 @@ If you cannot identify it, respond with: {"identified": false}`;
 
     try {
       // ── API 1: Open Food Facts ──
+      log += 'API-1 Open Food Facts... ';
       const offResult = await lookupOpenFoodFacts(data);
       debugEntry.off = { status: offResult ? 200 : 'not found', found: !!offResult };
+      log += offResult ? `FOUND: ${offResult.name}\n` : 'not found\n';
+      setScanDebugLog(log);
       setDebugInfo({ ...debugEntry });
 
       if (offResult) {
@@ -865,10 +900,16 @@ If you cannot identify it, respond with: {"identified": false}`;
       }
 
       // ── API 2: Go-UPC ──
+      log += goUpcApiKey ? 'API-2 Go-UPC... ' : 'API-2 Go-UPC SKIPPED (no key)\n';
+      setScanDebugLog(log);
       console.log('[Scanner] OFF failed, trying Go-UPC...');
       const goUpcResult = await lookupGoUpc(data);
-      debugEntry.goUpc = { status: goUpcResult ? 200 : 'not found', found: !!goUpcResult };
-      setDebugInfo({ ...debugEntry });
+      if (goUpcApiKey) {
+        debugEntry.goUpc = { status: goUpcResult ? 200 : 'not found', found: !!goUpcResult };
+        log += goUpcResult ? `FOUND: ${goUpcResult.name}\n` : 'not found\n';
+        setScanDebugLog(log);
+        setDebugInfo({ ...debugEntry });
+      }
 
       if (goUpcResult) {
         console.log('[Scanner] SUCCESS via Go-UPC:', goUpcResult.name);
@@ -878,10 +919,16 @@ If you cannot identify it, respond with: {"identified": false}`;
       }
 
       // ── API 3: Claude fallback ──
+      log += claudeApiKey ? 'API-3 Claude fallback... ' : 'API-3 Claude SKIPPED (no key)\n';
+      setScanDebugLog(log);
       console.log('[Scanner] Go-UPC failed, trying Claude fallback...');
       const claudeResult = await lookupClaude(data);
-      debugEntry.claude = { triggered: true, found: !!claudeResult };
-      setDebugInfo({ ...debugEntry });
+      if (claudeApiKey) {
+        debugEntry.claude = { triggered: true, found: !!claudeResult };
+        log += claudeResult ? `FOUND: ${claudeResult.name}\n` : 'not identified\n';
+        setScanDebugLog(log);
+        setDebugInfo({ ...debugEntry });
+      }
 
       if (claudeResult) {
         console.log('[Scanner] SUCCESS via Claude fallback:', claudeResult.name);
@@ -891,6 +938,8 @@ If you cannot identify it, respond with: {"identified": false}`;
       }
 
       // ── All APIs failed ──
+      log += 'All APIs failed.';
+      setScanDebugLog(log);
       console.log('[Scanner] All 3 APIs failed for barcode:', data);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setFlashOverlay('red');
@@ -898,6 +947,8 @@ If you cannot identify it, respond with: {"identified": false}`;
       setNotFoundBarcode(data);
       setLoading(false);
     } catch (err) {
+      log += `ERROR: ${String(err)}`;
+      setScanDebugLog(log);
       console.log('[Scanner] Unexpected lookup error:', err);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setFlashOverlay('red');
@@ -1317,6 +1368,7 @@ If you cannot identify it, respond with: {"identified": false}`;
         <NotFoundSheet
           barcode={notFoundBarcode}
           visible
+          debugLog={scanDebugLog}
           onTryAgain={() => {
             setNotFoundBarcode(null);
             setScanned(false);

@@ -656,6 +656,21 @@ export default function SettingsScreen() {
               <Pressable style={[styles.saveButton, { marginTop: 12 }]} onPress={saveApiKeys} testID="save-api-keys-btn">
                 <Text style={styles.saveText}>Save API Keys</Text>
               </Pressable>
+              <Pressable
+                onPress={() => router.push('/api-status' as never)}
+                style={{
+                  marginTop: 10,
+                  borderRadius: BorderRadius.md,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: Colors.green,
+                }}
+              >
+                <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 14, color: Colors.green }}>
+                  Test APIs & Check Key Status
+                </Text>
+              </Pressable>
               <View style={styles.divider} />
               <ToggleRow
                 label="Photo Recognition"
