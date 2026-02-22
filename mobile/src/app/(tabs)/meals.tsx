@@ -43,12 +43,14 @@ import {
   RefreshCw,
   X,
   Minus,
+  Edit3,
 } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { useMealsStore, FoodEntry, MealType } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { useToast } from '@/components/Toast';
+import { ManualFoodEntryForm } from '@/components/ManualFoodEntryForm';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -1076,16 +1078,17 @@ function PortionSelector({ food, mealType, onLog, onCancel }: PortionSelectorPro
 }
 
 // ─── Add Food Modal ───────────────────────────────────────────────────────────
-type ModalView = 'options' | 'search' | 'favorites' | 'portion';
+type ModalView = 'options' | 'search' | 'favorites' | 'portion' | 'manual';
 
 interface AddFoodModalProps {
   visible: boolean;
   mealType: MealType;
   onClose: () => void;
   onAddEntry: (food: FoodItem, servings: number) => void;
+  onAddManualEntry?: (entry: Omit<FoodEntry, 'id' | 'date' | 'mealType'>, mealType: MealType) => void;
 }
 
-function AddFoodModal({ visible, mealType, onClose, onAddEntry }: AddFoodModalProps) {
+function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry }: AddFoodModalProps) {
   const router = useRouter();
   const [view, setView] = useState<ModalView>('options');
   const [searchQuery, setSearchQuery] = useState('');
@@ -1234,6 +1237,14 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry }: AddFoodModalPr
                     bg: Colors.errorMuted,
                     onPress: () => setView('favorites'),
                     testID: 'favorites-option',
+                  },
+                  {
+                    icon: <Edit3 size={24} color="#F39C12" />,
+                    title: 'Enter Manually',
+                    subtitle: 'Fill in details yourself',
+                    bg: 'rgba(243,156,18,0.15)',
+                    onPress: () => setView('manual'),
+                    testID: 'manual-entry-option',
                   },
                 ].map((opt) => (
                   <Pressable
@@ -1458,6 +1469,17 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry }: AddFoodModalPr
                 onCancel={() => setView(selectedFood ? (view === 'portion' ? 'search' : 'options') : 'options')}
               />
             ) : null}
+
+            {/* MANUAL ENTRY VIEW */}
+            {view === 'manual' ? (
+              <ManualFoodEntryForm
+                onSave={(entry) => {
+                  onAddManualEntry?.(entry, mealType);
+                  handleClose();
+                }}
+                onCancel={() => setView('options')}
+              />
+            ) : null}
           </ScrollView>
         </Animated.View>
       </View>
@@ -1591,6 +1613,15 @@ export default function MealsScreen() {
       netCarbs: food.netCarbsPerServing,
       isFavorite: false,
     });
+  };
+
+  const handleAddManualEntry = (entry: Omit<FoodEntry, 'id' | 'date' | 'mealType'>, mealType: MealType) => {
+    addEntry({
+      ...entry,
+      mealType,
+      date: dateStr,
+    });
+    showToast(`${entry.name} added to ${mealType}`, 'success');
   };
 
   const handleQuickAdd = (food: FoodItem) => {
@@ -1811,6 +1842,7 @@ export default function MealsScreen() {
             setAddFoodModalVisible(false);
           }}
           onAddEntry={handleAddEntry}
+          onAddManualEntry={handleAddManualEntry}
         />
 
         <DeleteConfirmationModal

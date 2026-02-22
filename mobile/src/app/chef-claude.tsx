@@ -61,14 +61,14 @@ interface ConversationMetadata {
 type MealCardStatus = 'pending' | 'logging' | 'success' | 'failure';
 
 const QUICK_PROMPTS = [
+  "Log my morning coffee",
   "What can I make for dinner tonight?",
-  "Am I on track with my carbs today?",
-  "What's expiring soon that I should use?",
-  "Give me a low carb meal plan for tomorrow",
-  "What's the crispiest thing I can make tonight?",
-  "What should I eat to hit my protein goal?",
-  "Suggest a recipe using my chicken",
-  "Show me a double-fry recipe for tonight",
+  "How are my carbs today",
+  "What's expiring soon",
+  "Suggest a crispy recipe",
+  "Give me a meal plan",
+  "Log my water intake",
+  "How is my streak",
 ];
 
 function buildSystemPrompt(
@@ -1150,6 +1150,66 @@ export default function ChefClaudeScreen() {
       setMessages((prev) => [...prev, userMessage]);
       setInputText('');
       setIsTyping(true);
+
+      // Special handling for coffee shortcut
+      if (trimmed.toLowerCase().includes('morning coffee') || trimmed.toLowerCase().includes('log my morning coffee')) {
+        const coffeeResponse = 'The usual? 18oz coffee with 4oz half and half and 4 Splenda?';
+        const assistantMsg: Message = {
+          id: `msg-${Date.now()}-coffee`,
+          role: 'assistant',
+          content: coffeeResponse,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        setIsTyping(false);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        return;
+      }
+
+      // Check for coffee confirmation (yes/no response to coffee prompt)
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage?.content?.includes('The usual? 18oz coffee')) {
+        if (trimmed.toLowerCase() === 'yes' || trimmed.toLowerCase() === 'y') {
+          // Log coffee as breakfast
+          const coffeeEntry = {
+            name: 'Morning Coffee',
+            servings: 1,
+            calories: 160,
+            carbs: 10,
+            fiber: 0,
+            netCarbs: 10,
+            protein: 4,
+            fat: 10,
+            isFavorite: true,
+          };
+          addMealEntry({
+            ...coffeeEntry,
+            mealType: 'Breakfast',
+            date: todayStr,
+          });
+
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: 'Logged! Your morning coffee has been added to breakfast. That coffee will use 10g of your carb budget.',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, successMsg]);
+          setIsTyping(false);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          return;
+        } else if (trimmed.toLowerCase() === 'no' || trimmed.toLowerCase() === 'n') {
+          const askMsg: Message = {
+            id: `msg-${Date.now()}-ask`,
+            role: 'assistant',
+            content: 'No problem! What did you change? Tell me what\'s in your coffee and I\'ll log it.',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, askMsg]);
+          setIsTyping(false);
+          return;
+        }
+      }
 
       try {
         // Check if this is a meal description
