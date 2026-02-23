@@ -327,11 +327,12 @@ class MealLoggerService {
   async moveEntry(
     entryId: string,
     fromMealType: MealType,
-    toMealType: MealType
+    toMealType: MealType,
+    dateStr?: string
   ): Promise<{ success: boolean; entry?: FoodEntry; error?: string }> {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
+      const date = dateStr || new Date().toISOString().split('T')[0];
+      const key = `${DAILY_LOG_KEY_PREFIX}${date}`;
       const stored = await AsyncStorage.getItem(key);
 
       if (!stored) return { success: false, error: 'No meal log found' };

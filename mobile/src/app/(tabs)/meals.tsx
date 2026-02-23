@@ -2069,7 +2069,7 @@ export default function MealsScreen() {
         }
       } else {
         // Same date, just change meal type
-        const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType);
+        const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType, selectedDate);
         if (result.success) {
           updateEntry(movingEntry.id, { mealType: targetMealType });
           showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
