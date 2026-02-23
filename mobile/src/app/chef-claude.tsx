@@ -2370,6 +2370,7 @@ export default function ChefClaudeScreen() {
         onConfirm={handleConfirmLogMeal}
         onLogAndAddMore={handleConfirmLogAndAddMore}
         isLoading={isMealLogging}
+        currentDate={new Date().toISOString().split('T')[0]}
       />
 
       {recipeToCapture ? (

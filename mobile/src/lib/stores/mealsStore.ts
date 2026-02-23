@@ -328,14 +328,15 @@ export const useMealsStore = create<MealsState>()(
 
       cleanupOldSeedEntries: () => {
         const today = dateUtils.today();
+        const yesterday = dateUtils.yesterday();
         set((state) => ({
           entries: state.entries.filter((e) => {
-            // Keep non-seed entries (user-added entries)
+            // Always keep non-seed entries (user-added entries) regardless of date
             if (!e.id.startsWith('meal-seed-')) {
               return true;
             }
-            // Keep seed entries for today and yesterday
-            return e.date === today || e.date === dateUtils.yesterday();
+            // Only keep seed entries for today and yesterday
+            return e.date === today || e.date === yesterday;
           }),
         }));
       },

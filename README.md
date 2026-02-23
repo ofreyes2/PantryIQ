@@ -250,6 +250,14 @@ mobile/src/
       - Now shows "Today" with full date below (e.g., "Today\nWednesday, February 23, 2025")
       - Past dates show "Yesterday/Full Date" label with full date below
       - All dates consistently display the actual calendar date for clarity
+    - **Navigation Arrows Fix ✅ COMPLETE**: Fixed left/right arrows in meals tab:
+      - Left arrow now correctly goes to previous day
+      - Right arrow now correctly goes to next day (disabled on today)
+      - Simplified navigation logic using direct date arithmetic instead of complex daysDifference calculations
+    - **Meal Confirmation Date Fix ✅ COMPLETE**: Fixed entries being logged with wrong dates:
+      - MealConfirmationModal now accepts optional currentDate prop
+      - Chef Claude explicitly passes today's date to ensure meals are always logged to today from Claude
+      - Improved robustness of seed entry cleanup to preserve all user-created entries regardless of date
     - **Implementation Details**:
       - New `dateUtils.ts` library with 20+ centralized date helper functions
       - New `dailyReset.ts` with daily reset logic and streak validity checking

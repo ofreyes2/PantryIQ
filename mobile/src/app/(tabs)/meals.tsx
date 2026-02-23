@@ -1962,9 +1962,9 @@ export default function MealsScreen() {
   const isToday = dateUtils.isToday(selectedDate);
 
   const navigateDay = (dir: -1 | 1) => {
-    const newDate = dir === -1
-      ? dateUtils.daysAgo(dateUtils.daysDifference(dateUtils.today(), selectedDate) - 1)
-      : dateUtils.daysFromNow(dateUtils.daysDifference(selectedDate, dateUtils.today()) + 1);
+    const d = new Date(selectedDate + 'T12:00:00');
+    d.setDate(d.getDate() + dir);
+    const newDate = d.toISOString().split('T')[0];
     setSelectedDate(newDate);
   };
 

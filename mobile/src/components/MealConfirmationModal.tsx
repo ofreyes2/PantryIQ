@@ -20,6 +20,7 @@ interface MealConfirmationModalProps {
   onConfirm: (mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks', date: string) => Promise<void>;
   onLogAndAddMore: (mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks', date: string) => Promise<void>;
   isLoading?: boolean;
+  currentDate?: string; // Optional date override, defaults to today
 }
 
 export function MealConfirmationModal({
@@ -29,9 +30,10 @@ export function MealConfirmationModal({
   onConfirm,
   onLogAndAddMore,
   isLoading = false,
+  currentDate,
 }: MealConfirmationModalProps) {
   const [selectedMealType, setSelectedMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'>('Breakfast');
-  const selectedDate = new Date().toISOString().split('T')[0];
+  const selectedDate = currentDate || new Date().toISOString().split('T')[0];
   const [isConfirming, setIsConfirming] = useState(false);
 
   if (!analysis) {
