@@ -417,337 +417,8 @@ export default function MealTypeDetail() {
   }, [currentDate]);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }}>
-      <View style={{ flex: 1 }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: Colors.border,
-            backgroundColor: Colors.surface,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={8}
-            style={{
-              padding: 8,
-              marginLeft: -8,
-            }}
-          >
-            <ChevronLeft size={24} color={Colors.textPrimary} />
-          </Pressable>
-
-          <View style={{ flex: 1, alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 20 }}>{mealConfig.icon}</Text>
-              <Text
-                style={{
-                  fontFamily: 'DMSans_700Bold',
-                  fontSize: 18,
-                  color: Colors.textPrimary,
-                }}
-              >
-                {mealConfig.label}
-              </Text>
-            </View>
-          </View>
-
-          <View style={{ width: 40 }} />
-        </View>
-
-        {/* Date navigation */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: Colors.border,
-            backgroundColor: Colors.surface,
-          }}
-        >
-          <Pressable
-            onPress={() => handleNavigateDate(-1)}
-            hitSlop={8}
-            style={{ padding: 8, marginLeft: -8 }}
-          >
-            <ChevronLeft size={20} color={Colors.textSecondary} />
-          </Pressable>
-
-          <Text
-            style={{
-              fontFamily: 'DMSans_600SemiBold',
-              fontSize: 14,
-              color: Colors.textPrimary,
-              flex: 1,
-              textAlign: 'center',
-            }}
-          >
-            {formatDate(currentDate)}
-          </Text>
-
-          <Pressable
-            onPress={() => handleNavigateDate(1)}
-            hitSlop={8}
-            style={{ padding: 8, marginRight: -8 }}
-          >
-            <ChevronRight size={20} color={Colors.textSecondary} />
-          </Pressable>
-        </View>
-
-        {/* Content */}
-        {entries.length === 0 ? (
-          <View
-            style={{
-              flex: 1,
-              justifyContent: 'center',
-              alignItems: 'center',
-              paddingHorizontal: 16,
-            }}
-          >
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: `${mealConfig.color}20`,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <Text style={{ fontSize: 32 }}>{mealConfig.icon}</Text>
-            </View>
-            <Text
-              style={{
-                fontFamily: 'DMSans_700Bold',
-                fontSize: 16,
-                color: Colors.textPrimary,
-                marginBottom: 8,
-              }}
-            >
-              No items logged
-            </Text>
-            <Text
-              style={{
-                fontFamily: 'DMSans_400Regular',
-                fontSize: 14,
-                color: Colors.textSecondary,
-                textAlign: 'center',
-                marginBottom: 20,
-              }}
-            >
-              Add your first {mealConfig.label.toLowerCase()} item to get started
-            </Text>
-            <Pressable
-              onPress={() => {
-                router.push({
-                  pathname: '/add-meal-entry',
-                  params: { mealType, date: dateStr },
-                });
-              }}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 16,
-                paddingVertical: 10,
-                borderRadius: BorderRadius.md,
-                backgroundColor: mealConfig.color,
-              }}
-            >
-              <Plus size={18} color="#FFFFFF" />
-              <Text
-                style={{
-                  fontFamily: 'DMSans_600SemiBold',
-                  fontSize: 14,
-                  color: '#FFFFFF',
-                }}
-              >
-                Add Food
-              </Text>
-            </Pressable>
-          </View>
-        ) : (
-          <FlatList
-            data={entries}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <FoodItemRow
-                entry={item}
-                onDelete={() => handleDeleteEntry(item.id)}
-                onToggleFavorite={() => handleToggleFavorite(item.id)}
-                onEdit={() => handleEditEntry(item)}
-                onMove={() => handleMoveEntry(item)}
-              />
-            )}
-            contentContainerStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 12,
-              flexGrow: 1,
-            }}
-            scrollEnabled={entries.length > 4}
-            ListFooterComponent={
-              <View style={{ marginTop: 12, marginBottom: 20 }}>
-                <Pressable
-                  onPress={() => {
-                    router.push({
-                      pathname: '/add-meal-entry',
-                      params: { mealType, date: dateStr },
-                    });
-                  }}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 12,
-                    borderRadius: BorderRadius.md,
-                    borderWidth: 1,
-                    borderColor: `${mealConfig.color}50`,
-                    borderStyle: 'dashed',
-                  }}
-                >
-                  <Plus size={16} color={mealConfig.color} />
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_500Medium',
-                      fontSize: 14,
-                      color: mealConfig.color,
-                      marginLeft: 6,
-                    }}
-                  >
-                    Add More Items
-                  </Text>
-                </Pressable>
-              </View>
-            }
-          />
-        )}
-
-        {/* Nutrition summary footer (if entries exist) */}
-        {entries.length > 0 && (
-          <View
-            style={{
-              backgroundColor: Colors.surface,
-              borderTopWidth: 1,
-              borderTopColor: Colors.border,
-              paddingHorizontal: 16,
-              paddingTop: 12,
-              paddingBottom: 16,
-            }}
-          >
-            <Text
-              style={{
-                fontFamily: 'DMSans_600SemiBold',
-                fontSize: 12,
-                color: Colors.textSecondary,
-                marginBottom: 8,
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-              }}
-            >
-              {mealConfig.label} Totals
-            </Text>
-            <View style={{ flexDirection: 'row', gap: 16 }}>
-              <View>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 12,
-                    color: Colors.textSecondary,
-                    marginBottom: 4,
-                  }}
-                >
-                  Calories
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 18,
-                    color: Colors.textPrimary,
-                  }}
-                >
-                  {Math.round(totalCals)}
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 12,
-                    color: Colors.textSecondary,
-                    marginBottom: 4,
-                  }}
-                >
-                  Net Carbs
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 18,
-                    color: Colors.green,
-                  }}
-                >
-                  {Math.round(totalNetCarbs)}g
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 12,
-                    color: Colors.textSecondary,
-                    marginBottom: 4,
-                  }}
-                >
-                  Protein
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 18,
-                    color: Colors.textPrimary,
-                  }}
-                >
-                  {Math.round(totalProtein)}g
-                </Text>
-              </View>
-              <View>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 12,
-                    color: Colors.textSecondary,
-                    marginBottom: 4,
-                  }}
-                >
-                  Fat
-                </Text>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 18,
-                    color: Colors.textPrimary,
-                  }}
-                >
-                  {Math.round(totalFat)}g
-                </Text>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* Meal Entry Detail Sheet */}
-      {selectedEntry ? (
+    <>
+      {detailSheetVisible && selectedEntry ? (
         <MealEntryDetailSheet
           visible={detailSheetVisible}
           entry={selectedEntry}
@@ -769,34 +440,364 @@ export default function MealTypeDetail() {
             showToast('Nutrition updated', 'success');
           }}
         />
-      ) : null}
+      ) : (
+        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }}>
+          <View style={{ flex: 1 }}>
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+                backgroundColor: Colors.surface,
+              }}
+            >
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={8}
+                style={{
+                  padding: 8,
+                  marginLeft: -8,
+                }}
+              >
+                <ChevronLeft size={24} color={Colors.textPrimary} />
+              </Pressable>
 
-      {/* Move Entry Sheet */}
-      {selectedEntry ? (
-        <MoveToMealSheet
-          visible={moveSheetVisible}
-          currentMealType={selectedEntry.mealType}
-          foodName={selectedEntry.name}
-          currentDate={dateStr}
-          onMove={(newMealType, targetDate) => {
-            if (targetDate !== dateStr) {
-              // Moving to a different date
-              deleteEntry(selectedEntry.id);
-              // Note: The entry will need to be added to the target date
-              // This is a simplified implementation that just deletes from current date
-              showToast(`Moved to ${newMealType} on another date`, 'success');
-            } else {
-              // Same date, just change meal type
-              updateEntry(selectedEntry.id, {
-                mealType: newMealType,
-              });
-              showToast(`Moved to ${newMealType}`, 'success');
-            }
-            setMoveSheetVisible(false);
-          }}
-          onCancel={() => setMoveSheetVisible(false)}
-        />
-      ) : null}
-    </SafeAreaView>
+              <View style={{ flex: 1, alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ fontSize: 20 }}>{mealConfig.icon}</Text>
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_700Bold',
+                      fontSize: 18,
+                      color: Colors.textPrimary,
+                    }}
+                  >
+                    {mealConfig.label}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ width: 40 }} />
+            </View>
+
+            {/* Date navigation */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+                backgroundColor: Colors.surface,
+              }}
+            >
+              <Pressable
+                onPress={() => handleNavigateDate(-1)}
+                hitSlop={8}
+                style={{ padding: 8, marginLeft: -8 }}
+              >
+                <ChevronLeft size={20} color={Colors.textSecondary} />
+              </Pressable>
+
+              <Text
+                style={{
+                  fontFamily: 'DMSans_600SemiBold',
+                  fontSize: 14,
+                  color: Colors.textPrimary,
+                  flex: 1,
+                  textAlign: 'center',
+                }}
+              >
+                {formatDate(currentDate)}
+              </Text>
+
+              <Pressable
+                onPress={() => handleNavigateDate(1)}
+                hitSlop={8}
+                style={{ padding: 8, marginRight: -8 }}
+              >
+                <ChevronRight size={20} color={Colors.textSecondary} />
+              </Pressable>
+            </View>
+
+            {/* Content */}
+            {entries.length === 0 ? (
+              <View
+                style={{
+                  flex: 1,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingHorizontal: 16,
+                }}
+              >
+                <View
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: 32,
+                    backgroundColor: `${mealConfig.color}20`,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ fontSize: 32 }}>{mealConfig.icon}</Text>
+                </View>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 16,
+                    color: Colors.textPrimary,
+                    marginBottom: 8,
+                  }}
+                >
+                  No items logged
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 14,
+                    color: Colors.textSecondary,
+                    textAlign: 'center',
+                    marginBottom: 20,
+                  }}
+                >
+                  Add your first {mealConfig.label.toLowerCase()} item to get started
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    router.push({
+                      pathname: '/add-meal-entry',
+                      params: { mealType, date: dateStr },
+                    });
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: BorderRadius.md,
+                    backgroundColor: mealConfig.color,
+                  }}
+                >
+                  <Plus size={18} color="#FFFFFF" />
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_600SemiBold',
+                      fontSize: 14,
+                      color: '#FFFFFF',
+                    }}
+                  >
+                    Add Food
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <FlatList
+                data={entries}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <FoodItemRow
+                    entry={item}
+                    onDelete={() => handleDeleteEntry(item.id)}
+                    onToggleFavorite={() => handleToggleFavorite(item.id)}
+                    onEdit={() => handleEditEntry(item)}
+                    onMove={() => handleMoveEntry(item)}
+                  />
+                )}
+                contentContainerStyle={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  flexGrow: 1,
+                }}
+                scrollEnabled={entries.length > 4}
+                ListFooterComponent={
+                  <View style={{ marginTop: 12, marginBottom: 20 }}>
+                    <Pressable
+                      onPress={() => {
+                        router.push({
+                          pathname: '/add-meal-entry',
+                          params: { mealType, date: dateStr },
+                        });
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 12,
+                        borderRadius: BorderRadius.md,
+                        borderWidth: 1,
+                        borderColor: `${mealConfig.color}50`,
+                        borderStyle: 'dashed',
+                      }}
+                    >
+                      <Plus size={16} color={mealConfig.color} />
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_500Medium',
+                          fontSize: 14,
+                          color: mealConfig.color,
+                          marginLeft: 6,
+                        }}
+                      >
+                        Add More Items
+                      </Text>
+                    </Pressable>
+                  </View>
+                }
+              />
+            )}
+
+            {/* Nutrition summary footer (if entries exist) */}
+            {entries.length > 0 && (
+              <View
+                style={{
+                  backgroundColor: Colors.surface,
+                  borderTopWidth: 1,
+                  borderTopColor: Colors.border,
+                  paddingHorizontal: 16,
+                  paddingTop: 12,
+                  paddingBottom: 16,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_600SemiBold',
+                    fontSize: 12,
+                    color: Colors.textSecondary,
+                    marginBottom: 8,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {mealConfig.label} Totals
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Calories
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 18,
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {Math.round(totalCals)}
+                    </Text>
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Net Carbs
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 18,
+                        color: Colors.green,
+                      }}
+                    >
+                      {Math.round(totalNetCarbs)}g
+                    </Text>
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Protein
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 18,
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {Math.round(totalProtein)}g
+                    </Text>
+                  </View>
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Fat
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 18,
+                        color: Colors.textPrimary,
+                      }}
+                    >
+                      {Math.round(totalFat)}g
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+
+          {/* Move Entry Sheet */}
+          {selectedEntry ? (
+            <MoveToMealSheet
+              visible={moveSheetVisible}
+              currentMealType={selectedEntry.mealType}
+              foodName={selectedEntry.name}
+              currentDate={dateStr}
+              onMove={(newMealType, targetDate) => {
+                if (targetDate !== dateStr) {
+                  // Moving to a different date
+                  deleteEntry(selectedEntry.id);
+                  // Note: The entry will need to be added to the target date
+                  // This is a simplified implementation that just deletes from current date
+                  showToast(`Moved to ${newMealType} on another date`, 'success');
+                } else {
+                  // Same date, just change meal type
+                  updateEntry(selectedEntry.id, {
+                    mealType: newMealType,
+                  });
+                  showToast(`Moved to ${newMealType}`, 'success');
+                }
+                setMoveSheetVisible(false);
+              }}
+              onCancel={() => setMoveSheetVisible(false)}
+            />
+          ) : null}
+        </SafeAreaView>
+      )}
+    </>
   );
 }
