@@ -59,13 +59,13 @@ export function MealEntryDetailSheet({
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <View
           style={{
+            flex: 1,
             backgroundColor: Colors.navyCard,
             borderTopLeftRadius: BorderRadius.xxl,
             borderTopRightRadius: BorderRadius.xxl,
             borderTopWidth: 1,
             borderTopColor: Colors.border,
             paddingBottom: 40,
-            maxHeight: '95%',
           }}
         >
           {/* Header */}
