@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dateUtils } from '../dateUtils';
 import { usePantryStore } from './pantryStore';
 
 export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
@@ -55,8 +56,8 @@ interface MealsState {
 
 const generateId = () => `meal-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-const todayStr = new Date().toISOString().split('T')[0];
-const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+const todayStr = dateUtils.today();
+const yesterdayStr = dateUtils.yesterday();
 
 const seedEntries: FoodEntry[] = [
   {
