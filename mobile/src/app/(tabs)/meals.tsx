@@ -2320,11 +2320,6 @@ export default function MealsScreen() {
             setDetailSheetVisible(false);
             setDetailEntry(null);
           }}
-          onEdit={() => {
-            if (detailEntry) {
-              handleEditEntry(detailEntry);
-            }
-          }}
           onDelete={() => {
             if (detailEntry) {
               deleteEntry(detailEntry.id);

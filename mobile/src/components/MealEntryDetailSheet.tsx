@@ -4,20 +4,19 @@ import {
   Text,
   Pressable,
   ScrollView,
-  SafeAreaView,
+  Modal,
   TextInput,
-  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
-import { ChevronLeft, ChefHat, Send, Trash2, Move, Heart } from 'lucide-react-native';
-import { Colors, BorderRadius, Shadows } from '@/constants/theme';
+import { X, Edit2 } from 'lucide-react-native';
+import { Colors, BorderRadius } from '@/constants/theme';
 import type { FoodEntry } from '@/lib/stores/mealsStore';
-import { useMealsStore } from '@/lib/stores/mealsStore';
 
 interface MealEntryDetailSheetProps {
   visible: boolean;
   entry: FoodEntry | null;
   onClose: () => void;
-  onEdit?: () => void;
   onDelete?: () => void;
   onMove?: () => void;
   onUpdateNutrition?: (entryId: string, updates: Partial<FoodEntry>) => void;
@@ -27,55 +26,14 @@ export function MealEntryDetailSheet({
   visible,
   entry,
   onClose,
-  onEdit,
   onDelete,
   onMove,
   onUpdateNutrition,
 }: MealEntryDetailSheetProps) {
-  const [chefRequest, setChefRequest] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const mealsStore = useMealsStore();
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [editValues, setEditValues] = useState<Record<string, string>>({});
 
-  if (!entry || !visible) return null;
-
-  // Get all entries for this meal type and date
-  const mealEntries = mealsStore.getEntriesForDate(entry.date).filter(
-    (e) => e.mealType === entry.mealType
-  );
-
-  const handleChefRequest = async () => {
-    if (!chefRequest.trim() || !onUpdateNutrition) return;
-
-    setIsProcessing(true);
-    try {
-      const baseUrl = process.env.EXPO_PUBLIC_BACKEND_URL!;
-      const response = await fetch(`${baseUrl}/api/chef-claude/interpret-nutrition-request`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          request: chefRequest,
-          currentNutrition: {
-            calories: entry.calories,
-            carbs: entry.carbs,
-            protein: entry.protein,
-            fat: entry.fat,
-            fiber: entry.fiber,
-            netCarbs: entry.netCarbs,
-          },
-        }),
-      });
-
-      const json = await response.json();
-      if (json.data && json.data.updates) {
-        onUpdateNutrition(entry.id, json.data.updates);
-        setChefRequest('');
-      }
-    } catch (error) {
-      console.error('Chef Claude error:', error);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  if (!entry) return null;
 
   const getMealEmoji = () => {
     const emojis: Record<string, string> = {
@@ -87,337 +45,609 @@ export function MealEntryDetailSheet({
     return emojis[entry.mealType] || '🍽️';
   };
 
+  const formatTime = (dateStr: string) => {
+    const date = new Date();
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Handle single food entry - create a foods array representation
+  const foods = [
+    {
+      id: entry.id,
+      name: entry.name,
+      quantity: entry.servings,
+      unit: 'serving',
+      calories: entry.calories,
+      netCarbs: entry.netCarbs,
+      protein: entry.protein,
+      fat: entry.fat,
+      fiber: entry.fiber,
+    },
+  ];
+
+  const totalCalories = foods.reduce((sum, food) => sum + food.calories * food.quantity, 0);
+  const totalNetCarbs = foods.reduce((sum, food) => sum + food.netCarbs * food.quantity, 0);
+  const totalProtein = foods.reduce((sum, food) => sum + food.protein * food.quantity, 0);
+  const totalFat = foods.reduce((sum, food) => sum + food.fat * food.quantity, 0);
+  const totalFiber = foods.reduce((sum, food) => sum + food.fiber * food.quantity, 0);
+  const totalSugar = foods.reduce((sum, food) => sum + (food.calories - food.fat * 9 - (food.protein * 4)) / 4 * food.quantity, 0);
+
+  const handleEditItem = (itemId: string, food: typeof foods[0]) => {
+    setExpandedItemId(itemId);
+    setEditValues({
+      name: food.name,
+      calories: String(food.calories),
+      netCarbs: String(food.netCarbs),
+      protein: String(food.protein),
+      fat: String(food.fat),
+    });
+  };
+
+  const handleSaveItem = (itemId: string) => {
+    if (onUpdateNutrition) {
+      onUpdateNutrition(entry.id, {
+        name: editValues.name || entry.name,
+        calories: parseFloat(editValues.calories) || entry.calories,
+        netCarbs: parseFloat(editValues.netCarbs) || entry.netCarbs,
+        protein: parseFloat(editValues.protein) || entry.protein,
+        fat: parseFloat(editValues.fat) || entry.fat,
+      });
+      setExpandedItemId(null);
+      setEditValues({});
+    }
+  };
+
+  const isItemExpanded = (itemId: string) => expandedItemId === itemId;
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }}>
-      <View style={{ flex: 1 }}>
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: Colors.border,
-            backgroundColor: Colors.surface,
-          }}
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={80}
+          style={{ flex: 1 }}
         >
-          <Pressable onPress={onClose} hitSlop={8}>
-            <ChevronLeft size={24} color={Colors.textPrimary} />
-          </Pressable>
-
-          <View style={{ flex: 1, alignItems: 'center', marginLeft: 8 }}>
-            <Text style={{ fontSize: 20 }}>{getMealEmoji()}</Text>
-            <Text
-              style={{
-                fontFamily: 'DMSans_700Bold',
-                fontSize: 16,
-                color: Colors.textPrimary,
-                marginTop: 4,
-              }}
-            >
-              {entry.mealType}
-            </Text>
-          </View>
-
-          <View style={{ width: 40 }} />
-        </View>
-
-        {/* Content */}
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 20 }}
-        >
-          {/* Food Item Card - Ready to Log Style */}
           <View
             style={{
-              marginHorizontal: 16,
-              marginTop: 16,
-              backgroundColor: Colors.navyCard,
-              borderRadius: BorderRadius.lg,
-              borderWidth: 1,
-              borderColor: Colors.border,
+              flex: 1,
+              backgroundColor: Colors.navy,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              borderTopWidth: 1,
+              borderTopColor: Colors.border,
               overflow: 'hidden',
-              ...Shadows.card,
             }}
           >
-            {/* Header */}
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                backgroundColor: Colors.surface,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 40 }}
+              showsVerticalScrollIndicator={false}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text style={{ fontSize: 16 }}>{getMealEmoji()}</Text>
-                <View>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_600SemiBold',
-                      fontSize: 13,
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    Ready to Log
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_400Regular',
-                      fontSize: 11,
-                      color: Colors.green,
-                      marginTop: 2,
-                    }}
-                  >
-                    {entry.mealType}
-                  </Text>
-                </View>
+              {/* HEADER */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 20,
+                  paddingTop: 16,
+                  paddingBottom: 12,
+                  borderBottomWidth: 1,
+                  borderBottomColor: Colors.border,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 20,
+                    color: '#FFFFFF',
+                  }}
+                >
+                  Meal Details
+                </Text>
+                <Pressable onPress={onClose} hitSlop={8}>
+                  <X size={24} color={Colors.textSecondary} />
+                </Pressable>
               </View>
-              <Pressable onPress={onClose} hitSlop={8}>
-                <Text style={{ fontSize: 20, color: Colors.textSecondary }}>✕</Text>
-              </Pressable>
-            </View>
 
-            {/* Food Item Details */}
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 16,
-                borderBottomWidth: 1,
-                borderBottomColor: Colors.border,
-              }}
-            >
+              {/* Meal type and time */}
+              <View
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  {getMealEmoji()} {entry.mealType} • Logged at {formatTime(entry.date)}
+                </Text>
+              </View>
+
+              {/* FOOD ITEMS LIST */}
+              <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+                {foods.map((food, idx) => (
+                  <View key={food.id}>
+                    {isItemExpanded(food.id) ? (
+                      // EXPANDED EDIT VIEW
+                      <View
+                        style={{
+                          backgroundColor: Colors.surface,
+                          borderRadius: BorderRadius.md,
+                          padding: 16,
+                          marginBottom: 12,
+                        }}
+                      >
+                        {/* Name */}
+                        <View style={{ marginBottom: 12 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Name
+                          </Text>
+                          <TextInput
+                            value={editValues.name || ''}
+                            onChangeText={(text) => setEditValues({ ...editValues, name: text })}
+                            style={{
+                              backgroundColor: Colors.navy,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.sm,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontFamily: 'DMSans_400Regular',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          />
+                        </View>
+
+                        {/* Calories */}
+                        <View style={{ marginBottom: 12 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Calories
+                          </Text>
+                          <TextInput
+                            value={editValues.calories || ''}
+                            onChangeText={(text) => setEditValues({ ...editValues, calories: text })}
+                            keyboardType="decimal-pad"
+                            style={{
+                              backgroundColor: Colors.navy,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.sm,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontFamily: 'DMSans_400Regular',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          />
+                        </View>
+
+                        {/* Net Carbs */}
+                        <View style={{ marginBottom: 12 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Net Carbs
+                          </Text>
+                          <TextInput
+                            value={editValues.netCarbs || ''}
+                            onChangeText={(text) => setEditValues({ ...editValues, netCarbs: text })}
+                            keyboardType="decimal-pad"
+                            style={{
+                              backgroundColor: Colors.navy,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.sm,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontFamily: 'DMSans_400Regular',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          />
+                        </View>
+
+                        {/* Protein */}
+                        <View style={{ marginBottom: 12 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Protein
+                          </Text>
+                          <TextInput
+                            value={editValues.protein || ''}
+                            onChangeText={(text) => setEditValues({ ...editValues, protein: text })}
+                            keyboardType="decimal-pad"
+                            style={{
+                              backgroundColor: Colors.navy,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.sm,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontFamily: 'DMSans_400Regular',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          />
+                        </View>
+
+                        {/* Fat */}
+                        <View style={{ marginBottom: 16 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Fat
+                          </Text>
+                          <TextInput
+                            value={editValues.fat || ''}
+                            onChangeText={(text) => setEditValues({ ...editValues, fat: text })}
+                            keyboardType="decimal-pad"
+                            style={{
+                              backgroundColor: Colors.navy,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.sm,
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              fontFamily: 'DMSans_400Regular',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          />
+                        </View>
+
+                        {/* Action buttons */}
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <Pressable
+                            onPress={() => {
+                              setExpandedItemId(null);
+                              setEditValues({});
+                            }}
+                            style={{
+                              flex: 1,
+                              backgroundColor: Colors.surface,
+                              borderWidth: 1,
+                              borderColor: Colors.border,
+                              borderRadius: BorderRadius.md,
+                              paddingVertical: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_600SemiBold',
+                                fontSize: 13,
+                                color: Colors.textSecondary,
+                              }}
+                            >
+                              Cancel
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => handleSaveItem(food.id)}
+                            style={{
+                              flex: 1,
+                              backgroundColor: Colors.green,
+                              borderRadius: BorderRadius.md,
+                              paddingVertical: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_600SemiBold',
+                                fontSize: 13,
+                                color: Colors.navy,
+                              }}
+                            >
+                              Update
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    ) : (
+                      // NORMAL ROW VIEW
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          borderBottomWidth: 1,
+                          borderBottomColor: Colors.border,
+                        }}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_600SemiBold',
+                              fontSize: 15,
+                              color: '#FFFFFF',
+                              marginBottom: 4,
+                            }}
+                          >
+                            {food.quantity} {food.unit} {food.name}
+                          </Text>
+                        </View>
+
+                        <View
+                          style={{
+                            alignItems: 'flex-end',
+                            marginRight: 12,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_700Bold',
+                              fontSize: 15,
+                              color: '#FFFFFF',
+                            }}
+                          >
+                            {Math.round(food.calories * food.quantity)} cal
+                          </Text>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.green,
+                              marginTop: 2,
+                            }}
+                          >
+                            {Math.round(food.netCarbs * food.quantity * 10) / 10}g carbs
+                          </Text>
+                        </View>
+
+                        <Pressable
+                          onPress={() => handleEditItem(food.id, food)}
+                          hitSlop={8}
+                        >
+                          <Edit2 size={16} color={Colors.textSecondary} />
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* TOTAL ROW */}
               <View
                 style={{
                   flexDirection: 'row',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginBottom: 12,
+                  paddingHorizontal: 20,
+                  paddingVertical: 14,
+                  marginTop: 8,
+                  borderTopWidth: 1.5,
+                  borderTopColor: Colors.border,
                 }}
               >
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_600SemiBold',
-                      fontSize: 15,
-                      color: Colors.textPrimary,
-                      marginBottom: 6,
-                    }}
-                  >
-                    {entry.name}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_400Regular',
-                      fontSize: 12,
-                      color: Colors.textSecondary,
-                    }}
-                  >
-                    {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
-                  </Text>
-                </View>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 13,
+                    color: '#FFFFFF',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Total
+                </Text>
                 <View style={{ alignItems: 'flex-end' }}>
                   <Text
                     style={{
                       fontFamily: 'DMSans_700Bold',
                       fontSize: 16,
-                      color: Colors.green,
-                      marginBottom: 4,
+                      color: '#FFFFFF',
                     }}
                   >
-                    {Math.round(entry.calories * entry.servings)} cal
+                    {Math.round(totalCalories)} cal
                   </Text>
                   <Text
                     style={{
-                      fontFamily: 'DMSans_500Medium',
-                      fontSize: 12,
-                      color: Colors.textSecondary,
+                      fontFamily: 'DMSans_700Bold',
+                      fontSize: 14,
+                      color: Colors.green,
+                      marginTop: 2,
                     }}
                   >
-                    {Math.round((entry.netCarbs * entry.servings) * 10) / 10}g carbs
+                    {Math.round(totalNetCarbs * 10) / 10}g net carbs
                   </Text>
                 </View>
               </View>
 
-              {/* Nutrition Breakdown */}
+              {/* NUTRITION SUMMARY CARD */}
               <View
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.05)',
-                  borderRadius: BorderRadius.md,
-                  paddingHorizontal: 12,
-                  paddingVertical: 12,
-                  marginTop: 12,
+                  marginHorizontal: 20,
+                  marginTop: 16,
+                  backgroundColor: Colors.surface,
+                  borderRadius: BorderRadius.lg,
+                  padding: 16,
                 }}
               >
                 <View
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
-                    marginBottom: 8,
+                    marginBottom: 16,
                   }}
                 >
-                  <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textSecondary }}>
-                    Protein
-                  </Text>
-                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: Colors.textPrimary }}>
-                    {Math.round((entry.protein * entry.servings) * 10) / 10}g
-                  </Text>
+                  {/* Protein */}
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 13,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Protein
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 16,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {Math.round(totalProtein * 10) / 10}g
+                    </Text>
+                  </View>
+
+                  {/* Fat */}
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 13,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Fat
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 16,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {Math.round(totalFat * 10) / 10}g
+                    </Text>
+                  </View>
                 </View>
+
                 <View
                   style={{
                     flexDirection: 'row',
                     justifyContent: 'space-between',
-                    marginBottom: 8,
                   }}
                 >
-                  <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textSecondary }}>
-                    Fat
-                  </Text>
-                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: Colors.textPrimary }}>
-                    {Math.round((entry.fat * entry.servings) * 10) / 10}g
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textSecondary }}>
-                    Fiber
-                  </Text>
-                  <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 12, color: Colors.textPrimary }}>
-                    {Math.round((entry.fiber * entry.servings) * 10) / 10}g
-                  </Text>
-                </View>
-              </View>
-            </View>
+                  {/* Fiber */}
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 13,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Fiber
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 16,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {Math.round(totalFiber * 10) / 10}g
+                    </Text>
+                  </View>
 
-            {/* Chef Claude Section */}
-            <View
-              style={{
-                paddingHorizontal: 16,
-                paddingVertical: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: Colors.border,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 }}>
-                <ChefHat size={14} color={Colors.amber} />
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 11,
-                    color: Colors.textSecondary,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Refine with Chef Claude
-                </Text>
+                  {/* Sugar */}
+                  <View>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 13,
+                        color: Colors.textSecondary,
+                        marginBottom: 4,
+                      }}
+                    >
+                      Sugar
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 16,
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {Math.round(totalSugar * 10) / 10}g
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <Text
-                style={{
-                  fontFamily: 'DMSans_400Regular',
-                  fontSize: 11,
-                  color: Colors.textTertiary,
-                  marginBottom: 10,
-                }}
-              >
-                e.g. "add 50 calories" or "double the protein"
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-end' }}>
-                <TextInput
-                  value={chefRequest}
-                  onChangeText={setChefRequest}
-                  placeholder="Ask Chef Claude..."
-                  placeholderTextColor={Colors.textTertiary}
-                  multiline
-                  maxLength={150}
-                  editable={!isProcessing}
-                  style={{
-                    flex: 1,
-                    backgroundColor: Colors.surface,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    borderRadius: BorderRadius.md,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 12,
-                    color: Colors.textPrimary,
-                    maxHeight: 60,
-                  }}
-                />
-                <Pressable
-                  onPress={handleChefRequest}
-                  disabled={isProcessing || !chefRequest.trim()}
-                  style={{
-                    backgroundColor:
-                      isProcessing || !chefRequest.trim() ? Colors.textTertiary : Colors.amber,
-                    borderRadius: BorderRadius.md,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minWidth: 40,
-                    minHeight: 40,
-                  }}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator size="small" color={Colors.navy} />
-                  ) : (
-                    <Send size={14} color={Colors.navy} />
-                  )}
-                </Pressable>
-              </View>
-            </View>
+            </ScrollView>
 
-            {/* Action Buttons */}
+            {/* ACTION BUTTONS - Always above keyboard */}
             <View
               style={{
                 paddingHorizontal: 16,
                 paddingVertical: 12,
+                backgroundColor: Colors.surface,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
                 gap: 10,
               }}
             >
+              {/* Save Changes */}
               <Pressable
-                onPress={() => {
-                  // Toggle favorite
-                  if (onUpdateNutrition) {
-                    const isFavorite = entry.isFavorite;
-                    onUpdateNutrition(entry.id, { isFavorite: !isFavorite });
-                  }
-                }}
+                onPress={onClose}
                 style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
                   backgroundColor: Colors.green,
                   borderRadius: BorderRadius.lg,
-                  paddingVertical: 12,
-                  gap: 8,
+                  paddingVertical: 14,
+                  alignItems: 'center',
                 }}
               >
-                <Heart
-                  size={16}
-                  color="#fff"
-                  fill={entry.isFavorite ? '#fff' : 'none'}
-                />
                 <Text
                   style={{
-                    fontFamily: 'DMSans_600SemiBold',
-                    fontSize: 14,
-                    color: '#fff',
+                    fontFamily: 'DMSans_700Bold',
+                    fontSize: 15,
+                    color: Colors.navy,
                   }}
                 >
-                  {entry.isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                  Save Changes
                 </Text>
               </Pressable>
 
+              {/* Move to Different Meal */}
               {onMove ? (
                 <Pressable
                   onPress={() => {
@@ -425,22 +655,18 @@ export function MealEntryDetailSheet({
                     onClose();
                   }}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     backgroundColor: 'transparent',
                     borderWidth: 1.5,
                     borderColor: Colors.border,
                     borderRadius: BorderRadius.lg,
                     paddingVertical: 12,
-                    gap: 8,
+                    alignItems: 'center',
                   }}
                 >
-                  <Move size={16} color={Colors.textSecondary} />
                   <Text
                     style={{
                       fontFamily: 'DMSans_600SemiBold',
-                      fontSize: 14,
+                      fontSize: 15,
                       color: Colors.textSecondary,
                     }}
                   >
@@ -449,6 +675,7 @@ export function MealEntryDetailSheet({
                 </Pressable>
               ) : null}
 
+              {/* Delete Entry */}
               {onDelete ? (
                 <Pressable
                   onPress={() => {
@@ -456,20 +683,16 @@ export function MealEntryDetailSheet({
                     onClose();
                   }}
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
                     backgroundColor: 'transparent',
                     borderRadius: BorderRadius.lg,
                     paddingVertical: 12,
-                    gap: 8,
+                    alignItems: 'center',
                   }}
                 >
-                  <Trash2 size={16} color={Colors.error} />
                   <Text
                     style={{
                       fontFamily: 'DMSans_600SemiBold',
-                      fontSize: 14,
+                      fontSize: 15,
                       color: Colors.error,
                     }}
                   >
@@ -479,8 +702,8 @@ export function MealEntryDetailSheet({
               ) : null}
             </View>
           </View>
-        </ScrollView>
+        </KeyboardAvoidingView>
       </View>
-    </SafeAreaView>
+    </Modal>
   );
 }

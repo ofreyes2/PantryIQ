@@ -423,10 +423,6 @@ export default function MealTypeDetail() {
           visible={detailSheetVisible}
           entry={selectedEntry}
           onClose={() => setDetailSheetVisible(false)}
-          onEdit={() => {
-            // Edit button in detail sheet - could open EditEntrySheet if needed
-            setDetailSheetVisible(false);
-          }}
           onDelete={() => {
             handleDeleteEntry(selectedEntry.id);
             setDetailSheetVisible(false);
