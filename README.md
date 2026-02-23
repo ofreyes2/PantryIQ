@@ -106,6 +106,14 @@ mobile/src/
   - **Feature 8 ✅ COMPLETE**: App Store Preparation — Complete privacy policy, terms of service, app store description, keywords, screenshots specifications, app icon design brief, TestFlight instructions
   - **Feature 9 ✅ COMPLETE**: Error Handling and Crash Prevention — Global ErrorBoundary component, debug logging system, API retry logic with exponential backoff, data validation utilities
   - **Feature 10 ✅ COMPLETE**: Natural Language Meal Logging — Backend endpoint for meal analysis, meal detection patterns, confirmation cards, conversational follow-ups, Quick Log bottom sheet, proactive meal time prompts, settings toggles for all features
+  - **BUG FIX ✅ IN PROGRESS**: Chef Claude Meal Logging Recovery — Fixing critical issue where meal confirmation cards stopped appearing:
+    - **Root Cause**: Claude API not consistently including required `<MEAL_DATA>` JSON block despite system prompt instructions
+    - **Solution Implemented**:
+      1. **Enhanced System Prompt**: Made MEAL_DATA instructions more explicit with concrete example showing exact format Claude must follow
+      2. **Improved Extraction Logging**: Added console logs to track MEAL_DATA extraction success/failure with detailed error messages
+      3. **Fallback Detection**: Implemented `detectMealFromConversation()` function using regex patterns to detect meals from conversational responses when JSON extraction fails
+      4. **Dependency Updates**: Added detectMealFromConversation to useCallback dependencies
+    - **How It Works**: When user describes food, app first tries to extract <MEAL_DATA> JSON block. If Claude didn't include it, fallback pattern matching detects meal mentions. Either way, confirmation card appears (high confidence if JSON found, low confidence if fallback triggered)
   - **BUG FIX ✅ COMPLETE**: Chef Claude Meal Logging Verification & Conversation Persistence — Two critical bugs fixed:
     - **Bug 1 - Meal Logging Verification**: Added data verification step after saving meals to AsyncStorage, ensuring Chef Claude doesn't claim to log meals that weren't actually saved. MealConfirmationCard now has 4 visual states (pending → logging → success/failure) with animations. Card turns green with checkmark on success, shows error details on failure with retry button.
     - **Bug 2 - Conversation Persistence**: Chef Claude conversations now persist to AsyncStorage instead of disappearing on app exit. Implemented conversation history screen showing all past chats with auto-generated titles, new conversation button, continue-previous-conversation banner, full conversation recovery with all 200+ messages and context.

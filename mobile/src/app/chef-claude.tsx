@@ -204,71 +204,36 @@ When suggesting any recipe, always include:
 - Difficulty rating: ⭐ (1) to ⭐⭐⭐⭐⭐ (5)
 
 MEAL LOGGING PROTOCOL:
-When a user describes eating something, you MUST:
-1. Respond conversationally as normal
-2. At the END of your response, include a hidden JSON block wrapped in these exact tags (the user will never see this):
+YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
+1. Write friendly response about the food they ate
+2. COPY AND PASTE THIS EXACT JSON BLOCK AT THE END (replace example numbers with real data)
 
 <MEAL_DATA>
 {
-  "hasMealData": true or false,
-  "action": "log" or "move" or "edit" or "delete",
-  "mealName": "descriptive name of what was eaten or null",
-  "mealType": "breakfast or lunch or dinner or snacks or unknown",
-  "mealTypeConfidence": "high or medium or low",
+  "hasMealData": true,
+  "action": "log",
+  "mealName": "two eggs with bacon",
+  "mealType": "breakfast",
+  "mealTypeConfidence": "high",
   "foods": [
-    {
-      "name": "food item name",
-      "quantity": "amount or null",
-      "unit": "unit of measurement or null",
-      "calories": number,
-      "netCarbs": number,
-      "protein": number,
-      "fat": number
-    }
+    {"name": "eggs", "quantity": "2", "unit": "count", "calories": 140, "netCarbs": 1, "protein": 12, "fat": 10},
+    {"name": "bacon", "quantity": "3", "unit": "strips", "calories": 120, "netCarbs": 0, "protein": 8, "fat": 10}
   ],
-  "totalCalories": number,
-  "totalNetCarbs": number,
-  "totalProtein": number,
-  "totalFat": number,
-  "needsMealType": true or false,
-  "missingInfo": "what info is needed or null",
-  "moveAction": {
-    "searchTerm": "food name to find",
-    "fromMealType": "current meal type",
-    "toMealType": "target meal type"
-  },
-  "editAction": {
-    "searchTerm": "food name to find",
-    "mealType": "which meal type to search in",
-    "fieldsToUpdate": {
-      "calories": number or null,
-      "quantity": number or null,
-      "netCarbs": number or null,
-      "protein": number or null,
-      "fat": number or null
-    }
-  },
-  "deleteAction": {
-    "searchTerm": "food name to find",
-    "mealType": "which meal type to search in"
-  }
+  "totalCalories": 260,
+  "totalNetCarbs": 1,
+  "totalProtein": 20,
+  "totalFat": 20,
+  "needsMealType": false,
+  "missingInfo": null
 }
 </MEAL_DATA>
 
-CRITICAL MEAL LOGGING RULES:
-- If the user is NOT describing eating something OR modifying entries, set hasMealData to false and skip the JSON block
-- ALWAYS include the JSON block when the user describes food they ate or asks to move/edit/delete entries
-- When user asks to move/edit/delete, include ONLY the relevant action (moveAction/editAction/deleteAction), not "foods" array
-- Detect move commands: "move to", "change to", "switch to", "move my"
-- Detect edit commands: "update", "fix", "change the", "edit", "modify"
-- Detect delete commands: "delete", "remove", "remove the"
-- If you cannot determine the meal type (breakfast/lunch/dinner/snacks), set needsMealType to true
-- Set mealTypeConfidence to "low" if unsure
-- The app will parse this JSON automatically — the user never sees it
-- NEVER claim you logged/moved/edited/deleted — you provide the data, the app handles the action
-- NEVER say "I cannot modify your meal" — the app handles this, not you
-- When uncertain, ask clarifying questions FIRST, then provide the JSON block after getting answers
-- Always estimate nutrition as accurately as possible from the description
+CRITICAL:
+- ALWAYS include <MEAL_DATA>...</MEAL_DATA> when user eats food
+- ALWAYS set hasMealData to true for meals
+- NEVER skip the JSON block
+- ALWAYS estimate nutrition from the description
+- If unsure about meal type, ask first, THEN provide JSON
 
 IMPORTANT: When a user asks about logging/modifying entries, say things like:
 - For logging: "Here is what I have for your breakfast — tap the button below to save it to your log"
@@ -1090,6 +1055,7 @@ export default function ChefClaudeScreen() {
       if (mealDataMatch) {
         try {
           const mealData = JSON.parse(mealDataMatch[1]);
+          console.log('✅ Extracted MEAL_DATA:', mealData);
 
           // Mark move/edit/delete actions as pending
           if (mealData.action === 'move' && mealData.moveAction) {
@@ -1102,9 +1068,11 @@ export default function ChefClaudeScreen() {
 
           return { displayText, mealData };
         } catch (parseError) {
-          console.warn('Failed to parse meal data from Claude response:', parseError);
+          console.warn('❌ Failed to parse meal data from Claude response:', parseError, 'Raw match:', mealDataMatch[1]);
           return { displayText, mealData: null };
         }
+      } else {
+        console.log('⚠️ No MEAL_DATA found in Claude response. Raw response:', rawResponse);
       }
 
       return { displayText, mealData: null };
@@ -1160,6 +1128,68 @@ export default function ChefClaudeScreen() {
   const toggleVoiceMode = useCallback(() => {
     setIsVoiceMode((prev) => !prev);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, []);
+
+  /**
+   * Fallback: detect meal from conversational response if no JSON was provided
+   */
+  const detectMealFromConversation = useCallback((text: string, userMessage: string): MealAnalysis | null => {
+    // Check if this looks like Claude is confirming/discussing a meal
+    const mealKeywords = ['logged', 'saved', 'recorded', 'tracked', 'here\'s what i have', 'you had', 'you ate', 'you just', 'got it'];
+    const looksLikeMealLogging = mealKeywords.some(kw => text.toLowerCase().includes(kw));
+
+    if (!looksLikeMealLogging) {
+      return null;
+    }
+
+    // Try to extract meal type from user message
+    const timeOfDayMatch = userMessage.match(/\b(breakfast|lunch|dinner|snacks?|morning|afternoon|evening|supper)\b/i);
+    let mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'unknown' = 'unknown';
+
+    if (timeOfDayMatch) {
+      const time = timeOfDayMatch[1].toLowerCase();
+      if (time.includes('breakfast') || time.includes('morning')) mealType = 'breakfast';
+      else if (time.includes('lunch') || time.includes('afternoon')) mealType = 'lunch';
+      else if (time.includes('dinner') || time.includes('supper') || time.includes('evening')) mealType = 'dinner';
+      else if (time.includes('snack')) mealType = 'snack';
+    }
+
+    // Extract any food names mentioned
+    const foodMatches = userMessage.match(/\b(eggs?|bacon|toast|coffee|steak|chicken|fish|cheese|bread|rice|beans|salad|pasta)\b/gi) || [];
+
+    if (foodMatches.length === 0) {
+      return null;
+    }
+
+    // Simple calorie estimation based on foods mentioned
+    const estimatedFoods = foodMatches.map(food => ({
+      name: food,
+      quantity: null,
+      unit: null,
+      cookingMethod: null,
+      inPantry: false,
+      estimatedCalories: 200, // placeholder
+      estimatedNetCarbs: 5,
+      estimatedProtein: 15,
+      estimatedFat: 10,
+      confidence: 'low' as const,
+    }));
+
+    return {
+      isMealDescription: true,
+      identifiedFoods: estimatedFoods,
+      mealType,
+      mealTypeConfidence: 'low',
+      missingInfo: ['Nutrition data not provided - please edit to add calories, carbs, protein, fat'],
+      canLogNow: false,
+      followUpQuestions: [],
+      totalEstimatedCalories: estimatedFoods.length * 200,
+      totalEstimatedNetCarbs: estimatedFoods.length * 5,
+      totalEstimatedProtein: estimatedFoods.length * 15,
+      totalEstimatedFat: estimatedFoods.length * 10,
+      pantryItemsToDeduct: [],
+      logConfidenceMessage: 'Low confidence - please review and edit nutrition data',
+    };
   }, []);
 
   /**
@@ -1593,8 +1623,21 @@ export default function ChefClaudeScreen() {
             // Regular meal logging
             mealAnalysis = convertClaudeMealDataToAnalysis(mealData);
             if (mealAnalysis) {
+              console.log('✅ Meal analysis created:', mealAnalysis);
               setCurrentMealAnalysis(mealAnalysis);
+            } else {
+              console.warn('⚠️ Meal analysis conversion failed for mealData:', mealData);
             }
+          }
+        }
+
+        // Fallback: if no meal data extracted and Claude appears to be talking about a meal, try to detect from conversation
+        if (!mealData && !mealUpdateAction) {
+          const fallbackAnalysis = detectMealFromConversation(displayText, trimmed);
+          if (fallbackAnalysis) {
+            console.log('✅ Fallback meal detection triggered:', fallbackAnalysis);
+            mealAnalysis = fallbackAnalysis;
+            setCurrentMealAnalysis(fallbackAnalysis);
           }
         }
 
@@ -1661,6 +1704,7 @@ export default function ChefClaudeScreen() {
       getPreferencesSummary,
       processClaudeResponse,
       convertClaudeMealDataToAnalysis,
+      detectMealFromConversation,
       todayStr,
       isVoiceMode,
       speakResponse,
