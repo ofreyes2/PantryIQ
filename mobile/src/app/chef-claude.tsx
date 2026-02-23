@@ -858,23 +858,23 @@ export default function ChefClaudeScreen() {
    * Check if we should show a proactive meal prompt
    */
   const getProactiveMealPrompt = useCallback((): { mealType: string; message: string } | null => {
-    if (!userProfile.proactiveMealPrompts) return null;
+    if (!userProfile?.proactiveMealPrompts) return null;
 
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
     const todayStr = now.toISOString().split('T')[0];
     const todayEntries = getEntriesForDate(todayStr);
-    const { personalityMode } = userProfile;
+    const personalityMode: string = userProfile?.personalityMode ?? 'default';
 
     // Check if we've already shown a prompt today for each meal
-    const alreadyShown = userProfile.shownMealTimePrompts;
+    const alreadyShown = userProfile?.shownMealTimePrompts ?? [];
 
     const getMessageForMode = (
       messages: Record<string, string>,
       mode: string
     ): string => {
-      if (mode in messages) {
+      if (mode && mode in messages) {
         return messages[mode];
       }
       return messages.default;
