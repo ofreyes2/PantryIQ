@@ -239,6 +239,11 @@ mobile/src/
     - **Part 6 - Dashboard Daily Reset Display**: Nutrition rings reset to zero every new day, only show today's data, Dashboard always shows today's date, never carries over previous day data
     - **Part 7 - Date-Based Storage**: All data stored with consistent YYYY-MM-DD date keys, utility functions for consistent date handling throughout app, prevents yesterday's data bleeding into today
     - **Part 8 - History Access for Past Dates**: Calendar navigation to view any past date, left/right arrows for day-by-day navigation, past date visual treatment (dimmed interface, subtle Past Date banner), all past dates fully editable with changes updating correctly
+    - **Part 9 - Seed Entry Daily Cleanup ✅ COMPLETE**: Fixed meals tab defaulting to yesterday's entries by:
+      - Added `cleanupOldSeedEntries()` method to mealsStore that removes seed entries older than today/yesterday on new day
+      - Integrated cleanup into daily reset handler to automatically clean old seed data when date changes
+      - Seed entries now only persist for today and yesterday, older seed data is purged
+      - User-added meals continue to be preserved (only seed meals are cleaned)
     - **Implementation Details**:
       - New `dateUtils.ts` library with 20+ centralized date helper functions
       - New `dailyReset.ts` with daily reset logic and streak validity checking

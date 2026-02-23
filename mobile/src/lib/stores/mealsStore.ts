@@ -52,6 +52,7 @@ interface MealsState {
   removeWaterEntry: (date: string) => void;
   getWaterForDate: (date: string) => number;
   getDailyTotals: (date: string) => DailyTotals;
+  cleanupOldSeedEntries: () => void;
 }
 
 const generateId = () => `meal-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -323,6 +324,20 @@ export const useMealsStore = create<MealsState>()(
           }),
           { calories: 0, carbs: 0, protein: 0, fat: 0, netCarbs: 0, fiber: 0 }
         );
+      },
+
+      cleanupOldSeedEntries: () => {
+        const today = dateUtils.today();
+        set((state) => ({
+          entries: state.entries.filter((e) => {
+            // Keep non-seed entries (user-added entries)
+            if (!e.id.startsWith('meal-seed-')) {
+              return true;
+            }
+            // Keep seed entries for today and yesterday
+            return e.date === today || e.date === dateUtils.yesterday();
+          }),
+        }));
       },
       };
     },

@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dateUtils } from './dateUtils';
+import { useMealsStore } from './stores/mealsStore';
 
 export interface DailyResetResult {
   isNewDay: boolean;
@@ -48,6 +49,13 @@ export const checkAndHandleDailyReset = async (): Promise<DailyResetResult> => {
 
       // Mark reset as complete for this day
       await AsyncStorage.setItem(DAILY_RESET_COMPLETE_KEY, today);
+
+      // Clean up old seed entries from meals store
+      try {
+        useMealsStore.getState().cleanupOldSeedEntries();
+      } catch (e) {
+        console.warn('Failed to cleanup old seed entries:', e);
+      }
 
       // Get yesterday's totals for the greeting card
       let yesterdayTotals = undefined;
