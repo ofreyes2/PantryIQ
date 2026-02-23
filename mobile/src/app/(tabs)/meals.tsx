@@ -2046,8 +2046,11 @@ export default function MealsScreen() {
   const handleMoveToMealType = async (targetMealType: MealType, targetDate: string) => {
     if (!movingEntry) return;
     try {
+      console.log('[Move] Starting move:', { entryId: movingEntry.id, from: movingEntry.mealType, to: targetMealType, targetDate, selectedDate });
+
       // If moving to a different date, we need to handle this differently
       if (targetDate !== selectedDate) {
+        console.log('[Move] Cross-date move detected');
         // Delete from current date in both storage and store
         await MealLogger.deleteEntry(movingEntry.id);
         deleteEntry(movingEntry.id);
@@ -2059,6 +2062,7 @@ export default function MealsScreen() {
           mealType: targetMealType,
         };
         const result = await MealLogger.logMealToDate(newEntry, targetDate);
+        console.log('[Move] LogMealToDate result:', result);
         if (result.success) {
           addEntry(newEntry);
           showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
@@ -2069,7 +2073,9 @@ export default function MealsScreen() {
         }
       } else {
         // Same date, just change meal type
+        console.log('[Move] Same-date move detected');
         const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType, selectedDate);
+        console.log('[Move] MoveEntry result:', result);
         if (result.success) {
           updateEntry(movingEntry.id, { mealType: targetMealType });
           showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
@@ -2080,6 +2086,7 @@ export default function MealsScreen() {
       setMoveSheetVisible(false);
       setMovingEntry(null);
     } catch (error) {
+      console.error('[Move] Error:', error);
       showToast('Failed to move entry', 'error');
     }
   };
