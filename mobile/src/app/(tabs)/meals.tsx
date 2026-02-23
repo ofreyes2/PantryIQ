@@ -58,6 +58,7 @@ import { useToast } from '@/components/Toast';
 import { ManualFoodEntryForm } from '@/components/ManualFoodEntryForm';
 import { EditEntrySheet } from '@/components/EditEntrySheet';
 import { MoveToMealSheet } from '@/components/MoveToMealSheet';
+import { MealEntryDetailSheet } from '@/components/MealEntryDetailSheet';
 import { MealLogger } from '@/lib/mealLogger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -334,12 +335,14 @@ function FoodItemRow({
   onToggleFavorite,
   onEdit,
   onMove,
+  onShowDetails,
 }: {
   entry: FoodEntry;
   onDelete: () => void;
   onToggleFavorite: () => void;
   onEdit?: () => void;
   onMove?: () => void;
+  onShowDetails?: () => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
@@ -410,6 +413,7 @@ function FoodItemRow({
         overshootRight={false}
       >
         <Pressable
+          onPress={onShowDetails}
           onLongPress={handleLongPress}
           delayLongPress={500}
           style={{
@@ -426,10 +430,10 @@ function FoodItemRow({
               <Text
                 style={{
                   fontFamily: 'DMSans_700Bold',
-                  fontSize: 14,
+                  fontSize: 13,
                   color: Colors.textPrimary,
+                  lineHeight: 18,
                 }}
-                numberOfLines={1}
               >
                 {entry.name}
               </Text>
@@ -438,7 +442,7 @@ function FoodItemRow({
                   fontFamily: 'DMSans_400Regular',
                   fontSize: 12,
                   color: Colors.textSecondary,
-                  marginTop: 1,
+                  marginTop: 2,
                 }}
               >
                 {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
@@ -455,7 +459,8 @@ function FoodItemRow({
               {(() => {
                 const hasNutrition = (entry.calories > 0) || (entry.netCarbs > 0) || (entry.protein > 0);
                 return !hasNutrition ? (
-                  <View
+                  <Pressable
+                    onPress={onEdit}
                     style={{
                       backgroundColor: 'rgba(243,156,18,0.15)',
                       borderRadius: BorderRadius.md,
@@ -476,7 +481,7 @@ function FoodItemRow({
                     >
                       ⚠️ Missing data
                     </Text>
-                  </View>
+                  </Pressable>
                 ) : null;
               })()}
             </View>
@@ -656,6 +661,7 @@ function MealSectionCard({
   onToggleFavorite,
   onEditEntry,
   onMoveEntry,
+  onShowDetails,
   dateStr,
 }: {
   section: MealSection;
@@ -665,6 +671,7 @@ function MealSectionCard({
   onToggleFavorite: (id: string) => void;
   onEditEntry?: (entry: FoodEntry) => void;
   onMoveEntry?: (entry: FoodEntry) => void;
+  onShowDetails?: (entry: FoodEntry) => void;
   dateStr: string;
 }) {
   const router = useRouter();
@@ -765,6 +772,7 @@ function MealSectionCard({
               onToggleFavorite={() => onToggleFavorite(entry.id)}
               onEdit={() => onEditEntry?.(entry)}
               onMove={() => onMoveEntry?.(entry)}
+              onShowDetails={() => onShowDetails?.(entry)}
             />
           ))}
           <Pressable
@@ -1923,6 +1931,8 @@ export default function MealsScreen() {
   const [editSheetVisible, setEditSheetVisible] = useState(false);
   const [movingEntry, setMovingEntry] = useState<FoodEntry | null>(null);
   const [moveSheetVisible, setMoveSheetVisible] = useState(false);
+  const [detailEntry, setDetailEntry] = useState<FoodEntry | null>(null);
+  const [detailSheetVisible, setDetailSheetVisible] = useState(false);
 
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const addEntry = useMealsStore((s) => s.addEntry);
@@ -2007,6 +2017,11 @@ export default function MealsScreen() {
   const handleEditEntry = (entry: FoodEntry) => {
     setEditingEntry(entry);
     setEditSheetVisible(true);
+  };
+
+  const handleShowDetails = (entry: FoodEntry) => {
+    setDetailEntry(entry);
+    setDetailSheetVisible(true);
   };
 
   const handleMoveEntry = (entry: FoodEntry) => {
@@ -2229,6 +2244,7 @@ export default function MealsScreen() {
                     onToggleFavorite={toggleFavorite}
                     onEditEntry={handleEditEntry}
                     onMoveEntry={handleMoveEntry}
+                    onShowDetails={handleShowDetails}
                     dateStr={selectedDate}
                   />
                 );
@@ -2278,6 +2294,34 @@ export default function MealsScreen() {
             }}
           />
         ) : null}
+
+        {/* Meal entry detail sheet */}
+        <MealEntryDetailSheet
+          visible={detailSheetVisible}
+          entry={detailEntry}
+          onClose={() => {
+            setDetailSheetVisible(false);
+            setDetailEntry(null);
+          }}
+          onEdit={() => {
+            if (detailEntry) {
+              handleEditEntry(detailEntry);
+            }
+          }}
+          onDelete={() => {
+            if (detailEntry) {
+              deleteEntry(detailEntry.id);
+              showToast(`${detailEntry.name} deleted`, 'success');
+              setDetailSheetVisible(false);
+              setDetailEntry(null);
+            }
+          }}
+          onMove={() => {
+            if (detailEntry) {
+              handleMoveEntry(detailEntry);
+            }
+          }}
+        />
 
         <DeleteConfirmationModal
           visible={clearConfirmVisible}

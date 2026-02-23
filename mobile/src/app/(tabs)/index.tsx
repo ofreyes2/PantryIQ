@@ -161,28 +161,35 @@ function CircularProgress({
   );
 }
 
-// ─── Carb Progress Bar ────────────────────────────────────────────────────────
+// ─── Nutrition Progress Bars ──────────────────────────────────────────────────
 
-function CarbProgressBar({
-  consumed,
-  goal,
+function NutritionProgressBars({
+  caloriesConsumed,
+  caloriesGoal,
+  carbsConsumed,
+  carbsGoal,
 }: {
-  consumed: number;
-  goal: number;
+  caloriesConsumed: number;
+  caloriesGoal: number;
+  carbsConsumed: number;
+  carbsGoal: number;
 }) {
-  const pct = Math.min((consumed / goal) * 100, 100);
-  const barColor = pct < 70 ? Colors.green : pct < 90 ? Colors.amber : Colors.error;
+  const calPct = Math.min((caloriesConsumed / caloriesGoal) * 100, 100);
+  const carbPct = Math.min((carbsConsumed / carbsGoal) * 100, 100);
+  const calBarColor = calPct < 70 ? Colors.green : calPct < 90 ? Colors.amber : Colors.error;
+  const carbBarColor = carbPct < 70 ? Colors.green : carbPct < 90 ? Colors.amber : Colors.error;
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Calories Row */}
       <View
         style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}
       >
         <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.textPrimary }}>
-          Net Carbs
+          Calories
         </Text>
         <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-          {consumed}g / {goal}g
+          {Math.round(caloriesConsumed)} / {caloriesGoal} kcal
         </Text>
       </View>
       <View
@@ -195,9 +202,9 @@ function CarbProgressBar({
       >
         <View
           style={{
-            width: `${pct}%`,
+            width: `${calPct}%`,
             height: '100%',
-            backgroundColor: barColor,
+            backgroundColor: calBarColor,
             borderRadius: 6,
           }}
         />
@@ -206,13 +213,16 @@ function CarbProgressBar({
         style={{
           fontFamily: 'DMSans_400Regular',
           fontSize: 11,
-          color: pct < 70 ? Colors.green : pct < 90 ? Colors.amber : Colors.error,
+          color: calBarColor,
           marginTop: 6,
         }}
       >
-        {goal - consumed > 0 ? `${goal - consumed}g remaining` : 'Goal reached!'}
+        {caloriesGoal - caloriesConsumed > 0
+          ? `${Math.round(caloriesGoal - caloriesConsumed)} kcal remaining`
+          : 'Goal reached!'}
       </Text>
 
+      {/* Carbs Row */}
       <View style={{ marginTop: 20 }}>
         <View
           style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}
@@ -220,12 +230,12 @@ function CarbProgressBar({
           <Text
             style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.textPrimary }}
           >
-            Calories
+            Net Carbs
           </Text>
           <Text
             style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}
           >
-            {consumed} / {goal}
+            {Math.round(carbsConsumed)}g / {carbsGoal}g
           </Text>
         </View>
         <View
@@ -238,9 +248,9 @@ function CarbProgressBar({
         >
           <View
             style={{
-              width: `${Math.min((consumed / goal) * 100, 100)}%`,
+              width: `${carbPct}%`,
               height: '100%',
-              backgroundColor: Colors.green,
+              backgroundColor: carbBarColor,
               borderRadius: 6,
             }}
           />
@@ -249,11 +259,11 @@ function CarbProgressBar({
           style={{
             fontFamily: 'DMSans_400Regular',
             fontSize: 11,
-            color: Colors.textSecondary,
+            color: carbBarColor,
             marginTop: 6,
           }}
         >
-          {goal - consumed} kcal remaining
+          {carbsGoal - carbsConsumed > 0 ? `${Math.round(carbsGoal - carbsConsumed)}g remaining` : 'Goal reached!'}
         </Text>
       </View>
     </View>
@@ -615,12 +625,13 @@ export default function DashboardScreen() {
   const calGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
 
   const [refreshing, setRefreshing] = React.useState(false);
+  const [dashboardKey, setDashboardKey] = React.useState(0);
 
   // Get real data from meals store
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
 
-  // Get today's data
+  // Get today's data - ALWAYS recalculate using today's date
   const todayStr = dateUtils.today();
   const todayEntries = getEntriesForDate(todayStr);
   const dailyTotals = getDailyTotals(todayStr);
@@ -636,10 +647,11 @@ export default function DashboardScreen() {
   }, []);
 
   // Refresh data when dashboard tab comes into focus
+  // This ensures we always load today's data, even if the app was open since yesterday
   useFocusEffect(
     useCallback(() => {
-      // Data is automatically up-to-date from the store
-      // This ensures we always show today's data when the tab is focused
+      // Trigger a key change to force component re-evaluation
+      setDashboardKey((prev) => prev + 1);
     }, [])
   );
 
@@ -649,6 +661,7 @@ export default function DashboardScreen() {
       style={{ flex: 1 }}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
+      key={dashboardKey}
     >
       <SafeAreaView style={{ flex: 1 }} testID="dashboard-screen">
         <ScrollView
@@ -672,20 +685,30 @@ export default function DashboardScreen() {
 
           {/* Daily Progress */}
           <View style={{ paddingHorizontal: CARD_PADDING, marginBottom: 20 }}>
-            <Card>
-              <SectionHeading title="Today's Progress" />
-              <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
-                <CircularProgress
-                  percentage={calPct}
-                  label={`${dailyTotals.calories} kcal`}
-                  sublabel={`of ${calGoal || 1800} goal`}
-                  color={Colors.green}
-                />
-                <View style={{ flex: 1, justifyContent: 'center', paddingTop: 4 }}>
-                  <CarbProgressBar consumed={dailyTotals.netCarbs} goal={carbGoal || 50} />
+            <Pressable
+              onPress={() => router.push('/(tabs)/meals')}
+              hitSlop={8}
+            >
+              <Card>
+                <SectionHeading title="Today's Progress" />
+                <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
+                  <CircularProgress
+                    percentage={calPct}
+                    label={`${dailyTotals.calories} kcal`}
+                    sublabel={`of ${calGoal || 1800} goal`}
+                    color={Colors.green}
+                  />
+                  <View style={{ flex: 1, justifyContent: 'center', paddingTop: 4 }}>
+                    <NutritionProgressBars
+                      caloriesConsumed={dailyTotals.calories}
+                      caloriesGoal={calGoal || 1800}
+                      carbsConsumed={dailyTotals.netCarbs}
+                      carbsGoal={carbGoal || 50}
+                    />
+                  </View>
                 </View>
-              </View>
-            </Card>
+              </Card>
+            </Pressable>
           </View>
 
           {/* Quick Actions */}

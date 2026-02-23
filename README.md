@@ -296,8 +296,21 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
    - ✅ Nutrition totals (calories, net carbs, protein, fat)
    - ✅ Add more items button
    - ✅ Empty state with quick add button
-8. UI Consistency Audit (Typography, colors, spacing, components)
-9. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+8. **Dashboard & Meals Tab Critical Fixes ✅ COMPLETE** — Four critical bugs and three key features fixed:
+   - **BUG FIX 1 ✅**: Dashboard showing wrong data — Fixed Dashboard to always load today's data on focus using `useFocusEffect` and dynamic key updates. Now correctly shows 0 calories and 0g carbs on fresh days.
+   - **BUG FIX 2 ✅**: Dashboard calories/carbs progress bars showing crossed values — Refactored CarbProgressBar into NutritionProgressBars component that properly displays calorie values in calories row and carb values in carbs row (bug was reusing same values for both bars).
+   - **BUG FIX 3 ✅**: Missing data badge not tappable — Converted "⚠️ Missing data" badge from View to Pressable component so tapping it opens the edit form to add missing nutrition values.
+   - **FEATURE 1 ✅**: Today's Progress card navigation — Wrapped card in Pressable so tapping navigates to Meals tab. Provides quick access from Dashboard to meal logging.
+   - **FEATURE 2 ✅**: Meal entry detail sheet — Created MealEntryDetailSheet component showing full nutrition breakdown (2-column layout with calories, net carbs, protein, fat, fiber, total carbs). Shows all entry details, includes Edit/Delete/Move buttons. Opens when tapping meal entry in Meals tab.
+   - **FEATURE 3 ✅**: Fixed meal entry name truncation — Removed `numberOfLines={1}` constraint and reduced font size from 14pt to 13pt, allowing meal names to wrap to second line. Full names now visible without ellipsis (e.g., "2 count eggs, 1 oz cheddar cheese" no longer shows as "2 count eggs, 1 oz che…")
+   - **Implementation Details**:
+     - New `MealEntryDetailSheet.tsx` component with 50-line nutrition breakdown display
+     - Added `onShowDetails` callback to `FoodItemRow` → `MealSectionCard` → main Meals screen
+     - Modified `NutritionProgressBars` component with separate calorie and carb tracking
+     - Dashboard uses `dashboardKey` state to force re-renders on tab focus
+9. UI Consistency Audit (Typography, colors, spacing, components)
+10. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+
 
 **Features Pending:**
 9. Advanced Analytics Dashboard
