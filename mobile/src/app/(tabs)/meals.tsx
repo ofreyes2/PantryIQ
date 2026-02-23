@@ -1940,16 +1940,18 @@ export default function MealsScreen() {
   const updateEntry = useMealsStore((s) => s.updateEntry);
   const toggleFavorite = useMealsStore((s) => s.toggleFavorite);
   const clearMeals = useMealsStore((s) => s.clearMeals);
+  const cleanupOldSeedEntries = useMealsStore((s) => s.cleanupOldSeedEntries);
   const { showToast } = useToast();
 
   const calorieGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
 
-  // Reset to today whenever the Meals tab is focused
+  // Reset to today whenever the Meals tab is focused, and cleanup old seed entries
   useFocusEffect(
     useCallback(() => {
       setSelectedDate(dateUtils.today());
-    }, [])
+      cleanupOldSeedEntries();
+    }, [cleanupOldSeedEntries])
   );
 
   const entries = getEntriesForDate(selectedDate);
@@ -2139,11 +2141,9 @@ export default function MealsScreen() {
               <Text style={{ fontFamily: 'PlayfairDisplay_700Bold', fontSize: 20, color: Colors.green, marginBottom: 2 }}>
                 {dateLabel}
               </Text>
-              {!dateUtils.isToday(selectedDate) && (
-                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-                  {fullDateLabel}
-                </Text>
-              )}
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                {fullDateLabel}
+              </Text>
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
