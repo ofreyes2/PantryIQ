@@ -2048,15 +2048,25 @@ export default function MealsScreen() {
     try {
       // If moving to a different date, we need to handle this differently
       if (targetDate !== selectedDate) {
-        // Remove from current date
+        // Delete from current date in both storage and store
+        await MealLogger.deleteEntry(movingEntry.id);
         deleteEntry(movingEntry.id);
-        // Add to target date with the new meal type
-        addEntry({
+
+        // Add to target date with the new meal type in both storage and store
+        const newEntry = {
           ...movingEntry,
           date: targetDate,
           mealType: targetMealType,
-        });
-        showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
+        };
+        const result = await MealLogger.logMealToDate(newEntry, targetDate);
+        if (result.success) {
+          addEntry(newEntry);
+          showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
+        } else {
+          // Revert if logging failed
+          addEntry(movingEntry);
+          showToast('Failed to move entry to new date', 'error');
+        }
       } else {
         // Same date, just change meal type
         const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType);
