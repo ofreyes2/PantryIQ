@@ -1461,21 +1461,30 @@ export default function ChefClaudeScreen() {
           const searchTerm = mealData.deleteAction?.searchTerm || mealData.searchTerm;
           const mealType = mealData.deleteAction?.mealType || mealData.mealType;
 
+          if (!searchTerm || !mealType) {
+            return {
+              success: false,
+              message: 'Delete action missing required fields',
+            };
+          }
+
           // Search across ALL entries (not just today) to find the entry to delete
-          // This allows users to delete from any date
           let entry = allEntries.find(
             (e) =>
               e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
               e.mealType === mealType
           );
 
-          // If not found in all entries, try today's entries as fallback
-          if (!entry) {
-            entry = entries.find(
-              (e) =>
-                e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-                e.mealType === mealType
-            );
+          // If not found in all entries, try a more lenient match with word boundaries
+          if (!entry && searchTerm.length > 2) {
+            const searchWords = searchTerm.toLowerCase().split(/[,\s]+/).filter((w: string) => w.length > 2);
+            entry = allEntries.find((e) => {
+              if (e.mealType !== mealType) return false;
+              const entryWords = e.name.toLowerCase().split(/[,\s]+/).filter((w: string) => w.length > 2);
+              // Match if at least 3 key words match (catches exact duplicates)
+              const matchCount = searchWords.filter((w: string) => entryWords.includes(w)).length;
+              return matchCount >= Math.min(3, searchWords.length);
+            });
           }
 
           if (!entry) {
@@ -1770,8 +1779,14 @@ export default function ChefClaudeScreen() {
               // For deleteAll, show that we're deleting all entries
               entryName = `All ${mealData.mealType} entries`;
             } else if (mealData.entriesToDelete && mealData.entriesToDelete.length > 0) {
-              // For specific entries to delete
-              entryName = mealData.entriesToDelete.map((e: any) => e.name).join(', ');
+              // For specific entries to delete - entriesToDelete is an array of strings
+              const entryList = mealData.entriesToDelete
+                .filter((e: any) => e && (typeof e === 'string' ? e.trim() : (e.name || '')))
+                .slice(0, 3)
+                .map((e: any) => typeof e === 'string' ? e : e.name)
+                .join(', ');
+              const moreCount = mealData.entriesToDelete.length > 3 ? ` +${mealData.entriesToDelete.length - 3} more` : '';
+              entryName = entryList ? `${entryList}${moreCount}` : `${mealData.entriesToDelete.length} entries`;
             }
 
             mealUpdateAction = {
@@ -1939,7 +1954,7 @@ export default function ChefClaudeScreen() {
       setMealUpdateCardError('');
 
       try {
-        // Special handling for bulk delete operations (deleteAll)
+        // Special handling for bulk delete operations (deleteAll or entriesToDelete)
         if (mealUpdateAction.type === 'delete' && mealUpdateAction.details.entryName.toLowerCase().includes('all')) {
           // This is a deleteAll operation
           const mealType = mealUpdateAction.details.fromMealType;
@@ -1955,6 +1970,59 @@ export default function ChefClaudeScreen() {
 
           // Get all entries of this meal type
           const relevantEntries = entries.filter((e) => e.mealType === mealType);
+
+          if (relevantEntries.length === 0) {
+            setMealUpdateCardState('failure');
+            setMealUpdateCardError(`No ${mealType} entries found to delete`);
+            return;
+          }
+
+          let deletedCount = 0;
+          for (const entry of relevantEntries) {
+            try {
+              deleteEntry(entry.id);
+              deletedCount++;
+            } catch (e) {
+              console.warn('Failed to delete entry:', entry.id, e);
+            }
+          }
+
+          setMealUpdateCardState('success');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: `Successfully removed ${deletedCount} ${mealType.toLowerCase()} ${deletedCount === 1 ? 'entry' : 'entries'} from your log.`,
+            timestamp: new Date(),
+          };
+
+          setTimeout(() => {
+            setMessages((prev) => [...prev, successMsg]);
+            setMealUpdateCardState('pending');
+          }, 500);
+          return;
+        }
+
+        // Handle bulk delete with specific entries (entriesToDelete from Claude)
+        if (mealUpdateAction.type === 'delete' && mealUpdateAction.details.entryName.match(/^\d+\s+entries?$/)) {
+          // Pattern: "2 entries", "3 entries", etc. - this comes from entriesToDelete array
+          const mealType = mealUpdateAction.details.fromMealType;
+
+          if (!mealType) {
+            setMealUpdateCardState('failure');
+            setMealUpdateCardError('Meal type not specified');
+            return;
+          }
+
+          const deleteEntry = useMealsStore.getState().deleteEntry;
+          const entries = useMealsStore.getState().entries;
+
+          // Get all entries of this meal type for today
+          const today = new Date().toISOString().split('T')[0];
+          const relevantEntries = entries.filter(
+            (e) => e.mealType === mealType && e.date === today
+          );
 
           if (relevantEntries.length === 0) {
             setMealUpdateCardState('failure');
