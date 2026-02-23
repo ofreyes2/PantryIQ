@@ -8,6 +8,7 @@ export type PersonalityMode =
   | 'gordon-ramsay'
   | 'scientist'
   | 'zen'
+  | 'jarvis'
   | 'custom';
 
 export interface CustomPersonality {

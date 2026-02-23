@@ -23,8 +23,9 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import * as Speech from 'expo-speech';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ChefHat, ArrowLeft, Send, History, Zap, Edit3 } from 'lucide-react-native';
+import { ChefHat, ArrowLeft, Send, History, Zap, Edit3, Volume2 } from 'lucide-react-native';
 import { usePantryStore } from '@/lib/stores/pantryStore';
 import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
@@ -41,12 +42,15 @@ import {
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
 import { getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
+import { MealLogger } from '@/lib/mealLogger';
 import { api } from '@/lib/api/api';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import { MealConfirmationModal } from '@/components/MealConfirmationModal';
+import { MealUpdateConfirmationCard } from '@/components/MealUpdateConfirmationCard';
 import { QuickLogSheet } from '@/components/QuickLogSheet';
 import { RecipeCaptureCard } from '@/components/RecipeCaptureCard';
 import { RecipeCreationModal } from '@/components/RecipeCreationModal';
+import { DuplicateWarningCard } from '@/components/DuplicateWarningCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
@@ -60,6 +64,16 @@ interface Message {
   timestamp: Date;
   mealAnalysis?: MealAnalysis;
   isFollowUpQuestion?: boolean;
+  mealUpdateAction?: {
+    type: 'move' | 'edit' | 'delete';
+    pending: boolean;
+    details: {
+      entryName: string;
+      fromMealType?: string;
+      toMealType?: string;
+      changedFields?: string[];
+    };
+  };
 }
 
 interface ConversationMetadata {
@@ -70,7 +84,7 @@ interface ConversationMetadata {
   messageCount: number;
 }
 
-type MealCardStatus = 'pending' | 'logging' | 'success' | 'failure';
+type MealCardStatus = 'pending' | 'logging' | 'success' | 'failure' | 'loading';
 
 const QUICK_PROMPTS = [
   "Log my morning coffee",
@@ -197,6 +211,7 @@ When a user describes eating something, you MUST:
 <MEAL_DATA>
 {
   "hasMealData": true or false,
+  "action": "log" or "move" or "edit" or "delete",
   "mealName": "descriptive name of what was eaten or null",
   "mealType": "breakfast or lunch or dinner or snacks or unknown",
   "mealTypeConfidence": "high or medium or low",
@@ -216,22 +231,50 @@ When a user describes eating something, you MUST:
   "totalProtein": number,
   "totalFat": number,
   "needsMealType": true or false,
-  "missingInfo": "what info is needed or null"
+  "missingInfo": "what info is needed or null",
+  "moveAction": {
+    "searchTerm": "food name to find",
+    "fromMealType": "current meal type",
+    "toMealType": "target meal type"
+  },
+  "editAction": {
+    "searchTerm": "food name to find",
+    "mealType": "which meal type to search in",
+    "fieldsToUpdate": {
+      "calories": number or null,
+      "quantity": number or null,
+      "netCarbs": number or null,
+      "protein": number or null,
+      "fat": number or null
+    }
+  },
+  "deleteAction": {
+    "searchTerm": "food name to find",
+    "mealType": "which meal type to search in"
+  }
 }
 </MEAL_DATA>
 
 CRITICAL MEAL LOGGING RULES:
-- If the user is NOT describing eating something, set hasMealData to false and skip the JSON block
-- ALWAYS include the JSON block when the user describes food they ate
+- If the user is NOT describing eating something OR modifying entries, set hasMealData to false and skip the JSON block
+- ALWAYS include the JSON block when the user describes food they ate or asks to move/edit/delete entries
+- When user asks to move/edit/delete, include ONLY the relevant action (moveAction/editAction/deleteAction), not "foods" array
+- Detect move commands: "move to", "change to", "switch to", "move my"
+- Detect edit commands: "update", "fix", "change the", "edit", "modify"
+- Detect delete commands: "delete", "remove", "remove the"
 - If you cannot determine the meal type (breakfast/lunch/dinner/snacks), set needsMealType to true
 - Set mealTypeConfidence to "low" if unsure
 - The app will parse this JSON automatically — the user never sees it
-- NEVER claim you logged a meal or saved it — you provide the data, the app handles saving
-- NEVER say "I cannot log your meal" — the app handles this, not you
+- NEVER claim you logged/moved/edited/deleted — you provide the data, the app handles the action
+- NEVER say "I cannot modify your meal" — the app handles this, not you
 - When uncertain, ask clarifying questions FIRST, then provide the JSON block after getting answers
 - Always estimate nutrition as accurately as possible from the description
 
-IMPORTANT: When a user asks about logging, NEVER say things like "I have logged your meal" or "I cannot write to the food log". Instead say things like "Here is what I have for your breakfast — tap the button below to save it to your log" or "Let me capture this in the system for you to confirm".
+IMPORTANT: When a user asks about logging/modifying entries, say things like:
+- For logging: "Here is what I have for your breakfast — tap the button below to save it to your log"
+- For moving: "I'll move that to snacks for you — just confirm below"
+- For editing: "Let me update that entry with the new nutrition — confirm below"
+- For deleting: "I'll remove that from your log — confirm below"
 
 INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
@@ -326,6 +369,8 @@ function TypingIndicator() {
 function MessageBubble({
   message,
   onMealConfirm,
+  onMealUpdate,
+  onMealUpdateCancel,
   isMealLogging,
   cardStatus,
   cardError,
@@ -333,6 +378,8 @@ function MessageBubble({
 }: {
   message: Message;
   onMealConfirm?: () => void;
+  onMealUpdate?: (action: any) => Promise<void>;
+  onMealUpdateCancel?: () => void;
   isMealLogging?: boolean;
   cardStatus?: MealCardStatus;
   cardError?: string;
@@ -340,6 +387,24 @@ function MessageBubble({
 }) {
   const isUser = message.role === 'user';
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Show meal update confirmation card if this message has a meal update action pending
+  if (message.mealUpdateAction?.pending && onMealUpdate && onMealUpdateCancel) {
+    return (
+      <View style={{ marginBottom: 12, paddingHorizontal: 16 }}>
+        <MealUpdateConfirmationCard
+          action={message.mealUpdateAction.type}
+          entryName={message.mealUpdateAction.details.entryName}
+          details={message.mealUpdateAction.details}
+          onConfirm={() => onMealUpdate(message.mealUpdateAction)}
+          onCancel={onMealUpdateCancel}
+          isLoading={isMealLogging}
+          status={cardStatus === 'logging' ? 'loading' : cardStatus === 'success' ? 'success' : cardStatus === 'failure' ? 'failure' : 'pending'}
+          errorMessage={cardError}
+        />
+      </View>
+    );
+  }
 
   // Show meal confirmation card if this message has meal analysis
   if (message.mealAnalysis && onMealConfirm) {
@@ -352,7 +417,7 @@ function MessageBubble({
             // TODO: Open meal editing modal
           }}
           isLoading={isMealLogging}
-          status={cardStatus ?? 'pending'}
+          status={(cardStatus === 'loading' ? 'logging' : cardStatus) as 'pending' | 'logging' | 'success' | 'failure' | undefined}
           errorMessage={cardError}
           onRetry={onRetry}
         />
@@ -785,8 +850,12 @@ export default function ChefClaudeScreen() {
   const [showQuickLogSheet, setShowQuickLogSheet] = useState(false);
   const [mealCardStates, setMealCardStates] = useState<Record<string, MealCardStatus>>({});
   const [mealCardErrors, setMealCardErrors] = useState<Record<string, string>>({});
+  const [mealUpdateCardState, setMealUpdateCardState] = useState<MealCardStatus>('pending');
+  const [mealUpdateCardError, setMealUpdateCardError] = useState<string>('');
   const [showMealConfirmationModal, setShowMealConfirmationModal] = useState(false);
   const [showRecipeCapture, setShowRecipeCapture] = useState(false);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const [recipeToCapture, setRecipeToCapture] = useState<{
     name: string;
     servingTime?: string;
@@ -795,6 +864,9 @@ export default function ChefClaudeScreen() {
     foods: string[];
     instructions: string[];
   } | null>(null);
+  const [pendingDuplicateCheck, setPendingDuplicateCheck] = useState<MealAnalysis | null>(null);
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [duplicateEntry, setDuplicateEntry] = useState<FoodEntry & { id: string } | null>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -1018,6 +1090,16 @@ export default function ChefClaudeScreen() {
       if (mealDataMatch) {
         try {
           const mealData = JSON.parse(mealDataMatch[1]);
+
+          // Mark move/edit/delete actions as pending
+          if (mealData.action === 'move' && mealData.moveAction) {
+            mealData.isPendingMove = true;
+          } else if (mealData.action === 'edit' && mealData.editAction) {
+            mealData.isPendingEdit = true;
+          } else if (mealData.action === 'delete' && mealData.deleteAction) {
+            mealData.isPendingDelete = true;
+          }
+
           return { displayText, mealData };
         } catch (parseError) {
           console.warn('Failed to parse meal data from Claude response:', parseError);
@@ -1029,6 +1111,56 @@ export default function ChefClaudeScreen() {
     },
     []
   );
+
+  /**
+   * Clean text for speech synthesis (remove markdown)
+   */
+  const cleanTextForSpeech = useCallback((text: string): string => {
+    return text
+      .replace(/\*\*/g, '')
+      .replace(/\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/`/g, '')
+      .trim();
+  }, []);
+
+  /**
+   * Speak response using expo-speech (JARVIS voice mode)
+   */
+  const speakResponse = useCallback(
+    (text: string) => {
+      if (!isVoiceMode) return;
+
+      const cleanText = cleanTextForSpeech(text);
+      if (!cleanText) return;
+
+      Speech.speak(cleanText, {
+        language: 'en-GB',
+        pitch: 0.85,
+        rate: 0.92,
+        onStart: () => setIsSpeaking(true),
+        onDone: () => setIsSpeaking(false),
+        onError: () => setIsSpeaking(false),
+      });
+    },
+    [isVoiceMode, cleanTextForSpeech]
+  );
+
+  /**
+   * Stop current speech
+   */
+  const stopSpeaking = useCallback(() => {
+    Speech.stop();
+    setIsSpeaking(false);
+  }, []);
+
+  /**
+   * Toggle voice mode
+   */
+  const toggleVoiceMode = useCallback(() => {
+    setIsVoiceMode((prev) => !prev);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, []);
 
   /**
    * Convert Claude's meal data to internal MealAnalysis format
@@ -1076,8 +1208,130 @@ export default function ChefClaudeScreen() {
 
 
   /**
-   * Log a meal to the meals store with verification
+   * Handle move/edit/delete operations
    */
+  const handleMealUpdate = useCallback(
+    async (mealData: any): Promise<{ success: boolean; message: string }> => {
+      const today = new Date().toISOString().split('T')[0];
+      const entries = getEntriesForDate(today);
+      const deleteEntry = useMealsStore.getState().deleteEntry;
+      const updateEntry = useMealsStore.getState().updateEntry;
+
+      try {
+        if (mealData.action === 'move' && mealData.moveAction) {
+          const { searchTerm, fromMealType, toMealType } = mealData.moveAction;
+
+          // Find matching entry
+          const entry = entries.find(
+            (e) =>
+              e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+              e.mealType === fromMealType
+          );
+
+          if (!entry) {
+            return {
+              success: false,
+              message: `Could not find "${searchTerm}" in ${fromMealType}`,
+            };
+          }
+
+          // Update the entry with new meal type
+          const updatedEntry = { ...entry, mealType: toMealType };
+          updateEntry(entry.id, updatedEntry);
+
+          return {
+            success: true,
+            message: `Moved "${entry.name}" from ${fromMealType} to ${toMealType}`,
+          };
+        }
+
+        if (mealData.action === 'edit' && mealData.editAction) {
+          const { searchTerm, mealType, fieldsToUpdate } = mealData.editAction;
+
+          // Find matching entry
+          const entry = entries.find(
+            (e) =>
+              e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+              e.mealType === mealType
+          );
+
+          if (!entry) {
+            return {
+              success: false,
+              message: `Could not find "${searchTerm}" in ${mealType}`,
+            };
+          }
+
+          // Build updated fields
+          const updatedEntry = { ...entry };
+          if (fieldsToUpdate.calories !== null && fieldsToUpdate.calories !== undefined) {
+            updatedEntry.calories = Math.round(fieldsToUpdate.calories);
+          }
+          if (fieldsToUpdate.netCarbs !== null && fieldsToUpdate.netCarbs !== undefined) {
+            updatedEntry.netCarbs = Math.round(fieldsToUpdate.netCarbs * 10) / 10;
+          }
+          if (fieldsToUpdate.protein !== null && fieldsToUpdate.protein !== undefined) {
+            updatedEntry.protein = Math.round(fieldsToUpdate.protein * 10) / 10;
+          }
+          if (fieldsToUpdate.fat !== null && fieldsToUpdate.fat !== undefined) {
+            updatedEntry.fat = Math.round(fieldsToUpdate.fat * 10) / 10;
+          }
+          if (fieldsToUpdate.quantity !== null && fieldsToUpdate.quantity !== undefined) {
+            // For quantity updates, we might want to keep the name as-is
+          }
+
+          updateEntry(entry.id, updatedEntry);
+
+          const changedFields = Object.keys(fieldsToUpdate)
+            .filter((k) => fieldsToUpdate[k] !== null && fieldsToUpdate[k] !== undefined)
+            .join(', ');
+
+          return {
+            success: true,
+            message: `Updated "${entry.name}" — ${changedFields} changed`,
+          };
+        }
+
+        if (mealData.action === 'delete' && mealData.deleteAction) {
+          const { searchTerm, mealType } = mealData.deleteAction;
+
+          // Find matching entry
+          const entry = entries.find(
+            (e) =>
+              e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+              e.mealType === mealType
+          );
+
+          if (!entry) {
+            return {
+              success: false,
+              message: `Could not find "${searchTerm}" in ${mealType}`,
+            };
+          }
+
+          // Delete the entry
+          deleteEntry(entry.id);
+
+          return {
+            success: true,
+            message: `Removed "${entry.name}" from your log`,
+          };
+        }
+
+        return {
+          success: false,
+          message: 'Unknown action',
+        };
+      } catch (error) {
+        console.error('Failed to handle meal update:', error);
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        };
+      }
+    },
+    [getEntriesForDate]
+  );
   const logMealFromAnalysis = useCallback(
     async (analysis: MealAnalysis): Promise<{ success: boolean; entry: FoodEntry | null; error: string | null }> => {
       try {
@@ -1309,10 +1563,38 @@ export default function ChefClaudeScreen() {
 
         // Check if meal data was extracted
         let mealAnalysis: MealAnalysis | null = null;
+        let mealUpdateAction: Message['mealUpdateAction'] = undefined;
+
         if (mealData) {
-          mealAnalysis = convertClaudeMealDataToAnalysis(mealData);
-          if (mealAnalysis) {
-            setCurrentMealAnalysis(mealAnalysis);
+          // Check for move/edit/delete actions
+          if (mealData.isPendingMove || mealData.isPendingEdit || mealData.isPendingDelete) {
+            const actionType = mealData.isPendingMove ? 'move' : mealData.isPendingEdit ? 'edit' : 'delete';
+            let entryName = '';
+
+            if (mealData.moveAction) {
+              entryName = mealData.moveAction.searchTerm;
+            } else if (mealData.editAction) {
+              entryName = mealData.editAction.searchTerm;
+            } else if (mealData.deleteAction) {
+              entryName = mealData.deleteAction.searchTerm;
+            }
+
+            mealUpdateAction = {
+              type: actionType as 'move' | 'edit' | 'delete',
+              pending: true,
+              details: {
+                entryName,
+                fromMealType: mealData.moveAction?.fromMealType || mealData.deleteAction?.mealType,
+                toMealType: mealData.moveAction?.toMealType,
+                changedFields: mealData.editAction ? Object.keys(mealData.editAction.fieldsToUpdate || {}) : undefined,
+              },
+            };
+          } else {
+            // Regular meal logging
+            mealAnalysis = convertClaudeMealDataToAnalysis(mealData);
+            if (mealAnalysis) {
+              setCurrentMealAnalysis(mealAnalysis);
+            }
           }
         }
 
@@ -1338,16 +1620,23 @@ export default function ChefClaudeScreen() {
           setShowRecipeCapture(true);
         }
 
-        // Create the assistant message with extracted meal analysis if present
+        // Create the assistant message with extracted meal analysis or update action
         const assistantMessage: Message = {
           id: `msg-${Date.now()}-reply`,
           role: 'assistant',
           content: displayText,
           timestamp: new Date(),
           mealAnalysis: mealAnalysis && mealAnalysis.isMealDescription ? mealAnalysis : undefined,
+          mealUpdateAction: mealUpdateAction,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+
+        // Auto-speak if in voice mode
+        if (isVoiceMode && displayText) {
+          setTimeout(() => speakResponse(displayText), 300);
+        }
+
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       } catch (err: unknown) {
         const errorMessage: Message = {
@@ -1373,16 +1662,143 @@ export default function ChefClaudeScreen() {
       processClaudeResponse,
       convertClaudeMealDataToAnalysis,
       todayStr,
+      isVoiceMode,
+      speakResponse,
     ]
   );
 
   /**
    * Handle meal confirmation - show modal instead of logging immediately
    */
-  const handleMealConfirm = useCallback(() => {
+  const handleMealConfirm = useCallback(async () => {
     if (!currentMealAnalysis) return;
-    setShowMealConfirmationModal(true);
+
+    // Check for duplicate
+    const foodName = currentMealAnalysis.identifiedFoods[0]?.name || 'Unknown food';
+    const mealTypeFormatted = formatMealType(currentMealAnalysis.mealType);
+    const mealType = mealTypeFormatted as 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
+
+    const duplicate = await MealLogger.checkForDuplicate(
+      {
+        id: 'temp',
+        name: foodName,
+        mealType,
+        date: new Date().toISOString().split('T')[0],
+        servings: 1,
+        calories: 0,
+        carbs: 0,
+        protein: 0,
+        fat: 0,
+        fiber: 0,
+        netCarbs: 0,
+        isFavorite: false,
+      },
+      mealType
+    );
+
+    if (duplicate) {
+      setDuplicateEntry(duplicate);
+      setPendingDuplicateCheck(currentMealAnalysis);
+      setShowDuplicateWarning(true);
+    } else {
+      // No duplicate, proceed to confirmation
+      setShowMealConfirmationModal(true);
+    }
   }, [currentMealAnalysis]);
+
+  /**
+   * Handle duplicate warning response
+   */
+  const handleDuplicateResponse = useCallback(
+    (action: 'log' | 'update' | 'cancel') => {
+      if (action === 'cancel') {
+        setShowDuplicateWarning(false);
+        setPendingDuplicateCheck(null);
+        setDuplicateEntry(null);
+      } else if (action === 'log') {
+        // User wants to log again despite duplicate
+        setShowDuplicateWarning(false);
+        setShowMealConfirmationModal(true);
+      } else if (action === 'update') {
+        // User wants to update existing entry instead
+        // TODO: Navigate to edit existing entry
+        setShowDuplicateWarning(false);
+        setPendingDuplicateCheck(null);
+        setDuplicateEntry(null);
+      }
+    },
+    []
+  );
+
+  /**
+   * Handle meal update (move/edit/delete) confirmation
+   */
+  const handleMealUpdateConfirm = useCallback(
+    async (mealUpdateAction: Message['mealUpdateAction']) => {
+      if (!mealUpdateAction) return;
+
+      setMealUpdateCardState('loading');
+      setMealUpdateCardError('');
+
+      try {
+        // Construct the meal data object from the action
+        const mealData = {
+          action: mealUpdateAction.type,
+          moveAction: mealUpdateAction.type === 'move' ? {
+            searchTerm: mealUpdateAction.details.entryName,
+            fromMealType: mealUpdateAction.details.fromMealType,
+            toMealType: mealUpdateAction.details.toMealType,
+          } : undefined,
+          editAction: mealUpdateAction.type === 'edit' ? {
+            searchTerm: mealUpdateAction.details.entryName,
+            mealType: mealUpdateAction.details.fromMealType,
+            fieldsToUpdate: {},
+          } : undefined,
+          deleteAction: mealUpdateAction.type === 'delete' ? {
+            searchTerm: mealUpdateAction.details.entryName,
+            mealType: mealUpdateAction.details.fromMealType,
+          } : undefined,
+        };
+
+        const result = await handleMealUpdate(mealData);
+
+        if (result.success) {
+          setMealUpdateCardState('success');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          // Add success message
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: result.message,
+            timestamp: new Date(),
+          };
+
+          setTimeout(() => {
+            setMessages((prev) => [...prev, successMsg]);
+            setMealUpdateCardState('pending');
+          }, 500);
+        } else {
+          setMealUpdateCardState('failure');
+          setMealUpdateCardError(result.message);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+      } catch (error) {
+        setMealUpdateCardState('failure');
+        setMealUpdateCardError(error instanceof Error ? error.message : 'Unknown error');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+    },
+    [handleMealUpdate]
+  );
+
+  /**
+   * Cancel meal update
+   */
+  const handleMealUpdateCancel = useCallback(() => {
+    setMealUpdateCardState('pending');
+    setMealUpdateCardError('');
+  }, []);
 
   /**
    * Handle logging meal from confirmation modal
@@ -1545,14 +1961,16 @@ export default function ChefClaudeScreen() {
         <MessageBubble
           message={item}
           onMealConfirm={item.mealAnalysis ? handleMealConfirm : undefined}
+          onMealUpdate={item.mealUpdateAction ? handleMealUpdateConfirm : undefined}
+          onMealUpdateCancel={item.mealUpdateAction ? handleMealUpdateCancel : undefined}
           isMealLogging={isMealLogging}
-          cardStatus={mealCardStates[cardKey]}
-          cardError={mealCardErrors[cardKey]}
+          cardStatus={item.mealUpdateAction ? mealUpdateCardState : mealCardStates[cardKey]}
+          cardError={item.mealUpdateAction ? mealUpdateCardError : mealCardErrors[cardKey]}
           onRetry={item.mealAnalysis ? handleMealConfirm : undefined}
         />
       );
     },
-    [handleMealConfirm, isMealLogging, mealCardStates, mealCardErrors]
+    [handleMealConfirm, handleMealUpdateConfirm, handleMealUpdateCancel, isMealLogging, mealCardStates, mealCardErrors, mealUpdateCardState, mealUpdateCardError]
   );
 
   const keyExtractor = useCallback((item: Message) => item.id, []);
@@ -1565,7 +1983,10 @@ export default function ChefClaudeScreen() {
 
   return (
     <ErrorBoundary>
-      <LinearGradient colors={['#0A1628', '#0B1C35']} style={{ flex: 1 }}>
+      <LinearGradient
+        colors={isVoiceMode ? ['#0a0f1f', '#0d1b3a', '#0a0f1f'] : ['#0A1628', '#0B1C35']}
+        style={{ flex: 1 }}
+      >
         <SafeAreaView testID="chef-claude-screen" style={{ flex: 1 }} edges={['top', 'bottom']}>
         {/* Header */}
         <View
@@ -1619,18 +2040,32 @@ export default function ChefClaudeScreen() {
                 Chef Claude
               </Text>
             </View>
-            <Text
-              style={{
-                fontFamily: 'DMSans_400Regular',
-                fontSize: 11,
-                color: Colors.green,
-                marginTop: 1,
-              }}
-            >
-              {userProfile?.personalityMode === 'custom' && userProfile?.customPersonality?.description
-                ? 'Custom Mode'
-                : getPersonalityConfig(userProfile?.personalityMode)?.name ?? 'Your personal kitchen AI'}
-            </Text>
+            {isVoiceMode ? (
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 10,
+                  color: '#1E90FF',
+                  marginTop: 1,
+                  letterSpacing: 1,
+                }}
+              >
+                JARVIS — ONLINE
+              </Text>
+            ) : (
+              <Text
+                style={{
+                  fontFamily: 'DMSans_400Regular',
+                  fontSize: 11,
+                  color: Colors.green,
+                  marginTop: 1,
+                }}
+              >
+                {userProfile?.personalityMode === 'custom' && userProfile?.customPersonality?.description
+                  ? 'Custom Mode'
+                  : getPersonalityConfig(userProfile?.personalityMode)?.name ?? 'Your personal kitchen AI'}
+              </Text>
+            )}
           </View>
 
           <Pressable
@@ -1667,6 +2102,23 @@ export default function ChefClaudeScreen() {
             }}
           >
             <History size={18} color={Colors.textSecondary} />
+          </Pressable>
+
+          <Pressable
+            testID="jarvis-voice-button"
+            onPress={toggleVoiceMode}
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: isVoiceMode ? 'rgba(30,144,255,0.2)' : Colors.surface,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: isVoiceMode ? 2 : 1,
+              borderColor: isVoiceMode ? '#1E90FF' : Colors.border,
+            }}
+          >
+            <Volume2 size={18} color={isVoiceMode ? '#1E90FF' : Colors.textSecondary} />
           </Pressable>
         </View>
 
@@ -1822,6 +2274,31 @@ export default function ChefClaudeScreen() {
         favoriteMeals={favoriteMeals}
         isLoading={isTyping}
       />
+
+      {/* Duplicate Warning Card */}
+      {showDuplicateWarning && pendingDuplicateCheck ? (
+        <View
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            padding: 16,
+            paddingBottom: 32,
+          }}
+        >
+          <DuplicateWarningCard
+            foodName={pendingDuplicateCheck.identifiedFoods[0]?.name || 'Unknown food'}
+            mealType={formatMealType(pendingDuplicateCheck.mealType)}
+            existingEntry={duplicateEntry ?? undefined}
+            onLogAgain={() => handleDuplicateResponse('log')}
+            onUpdateExisting={() => handleDuplicateResponse('update')}
+            onCancel={() => handleDuplicateResponse('cancel')}
+            isLoading={isMealLogging}
+          />
+        </View>
+      ) : null}
 
       <MealConfirmationModal
         visible={showMealConfirmationModal}

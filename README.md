@@ -191,6 +191,36 @@ mobile/src/
       6. Meal saved to AsyncStorage
       7. Success: "Logged! Your breakfast has been added..."
       8. Opens Meals tab → meal is there
+  - **ENHANCEMENT ✅ COMPLETE**: Meal Entry Management & JARVIS Voice Mode — Comprehensive meal editing system plus AI voice assistant:
+    - **Meal Entry Editing & Moving**:
+      - ✅ Swipe left on any meal entry to reveal Edit (blue) and Delete (red) action buttons
+      - ✅ Long-press any meal entry for context menu (Edit, Move, Delete, Duplicate, Favorite)
+      - ✅ Always-visible edit pencil button for discoverability
+      - ✅ EditEntrySheet component with all editable fields (name, quantity, unit, meal type, nutrition)
+      - ✅ MoveToMealSheet for moving entries between meal types with smooth animations
+      - ✅ MealLogger service methods: moveEntry(), editEntry(), deleteEntry(), checkForDuplicate(), validateEntry()
+    - **Chef Claude Move/Edit/Delete Interceptor**:
+      - ✅ Extended MEAL_DATA JSON block to support "move", "edit", "delete" actions
+      - ✅ Natural language detection for: "move to", "change to", "update", "fix", "delete", "remove"
+      - ✅ MealUpdateConfirmationCard (purple-tinted) shows pending move/edit/delete operations
+      - ✅ User confirms or cancels changes before they're applied
+      - ✅ Seamless integration with existing meal logging system
+    - **Duplicate Detection & Nutrition Validation**:
+      - ✅ Yellow warning card shows when logging duplicate entries in same meal type
+      - ✅ Options: "Log Again", "Update Existing", or "Cancel"
+      - ✅ Nutrition data validation badges on entries missing calorie/carb/protein data
+      - ✅ Warning prompts users to add missing nutrition info
+    - **Meal Section Context Menus**:
+      - ✅ Three-dot menu on each meal section (Breakfast, Lunch, Dinner, Snacks)
+      - ✅ Options: Add Food, Clear Section (with confirmation), Move All to (meal type selector)
+      - ✅ Smooth animations and toast confirmations for all actions
+    - **JARVIS Voice Mode**:
+      - ✅ Microphone button in Chef Claude header to toggle JARVIS voice mode
+      - ✅ JARVIS personality mode: Formal British tone, precision focus, confident delivery
+      - ✅ Auto-speak Claude responses using expo-speech (British English, lower pitch, deliberate pace)
+      - ✅ Dark blue visual theme when voice mode active ("JARVIS — ONLINE" header)
+      - ✅ Haptic feedback and button highlighting for voice mode toggle
+      - ✅ Works with any personality mode, designed specifically for JARVIS character
   - **Feature 7 ✅ IN PROGRESS**: Accessibility Improvements — AccessibilityInfo integration, WCAG AA contrast checking, screen reader utilities, semantic HTML for accessibility
   - **Feature 5 IN PROGRESS**: UI Consistency Audit — Reviewing and standardizing typography, colors, spacing, component styles across entire app
   - **Feature 6 PENDING**: Onboarding Polish — Splash screen animation, onboarding illustrations, progress indicators, first-use tooltips, empty state designs

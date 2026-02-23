@@ -25,6 +25,7 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import { LongPressGestureHandler, State } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
@@ -44,6 +45,10 @@ import {
   X,
   Minus,
   Edit3,
+  Copy,
+  Share2,
+  Move,
+  MoreVertical,
 } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { useMealsStore, FoodEntry, MealType } from '@/lib/stores/mealsStore';
@@ -51,6 +56,9 @@ import { useAppStore } from '@/lib/stores/appStore';
 import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { useToast } from '@/components/Toast';
 import { ManualFoodEntryForm } from '@/components/ManualFoodEntryForm';
+import { EditEntrySheet } from '@/components/EditEntrySheet';
+import { MoveToMealSheet } from '@/components/MoveToMealSheet';
+import { MealLogger } from '@/lib/mealLogger';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -345,13 +353,22 @@ function NutritionBar({ value, goal, color, label, unit = 'g' }: {
 }
 
 // ─── Food item row ────────────────────────────────────────────────────────────
-function FoodItemRow({ entry, onDelete, onToggleFavorite }: {
+function FoodItemRow({
+  entry,
+  onDelete,
+  onToggleFavorite,
+  onEdit,
+  onMove,
+}: {
   entry: FoodEntry;
   onDelete: () => void;
   onToggleFavorite: () => void;
+  onEdit?: () => void;
+  onMove?: () => void;
 }) {
   const swipeRef = useRef<Swipeable>(null);
   const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [contextMenuVisible, setContextMenuVisible] = useState(false);
   const { showToast } = useToast();
 
   const handleDeletePress = () => {
@@ -365,62 +382,284 @@ function FoodItemRow({ entry, onDelete, onToggleFavorite }: {
     showToast(`${entry.name} deleted`, 'success');
   };
 
+  const handleLongPress = (event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      setContextMenuVisible(true);
+    }
+  };
+
   const renderRightActions = () => (
-    <Pressable
-      onPress={handleDeletePress}
-      style={{
-        backgroundColor: Colors.error,
-        justifyContent: 'center',
-        alignItems: 'center',
-        width: 72,
-        borderRadius: BorderRadius.md,
-        marginLeft: 8,
-      }}
-      testID="delete-food-entry-button"
-    >
-      <Trash2 size={20} color="#fff" />
-      <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 10, color: '#fff', marginTop: 2 }}>Delete</Text>
-    </Pressable>
+    <View style={{ flexDirection: 'row', gap: 8, marginLeft: 8 }}>
+      <Pressable
+        onPress={() => {
+          onEdit?.();
+          swipeRef.current?.close();
+        }}
+        style={{
+          backgroundColor: '#3498DB',
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: 72,
+          borderRadius: BorderRadius.md,
+        }}
+        testID={`edit-food-entry-button-${entry.id}`}
+      >
+        <Edit3 size={18} color="#fff" />
+        <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 10, color: '#fff', marginTop: 2 }}>
+          Edit
+        </Text>
+      </Pressable>
+      <Pressable
+        onPress={handleDeletePress}
+        style={{
+          backgroundColor: Colors.error,
+          justifyContent: 'center',
+          alignItems: 'center',
+          width: 72,
+          borderRadius: BorderRadius.md,
+        }}
+        testID={`delete-food-entry-button-${entry.id}`}
+      >
+        <Trash2 size={18} color="#fff" />
+        <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 10, color: '#fff', marginTop: 2 }}>
+          Delete
+        </Text>
+      </Pressable>
+    </View>
   );
 
   return (
     <>
-      <Swipeable ref={swipeRef} renderRightActions={renderRightActions} friction={2} overshootRight={false}>
-        <View style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingVertical: 10,
-          paddingHorizontal: 14,
-          backgroundColor: Colors.navyCard,
-          borderRadius: BorderRadius.md,
-          marginBottom: 6,
-        }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }} numberOfLines={1}>
-              {entry.name}
-            </Text>
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 1 }}>
-              {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
-              {entry.brand ? ` · ${entry.brand}` : null}
-            </Text>
+      <LongPressGestureHandler
+        onHandlerStateChange={handleLongPress}
+        minDurationMs={500}
+      >
+        <Swipeable
+          ref={swipeRef}
+          renderRightActions={renderRightActions}
+          friction={2}
+          overshootRight={false}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              backgroundColor: Colors.navyCard,
+              borderRadius: BorderRadius.md,
+              marginBottom: 6,
+            }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_700Bold',
+                  fontSize: 14,
+                  color: Colors.textPrimary,
+                }}
+                numberOfLines={1}
+              >
+                {entry.name}
+              </Text>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_400Regular',
+                  fontSize: 12,
+                  color: Colors.textSecondary,
+                  marginTop: 1,
+                }}
+              >
+                {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
+                {entry.brand ? ` · ${entry.brand}` : null}
+              </Text>
+            </View>
+            <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
+                {Math.round(entry.calories * entry.servings)} cal
+              </Text>
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
+                {Math.round(entry.netCarbs * entry.servings)}g net carbs
+              </Text>
+              {(() => {
+                const hasNutrition = (entry.calories > 0) || (entry.netCarbs > 0) || (entry.protein > 0);
+                return !hasNutrition ? (
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(243,156,18,0.15)',
+                      borderRadius: BorderRadius.md,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      marginTop: 4,
+                      borderWidth: 1,
+                      borderColor: 'rgba(243,156,18,0.3)',
+                    }}
+                    testID={`nutrition-missing-badge-${entry.id}`}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 9,
+                        color: Colors.amber,
+                      }}
+                    >
+                      ⚠️ Missing data
+                    </Text>
+                  </View>
+                ) : null;
+              })()}
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                onPress={onEdit}
+                testID={`edit-btn-${entry.id}`}
+                hitSlop={8}
+              >
+                <Edit3 size={16} color={Colors.textTertiary} />
+              </Pressable>
+              <Pressable
+                onPress={onToggleFavorite}
+                testID={`favorite-btn-${entry.id}`}
+                hitSlop={8}
+              >
+                <Heart
+                  size={18}
+                  color={entry.isFavorite ? Colors.error : Colors.textTertiary}
+                  fill={entry.isFavorite ? Colors.error : 'transparent'}
+                />
+              </Pressable>
+            </View>
           </View>
-          <View style={{ alignItems: 'flex-end', marginRight: 10 }}>
-            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary }}>
-              {Math.round(entry.calories * entry.servings)} cal
-            </Text>
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.amber }}>
-              {Math.round(entry.netCarbs * entry.servings)}g net carbs
-            </Text>
+        </Swipeable>
+      </LongPressGestureHandler>
+
+      {/* Long Press Context Menu */}
+      <Modal visible={contextMenuVisible} transparent animationType="fade">
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={() => setContextMenuVisible(false)}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              bottom: '30%',
+              right: 16,
+              backgroundColor: Colors.navyCard,
+              borderRadius: BorderRadius.lg,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              overflow: 'hidden',
+              minWidth: 180,
+            }}
+          >
+            <Pressable
+              onPress={() => {
+                onEdit?.();
+                setContextMenuVisible(false);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 10,
+              }}
+            >
+              <Edit3 size={16} color={Colors.textSecondary} />
+              <Text
+                style={{
+                  fontFamily: 'DMSans_500Medium',
+                  fontSize: 14,
+                  color: Colors.textSecondary,
+                }}
+              >
+                Edit
+              </Text>
+            </Pressable>
+            {onMove ? (
+              <Pressable
+                onPress={() => {
+                  onMove();
+                  setContextMenuVisible(false);
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  gap: 10,
+                  borderTopWidth: 1,
+                  borderTopColor: Colors.border,
+                }}
+              >
+                <Move size={16} color={Colors.textSecondary} />
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_500Medium',
+                    fontSize: 14,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  Move
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                onToggleFavorite();
+                setContextMenuVisible(false);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 10,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
+              }}
+            >
+              <Heart
+                size={16}
+                color={entry.isFavorite ? Colors.error : Colors.textSecondary}
+                fill={entry.isFavorite ? Colors.error : 'transparent'}
+              />
+              <Text
+                style={{
+                  fontFamily: 'DMSans_500Medium',
+                  fontSize: 14,
+                  color: entry.isFavorite ? Colors.error : Colors.textSecondary,
+                }}
+              >
+                {entry.isFavorite ? 'Remove' : 'Favorite'}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={handleDeletePress}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 10,
+                borderTopWidth: 1,
+                borderTopColor: Colors.border,
+              }}
+            >
+              <Trash2 size={16} color={Colors.error} />
+              <Text
+                style={{
+                  fontFamily: 'DMSans_500Medium',
+                  fontSize: 14,
+                  color: Colors.error,
+                }}
+              >
+                Delete
+              </Text>
+            </Pressable>
           </View>
-          <Pressable onPress={onToggleFavorite} testID={`favorite-btn-${entry.id}`} hitSlop={8}>
-            <Heart
-              size={18}
-              color={entry.isFavorite ? Colors.error : Colors.textTertiary}
-              fill={entry.isFavorite ? Colors.error : 'transparent'}
-            />
-          </Pressable>
-        </View>
-      </Swipeable>
+        </Pressable>
+      </Modal>
 
       <DeleteConfirmationModal
         visible={deleteConfirmVisible}
@@ -442,14 +681,19 @@ function MealSectionCard({
   onAddFood,
   onDeleteEntry,
   onToggleFavorite,
+  onEditEntry,
+  onMoveEntry,
 }: {
   section: MealSection;
   entries: FoodEntry[];
   onAddFood: () => void;
   onDeleteEntry: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  onEditEntry?: (entry: FoodEntry) => void;
+  onMoveEntry?: (entry: FoodEntry) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [showSectionMenu, setShowSectionMenu] = useState(false);
   const rotateAnim = useSharedValue(expanded ? 1 : 0);
 
   const totalCals = entries.reduce((sum, e) => sum + e.calories * e.servings, 0);
@@ -476,41 +720,52 @@ function MealSectionCard({
       ...Shadows.card,
     }}>
       {/* Header */}
-      <Pressable
-        onPress={toggle}
-        style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}
-        testID={`meal-section-${section.type}`}
-      >
-        <View style={{
-          width: 36,
-          height: 36,
-          borderRadius: BorderRadius.md,
-          backgroundColor: `${section.color}20`,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 10,
-        }}>
-          <Text style={{ fontSize: 18 }}>{section.icon}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
-            {section.label}
-          </Text>
-          {entries.length > 0 && (
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
-              {Math.round(totalCals)} cal · {Math.round(totalNetCarbs)}g net carbs
+      <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
+        <Pressable
+          onPress={toggle}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+          testID={`meal-section-${section.type}`}
+        >
+          <View style={{
+            width: 36,
+            height: 36,
+            borderRadius: BorderRadius.md,
+            backgroundColor: `${section.color}20`,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 10,
+          }}>
+            <Text style={{ fontSize: 18 }}>{section.icon}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
+              {section.label}
             </Text>
-          )}
-          {entries.length === 0 && (
-            <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary }}>
-              Nothing logged
-            </Text>
-          )}
-        </View>
-        <Animated.View style={chevronStyle}>
-          <ChevronDown size={18} color={Colors.textSecondary} />
-        </Animated.View>
-      </Pressable>
+            {entries.length > 0 && (
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                {Math.round(totalCals)} cal · {Math.round(totalNetCarbs)}g net carbs
+              </Text>
+            )}
+            {entries.length === 0 && (
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary }}>
+                Nothing logged
+              </Text>
+            )}
+          </View>
+          <Animated.View style={chevronStyle}>
+            <ChevronDown size={18} color={Colors.textSecondary} />
+          </Animated.View>
+        </Pressable>
+
+        {/* Section menu button */}
+        <Pressable
+          onPress={() => setShowSectionMenu(true)}
+          style={{ padding: 8, marginLeft: 4 }}
+          testID={`section-menu-${section.type}`}
+        >
+          <MoreVertical size={18} color={Colors.textSecondary} />
+        </Pressable>
+      </View>
 
       {/* Content */}
       {expanded ? (
@@ -521,6 +776,8 @@ function MealSectionCard({
               entry={entry}
               onDelete={() => onDeleteEntry(entry.id)}
               onToggleFavorite={() => onToggleFavorite(entry.id)}
+              onEdit={() => onEditEntry?.(entry)}
+              onMove={() => onMoveEntry?.(entry)}
             />
           ))}
           <Pressable
@@ -545,6 +802,112 @@ function MealSectionCard({
           </Pressable>
         </View>
       ) : null}
+
+      {/* Section Menu Modal */}
+      <Modal visible={showSectionMenu} transparent animationType="fade">
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }}
+          onPress={() => setShowSectionMenu(false)}
+        >
+          <View
+            style={{
+              position: 'absolute',
+              bottom: '30%',
+              right: 16,
+              backgroundColor: Colors.navyCard,
+              borderRadius: BorderRadius.lg,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              overflow: 'hidden',
+              minWidth: 200,
+            }}
+          >
+            <Pressable
+              onPress={() => {
+                setShowSectionMenu(false);
+                onAddFood();
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                gap: 10,
+              }}
+              testID={`section-menu-add-food-${section.type}`}
+            >
+              <Plus size={16} color={Colors.textSecondary} />
+              <Text
+                style={{
+                  fontFamily: 'DMSans_500Medium',
+                  fontSize: 14,
+                  color: Colors.textSecondary,
+                }}
+              >
+                Add Food
+              </Text>
+            </Pressable>
+            {entries.length > 0 ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    setShowSectionMenu(false);
+                    // TODO: Implement clear section
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    gap: 10,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.border,
+                  }}
+                  testID={`section-menu-clear-${section.type}`}
+                >
+                  <Trash2 size={16} color={Colors.error} />
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_500Medium',
+                      fontSize: 14,
+                      color: Colors.error,
+                    }}
+                  >
+                    Clear Section
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setShowSectionMenu(false);
+                    // TODO: Implement move all
+                  }}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    gap: 10,
+                    borderTopWidth: 1,
+                    borderTopColor: Colors.border,
+                  }}
+                  testID={`section-menu-move-all-${section.type}`}
+                >
+                  <Move size={16} color={Colors.textSecondary} />
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_500Medium',
+                      fontSize: 14,
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    Move All to...
+                  </Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -1570,10 +1933,15 @@ export default function MealsScreen() {
   const [addFoodModalVisible, setAddFoodModalVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('Breakfast');
   const [clearConfirmVisible, setClearConfirmVisible] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<FoodEntry | null>(null);
+  const [editSheetVisible, setEditSheetVisible] = useState(false);
+  const [movingEntry, setMovingEntry] = useState<FoodEntry | null>(null);
+  const [moveSheetVisible, setMoveSheetVisible] = useState(false);
 
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
   const addEntry = useMealsStore((s) => s.addEntry);
   const deleteEntry = useMealsStore((s) => s.deleteEntry);
+  const updateEntry = useMealsStore((s) => s.updateEntry);
   const toggleFavorite = useMealsStore((s) => s.toggleFavorite);
   const clearMeals = useMealsStore((s) => s.clearMeals);
   const { showToast } = useToast();
@@ -1639,6 +2007,45 @@ export default function MealsScreen() {
     setClearConfirmVisible(false);
     const dateName = isToday ? "today's" : 'that day\'s';
     showToast(`${dateName} meal log cleared`, 'success');
+  };
+
+  const handleEditEntry = (entry: FoodEntry) => {
+    setEditingEntry(entry);
+    setEditSheetVisible(true);
+  };
+
+  const handleMoveEntry = (entry: FoodEntry) => {
+    setMovingEntry(entry);
+    setMoveSheetVisible(true);
+  };
+
+  const handleSaveEdit = async (updates: Partial<FoodEntry>) => {
+    if (!editingEntry) return;
+    try {
+      updateEntry(editingEntry.id, updates);
+      showToast(`${editingEntry.name} updated`, 'success');
+      setEditSheetVisible(false);
+      setEditingEntry(null);
+    } catch (error) {
+      showToast('Failed to update entry', 'error');
+    }
+  };
+
+  const handleMoveToMealType = async (targetMealType: MealType) => {
+    if (!movingEntry) return;
+    try {
+      const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType);
+      if (result.success) {
+        updateEntry(movingEntry.id, { mealType: targetMealType });
+        showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
+        setMoveSheetVisible(false);
+        setMovingEntry(null);
+      } else {
+        showToast(result.error || 'Failed to move entry', 'error');
+      }
+    } catch (error) {
+      showToast('Failed to move entry', 'error');
+    }
   };
 
   return (
@@ -1823,6 +2230,8 @@ export default function MealsScreen() {
                     onAddFood={() => handleAddFood(section.type)}
                     onDeleteEntry={deleteEntry}
                     onToggleFavorite={toggleFavorite}
+                    onEditEntry={handleEditEntry}
+                    onMoveEntry={handleMoveEntry}
                   />
                 );
               })}
@@ -1846,6 +2255,31 @@ export default function MealsScreen() {
           onAddEntry={handleAddEntry}
           onAddManualEntry={handleAddManualEntry}
         />
+
+        {/* Edit entry sheet */}
+        <EditEntrySheet
+          visible={editSheetVisible}
+          entry={editingEntry}
+          onSave={handleSaveEdit}
+          onCancel={() => {
+            setEditSheetVisible(false);
+            setEditingEntry(null);
+          }}
+        />
+
+        {/* Move to meal sheet */}
+        {movingEntry ? (
+          <MoveToMealSheet
+            visible={moveSheetVisible}
+            currentMealType={movingEntry.mealType}
+            foodName={movingEntry.name}
+            onMove={handleMoveToMealType}
+            onCancel={() => {
+              setMoveSheetVisible(false);
+              setMovingEntry(null);
+            }}
+          />
+        ) : null}
 
         <DeleteConfirmationModal
           visible={clearConfirmVisible}

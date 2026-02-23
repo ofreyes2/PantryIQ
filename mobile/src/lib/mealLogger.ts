@@ -228,6 +228,147 @@ class MealLoggerService {
       return [];
     }
   }
+
+  /**
+   * Check for duplicate entries in today's log
+   */
+  async checkForDuplicate(newEntry: FoodEntry, mealType: MealType): Promise<(FoodEntry & { id: string }) | false> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
+      const stored = await AsyncStorage.getItem(key);
+      if (!stored) return false;
+
+      const log: (FoodEntry & { id: string })[] = JSON.parse(stored);
+      const entries = log.filter((e) => e.mealType === mealType) || [];
+      const nameLower = newEntry.name?.toLowerCase() || '';
+
+      const duplicate = entries.find((e) => {
+        const existingName = e.name?.toLowerCase() || '';
+        return existingName.includes(nameLower) || nameLower.includes(existingName);
+      });
+
+      return duplicate || false;
+    } catch (error) {
+      console.warn('[MealLogger] Error checking for duplicate:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Validate that entry has nutrition data
+   */
+  validateEntry(entry: FoodEntry): { valid: boolean; reason?: string } {
+    const hasNutrition =
+      (entry.calories > 0) || (entry.netCarbs > 0) || (entry.protein > 0);
+
+    if (!hasNutrition) {
+      return {
+        valid: false,
+        reason: 'Nutrition data appears to be missing — please verify before saving',
+      };
+    }
+    return { valid: true };
+  }
+
+  /**
+   * Move entry between meal types
+   */
+  async moveEntry(
+    entryId: string,
+    fromMealType: MealType,
+    toMealType: MealType
+  ): Promise<{ success: boolean; entry?: FoodEntry; error?: string }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
+      const stored = await AsyncStorage.getItem(key);
+
+      if (!stored) return { success: false, error: 'No meal log found' };
+
+      const entries: FoodEntry[] = JSON.parse(stored);
+      const entryIndex = entries.findIndex((e) => e.id === entryId);
+
+      if (entryIndex === -1) return { success: false, error: 'Entry not found' };
+
+      const entry = entries[entryIndex];
+      if (entry.mealType !== fromMealType) {
+        return { success: false, error: 'Entry not in source meal type' };
+      }
+
+      entry.mealType = toMealType;
+
+      entries[entryIndex] = entry;
+      await AsyncStorage.setItem(key, JSON.stringify(entries));
+
+      return { success: true, entry };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Edit entry fields
+   */
+  async editEntry(
+    entryId: string,
+    fieldsToUpdate: Partial<FoodEntry>
+  ): Promise<{ success: boolean; updatedEntry?: FoodEntry; error?: string }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
+      const stored = await AsyncStorage.getItem(key);
+
+      if (!stored) return { success: false, error: 'No meal log found' };
+
+      const entries: FoodEntry[] = JSON.parse(stored);
+      const entryIndex = entries.findIndex((e) => e.id === entryId);
+
+      if (entryIndex === -1) return { success: false, error: 'Entry not found' };
+
+      entries[entryIndex] = {
+        ...entries[entryIndex],
+        ...fieldsToUpdate,
+      };
+
+      await AsyncStorage.setItem(key, JSON.stringify(entries));
+      await this.recalculateTotals(today);
+
+      return { success: true, updatedEntry: entries[entryIndex] };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMsg };
+    }
+  }
+
+  /**
+   * Delete entry
+   */
+  async deleteEntry(entryId: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
+      const stored = await AsyncStorage.getItem(key);
+
+      if (!stored) return { success: false, error: 'No meal log found' };
+
+      const entries: FoodEntry[] = JSON.parse(stored);
+      const beforeCount = entries.length;
+      const filtered = entries.filter((e) => e.id !== entryId);
+      const afterCount = filtered.length;
+
+      if (beforeCount === afterCount) return { success: false, error: 'Entry not found' };
+
+      await AsyncStorage.setItem(key, JSON.stringify(filtered));
+      await this.recalculateTotals(today);
+
+      return { success: true, deletedCount: beforeCount - afterCount };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, error: errorMsg };
+    }
+  }
 }
 
 // Export singleton instance
