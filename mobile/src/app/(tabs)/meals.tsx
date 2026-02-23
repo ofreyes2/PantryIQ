@@ -2043,18 +2043,32 @@ export default function MealsScreen() {
     }
   };
 
-  const handleMoveToMealType = async (targetMealType: MealType) => {
+  const handleMoveToMealType = async (targetMealType: MealType, targetDate: string) => {
     if (!movingEntry) return;
     try {
-      const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType);
-      if (result.success) {
-        updateEntry(movingEntry.id, { mealType: targetMealType });
-        showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
-        setMoveSheetVisible(false);
-        setMovingEntry(null);
+      // If moving to a different date, we need to handle this differently
+      if (targetDate !== selectedDate) {
+        // Remove from current date
+        deleteEntry(movingEntry.id);
+        // Add to target date with the new meal type
+        addEntry({
+          ...movingEntry,
+          date: targetDate,
+          mealType: targetMealType,
+        });
+        showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
       } else {
-        showToast(result.error || 'Failed to move entry', 'error');
+        // Same date, just change meal type
+        const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType);
+        if (result.success) {
+          updateEntry(movingEntry.id, { mealType: targetMealType });
+          showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
+        } else {
+          showToast(result.error || 'Failed to move entry', 'error');
+        }
       }
+      setMoveSheetVisible(false);
+      setMovingEntry(null);
     } catch (error) {
       showToast('Failed to move entry', 'error');
     }
@@ -2287,6 +2301,7 @@ export default function MealsScreen() {
             visible={moveSheetVisible}
             currentMealType={movingEntry.mealType}
             foodName={movingEntry.name}
+            currentDate={selectedDate}
             onMove={handleMoveToMealType}
             onCancel={() => {
               setMoveSheetVisible(false);

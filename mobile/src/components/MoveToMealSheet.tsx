@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   Pressable,
   Modal,
+  ScrollView,
 } from 'react-native';
-import { X } from 'lucide-react-native';
+import { X, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
 import type { MealType } from '@/lib/stores/mealsStore';
 
@@ -13,7 +14,8 @@ interface MoveToMealSheetProps {
   visible: boolean;
   currentMealType: MealType;
   foodName: string;
-  onMove: (mealType: MealType) => void;
+  currentDate: string; // ISO date string (YYYY-MM-DD)
+  onMove: (mealType: MealType, targetDate: string) => void;
   onCancel: () => void;
 }
 
@@ -24,23 +26,52 @@ const MEAL_TYPES: { type: MealType; label: string; emoji: string; color: string 
   { type: 'Snacks', label: 'Snacks', emoji: '🍎', color: '#2ECC71' },
 ];
 
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function addDays(dateStr: string, days: number): string {
+  const date = new Date(dateStr + 'T00:00:00');
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
+}
+
 export function MoveToMealSheet({
   visible,
   currentMealType,
   foodName,
+  currentDate,
   onMove,
   onCancel,
 }: MoveToMealSheetProps) {
+  const [selectedDate, setSelectedDate] = useState(currentDate);
+  const [selectedMealType, setSelectedMealType] = useState<MealType | null>(null);
+
+  const handleConfirmMove = () => {
+    if (selectedMealType) {
+      onMove(selectedMealType, selectedDate);
+      setSelectedDate(currentDate);
+      setSelectedMealType(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setSelectedDate(currentDate);
+    setSelectedMealType(null);
+    onCancel();
+  };
+
   return (
     <Modal
       visible={visible}
       transparent
       animationType="slide"
       statusBarTranslucent
-      onRequestClose={onCancel}
+      onRequestClose={handleCancel}
     >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-        <Pressable style={{ flex: 1 }} onPress={onCancel} />
+        <Pressable style={{ flex: 1 }} onPress={handleCancel} />
         <View
           style={{
             backgroundColor: Colors.navyCard,
@@ -51,6 +82,7 @@ export function MoveToMealSheet({
             paddingHorizontal: 20,
             paddingTop: 16,
             paddingBottom: 40,
+            maxHeight: '80%',
           }}
         >
           {/* Header */}
@@ -70,7 +102,7 @@ export function MoveToMealSheet({
                   marginBottom: 4,
                 }}
               >
-                Move to Meal Type
+                Move Meal
               </Text>
               <Text
                 style={{
@@ -79,112 +111,234 @@ export function MoveToMealSheet({
                   color: Colors.textSecondary,
                 }}
               >
-                Moving {foodName}
+                {foodName}
               </Text>
             </View>
-            <Pressable onPress={onCancel} hitSlop={8}>
+            <Pressable onPress={handleCancel} hitSlop={8}>
               <X size={20} color={Colors.textSecondary} />
             </Pressable>
           </View>
 
-          {/* Meal Type Buttons */}
-          <View style={{ gap: 12, marginBottom: 20 }}>
-            {MEAL_TYPES.map((meal) => {
-              const isCurrent = meal.type === currentMealType;
-              return (
+          <ScrollView showsVerticalScrollIndicator={false}>
+            {/* Date Picker */}
+            <View style={{ marginBottom: 24 }}>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_600SemiBold',
+                  fontSize: 13,
+                  color: Colors.textSecondary,
+                  marginBottom: 12,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}
+              >
+                Select Date
+              </Text>
+              <View
+                style={{
+                  backgroundColor: Colors.surface,
+                  borderRadius: BorderRadius.lg,
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  paddingHorizontal: 12,
+                  paddingVertical: 12,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
                 <Pressable
-                  key={meal.type}
-                  onPress={() => !isCurrent && onMove(meal.type)}
-                  disabled={isCurrent}
+                  onPress={() => setSelectedDate(addDays(selectedDate, -1))}
+                  hitSlop={8}
+                >
+                  <ChevronLeft size={20} color={Colors.textSecondary} />
+                </Pressable>
+
+                <Text
                   style={{
-                    backgroundColor: Colors.surface,
-                    borderRadius: BorderRadius.lg,
-                    padding: 16,
-                    borderWidth: 2,
-                    borderColor: isCurrent ? Colors.green : Colors.border,
-                    opacity: isCurrent ? 0.7 : 1,
+                    fontFamily: 'DMSans_600SemiBold',
+                    fontSize: 15,
+                    color: Colors.textPrimary,
+                    flex: 1,
+                    textAlign: 'center',
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View
-                        style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: BorderRadius.md,
-                          backgroundColor: `${meal.color}20`,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text style={{ fontSize: 24 }}>{meal.emoji}</Text>
-                      </View>
-                      <View>
-                        <Text
+                  {formatDate(selectedDate)}
+                </Text>
+
+                <Pressable
+                  onPress={() => setSelectedDate(addDays(selectedDate, 1))}
+                  hitSlop={8}
+                >
+                  <ChevronRight size={20} color={Colors.textSecondary} />
+                </Pressable>
+              </View>
+              {selectedDate !== currentDate && (
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 12,
+                    color: Colors.amber,
+                    marginTop: 8,
+                    textAlign: 'center',
+                  }}
+                >
+                  Moving to {formatDate(selectedDate)}
+                </Text>
+              )}
+            </View>
+
+            {/* Meal Type Buttons */}
+            <View style={{ gap: 12, marginBottom: 20 }}>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_600SemiBold',
+                  fontSize: 13,
+                  color: Colors.textSecondary,
+                  marginBottom: 8,
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}
+              >
+                Select Meal Type
+              </Text>
+              {MEAL_TYPES.map((meal) => {
+                const isCurrent = meal.type === currentMealType && selectedDate === currentDate;
+                const isSelected = meal.type === selectedMealType;
+                return (
+                  <Pressable
+                    key={meal.type}
+                    onPress={() => setSelectedMealType(isSelected ? null : meal.type)}
+                    disabled={isCurrent}
+                    style={{
+                      backgroundColor: Colors.surface,
+                      borderRadius: BorderRadius.lg,
+                      padding: 16,
+                      borderWidth: 2,
+                      borderColor: isSelected ? Colors.amber : isCurrent ? Colors.green : Colors.border,
+                      opacity: isCurrent ? 0.7 : 1,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View
                           style={{
-                            fontFamily: 'DMSans_700Bold',
-                            fontSize: 15,
-                            color: Colors.textPrimary,
+                            width: 44,
+                            height: 44,
+                            borderRadius: BorderRadius.md,
+                            backgroundColor: `${meal.color}20`,
+                            alignItems: 'center',
+                            justifyContent: 'center',
                           }}
                         >
-                          {meal.label}
-                        </Text>
-                        {isCurrent ? (
+                          <Text style={{ fontSize: 24 }}>{meal.emoji}</Text>
+                        </View>
+                        <View>
                           <Text
                             style={{
-                              fontFamily: 'DMSans_500Medium',
-                              fontSize: 12,
-                              color: Colors.green,
-                              marginTop: 2,
+                              fontFamily: 'DMSans_700Bold',
+                              fontSize: 15,
+                              color: Colors.textPrimary,
                             }}
                           >
-                            Current
+                            {meal.label}
                           </Text>
-                        ) : null}
+                          {isCurrent ? (
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_500Medium',
+                                fontSize: 12,
+                                color: Colors.green,
+                                marginTop: 2,
+                              }}
+                            >
+                              Current
+                            </Text>
+                          ) : null}
+                        </View>
                       </View>
+                      {isCurrent ? (
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: Colors.green,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: Colors.navy }}>✓</Text>
+                        </View>
+                      ) : isSelected ? (
+                        <View
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: 10,
+                            backgroundColor: Colors.amber,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, color: Colors.navy }}>✓</Text>
+                        </View>
+                      ) : null}
                     </View>
-                    {isCurrent ? (
-                      <View
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: 10,
-                          backgroundColor: Colors.green,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, color: Colors.navy }}>✓</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </ScrollView>
 
-          {/* Cancel Button */}
-          <Pressable
-            onPress={onCancel}
-            style={{
-              backgroundColor: Colors.surface,
-              borderRadius: BorderRadius.lg,
-              paddingVertical: 12,
-              alignItems: 'center',
-              borderWidth: 1,
-              borderColor: Colors.border,
-            }}
-          >
-            <Text
+          {/* Action Buttons */}
+          <View style={{ gap: 12, marginTop: 16 }}>
+            <Pressable
+              onPress={handleConfirmMove}
+              disabled={!selectedMealType}
               style={{
-                fontFamily: 'DMSans_600SemiBold',
-                fontSize: 15,
-                color: Colors.textSecondary,
+                backgroundColor: selectedMealType ? Colors.amber : Colors.surface,
+                borderRadius: BorderRadius.lg,
+                paddingVertical: 12,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: selectedMealType ? Colors.amber : Colors.border,
+                opacity: selectedMealType ? 1 : 0.5,
               }}
             >
-              Cancel
-            </Text>
-          </Pressable>
+              <Text
+                style={{
+                  fontFamily: 'DMSans_600SemiBold',
+                  fontSize: 15,
+                  color: selectedMealType ? Colors.navy : Colors.textSecondary,
+                }}
+              >
+                Confirm Move
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleCancel}
+              style={{
+                backgroundColor: Colors.surface,
+                borderRadius: BorderRadius.lg,
+                paddingVertical: 12,
+                alignItems: 'center',
+                borderWidth: 1,
+                borderColor: Colors.border,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: 'DMSans_600SemiBold',
+                  fontSize: 15,
+                  color: Colors.textSecondary,
+                }}
+              >
+                Cancel
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
