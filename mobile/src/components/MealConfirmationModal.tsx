@@ -8,10 +8,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { X } from 'lucide-react-native';
+import { X, Heart } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import type { MealAnalysis } from '@/lib/mealAnalysis';
 import { formatNutrient } from '@/lib/mealAnalysis';
+import { useFavoritesStore } from '@/lib/stores/favoritesStore';
+import * as Haptics from 'expo-haptics';
 
 interface MealConfirmationModalProps {
   visible: boolean;
@@ -21,6 +23,7 @@ interface MealConfirmationModalProps {
   onLogAndAddMore: (mealType: 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks', date: string) => Promise<void>;
   isLoading?: boolean;
   currentDate?: string; // Optional date override, defaults to today
+  targetDate?: string; // Target date from analysis (e.g., yesterday)
 }
 
 export function MealConfirmationModal({
@@ -31,10 +34,70 @@ export function MealConfirmationModal({
   onLogAndAddMore,
   isLoading = false,
   currentDate,
+  targetDate,
 }: MealConfirmationModalProps) {
   const [selectedMealType, setSelectedMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'>('Breakfast');
-  const selectedDate = currentDate || new Date().toISOString().split('T')[0];
+  // Use targetDate from analysis/props if available, otherwise default to today
+  const selectedDate = targetDate || currentDate || new Date().toISOString().split('T')[0];
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isFavoritingLoading, setIsFavoritingLoading] = useState(false);
+
+  // Favorites store
+  const addFavorite = useFavoritesStore((s) => s.addFavorite);
+  const isFavorited = useFavoritesStore((s) => s.isFavorited);
+
+  // Generate a stable ID for this meal combination
+  const mealId = analysis ? `meal-${analysis.mealType}-${analysis.totalEstimatedCalories}` : '';
+  const isCurrentlyFavorited = mealId && isFavorited(mealId);
+
+  const handleSaveAsFavorite = async () => {
+    if (!analysis || isFavoritingLoading) return;
+
+    setIsFavoritingLoading(true);
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
+        breakfast: 'Breakfast',
+        lunch: 'Lunch',
+        dinner: 'Dinner',
+        snack: 'Snacks',
+      };
+
+      addFavorite({
+        id: mealId,
+        name: analysis.identifiedFoods
+          .map((f) => (f.quantity && f.unit ? `${f.quantity} ${f.unit} ${f.name}` : f.name))
+          .join(', '),
+        mealType: mealTypeMap[analysis.mealType] || 'Snacks',
+        foods: analysis.identifiedFoods.map((food) => ({
+          name: food.name,
+          quantity: parseFloat(food.quantity || '0') || 0,
+          unit: food.unit || '',
+          calories: food.estimatedCalories,
+          carbs: 0,
+          protein: food.estimatedProtein,
+          fat: food.estimatedFat,
+          fiber: 0,
+          netCarbs: food.estimatedNetCarbs,
+        })),
+        nutrition: {
+          calories: analysis.totalEstimatedCalories,
+          carbs: 0,
+          protein: analysis.totalEstimatedProtein,
+          fat: analysis.totalEstimatedFat,
+          fiber: 0,
+          netCarbs: analysis.totalEstimatedNetCarbs,
+        },
+        timesLogged: 0,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error saving favorite:', error);
+    } finally {
+      setIsFavoritingLoading(false);
+    }
+  };
 
   if (!analysis) {
     return null;
@@ -101,19 +164,49 @@ export function MealConfirmationModal({
                 borderBottomColor: Colors.border,
               }}
             >
-              <Text
-                style={{
-                  fontFamily: 'PlayfairDisplay_700Bold',
-                  fontSize: 18,
-                  color: Colors.textPrimary,
-                  flex: 1,
-                }}
-              >
-                Confirm Meal
-              </Text>
-              <Pressable onPress={onClose} testID="close-meal-confirmation-modal" hitSlop={8}>
-                <X size={20} color={Colors.textSecondary} />
-              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontFamily: 'PlayfairDisplay_700Bold',
+                    fontSize: 18,
+                    color: Colors.textPrimary,
+                    marginBottom: 4,
+                  }}
+                >
+                  Confirm Meal
+                </Text>
+                {/* Date label showing target date */}
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_400Regular',
+                    fontSize: 12,
+                    color: Colors.textSecondary,
+                  }}
+                >
+                  {new Date(selectedDate).toLocaleDateString('en-US', {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                <Pressable
+                  onPress={handleSaveAsFavorite}
+                  disabled={isFavoritingLoading || isLoading}
+                  testID="favorite-meal-button"
+                  hitSlop={8}
+                >
+                  <Heart
+                    size={20}
+                    color={isCurrentlyFavorited ? Colors.error : Colors.textSecondary}
+                    fill={isCurrentlyFavorited ? Colors.error : 'none'}
+                  />
+                </Pressable>
+                <Pressable onPress={onClose} testID="close-meal-confirmation-modal" hitSlop={8}>
+                  <X size={20} color={Colors.textSecondary} />
+                </Pressable>
+              </View>
             </View>
 
             <ScrollView
@@ -252,56 +345,6 @@ export function MealConfirmationModal({
                       </Text>
                     </Pressable>
                   ))}
-                </View>
-              </View>
-
-              {/* Date Picker */}
-              <View style={{ marginBottom: 20 }}>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_500Medium',
-                    fontSize: 12,
-                    color: Colors.textSecondary,
-                    marginBottom: 8,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  Date
-                </Text>
-                <View
-                  style={{
-                    backgroundColor: Colors.surface,
-                    borderRadius: BorderRadius.md,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    paddingHorizontal: 12,
-                    paddingVertical: 12,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_500Medium',
-                      fontSize: 14,
-                      color: Colors.textPrimary,
-                    }}
-                  >
-                    {new Date(selectedDate).toLocaleDateString('en-US', {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: 'DMSans_400Regular',
-                      fontSize: 12,
-                      color: Colors.textTertiary,
-                      marginTop: 4,
-                    }}
-                  >
-                    (Today)
-                  </Text>
                 </View>
               </View>
             </ScrollView>

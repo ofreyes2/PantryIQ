@@ -294,6 +294,33 @@ mobile/src/
       - `targetDate`: specific date for logging
       - `displayDate`: human-readable date format
       - Ensures date information flows through entire logging pipeline
+    - **Critical Implementation Fix**: Fixed system prompt using `${dateUtils.yesterday()}` as function call instead of actual date value
+      - Now properly shows what "yesterday" and "today" mean to Chef Claude
+      - Meals now correctly save to user-specified dates
+    - **Favorite Meals System ✅ COMPLETE**: New Zustand store for saving meal templates:
+      - `useFavoritesStore` for managing favorite meals
+      - Save meals as favorites after logging with single tap
+      - Tracks how many times each meal has been logged
+      - Retrieve favorites by meal type for quick re-logging
+      - Persists favorite meals to AsyncStorage
+    - **Favorite Button in Confirmation Modal ✅ COMPLETE**:
+      - Heart icon button in meal confirmation modal header
+      - Tap to save meal as favorite for future quick-logging
+      - Shows filled heart if meal already in favorites
+      - Haptic feedback on interaction
+      - Automatically extracts food items and nutrition data
+    - **Meal Detail Sheet Component ✅ COMPLETE**: New full-screen modal showing:
+      - Meal name, date, and meal type (e.g., "Monday, February 23 • Breakfast")
+      - Complete nutrition breakdown (calories, carbs, protein, fat, fiber, net carbs)
+      - Favorite/unfavorite toggle with heart button
+      - Edit button to modify meal details
+      - Delete button with confirmation
+      - Shows exactly what was logged and when
+    - **Success Confirmation Message ✅ COMPLETE**: After logging shows:
+      - Date and meal type clearly (e.g., "✅ Logged to Monday, February 23 • Breakfast")
+      - Location in Meals tab where meal can be found
+      - Carb budget usage feedback
+      - Any pantry items that were deducted
     - **Implementation Details**:
       - New `dateUtils.ts` library with 20+ centralized date helper functions
       - New `dailyReset.ts` with daily reset logic and streak validity checking

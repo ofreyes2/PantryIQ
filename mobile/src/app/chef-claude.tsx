@@ -117,6 +117,7 @@ function buildSystemPrompt(
   const now = new Date();
   const dayOfWeek = dateUtils.dayOfWeek();
   const timeOfDay = dateUtils.timeOfDay();
+  const yesterdayStr = dateUtils.yesterday();
   const currentTime = now.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
@@ -221,10 +222,10 @@ MEAL LOGGING PROTOCOL:
 IMPORTANT — DATE AWARENESS FOR MEAL LOGGING:
 
 CRITICAL DATE PARSING RULES:
-- "yesterday" = use ${dateUtils.yesterday()}
+- "yesterday" = use ${yesterdayStr}
 - "today" = use ${todayStr}
 - "this morning" = today if before 2pm, yesterday if after 2pm
-- "last night" = ${dateUtils.yesterday()}
+- "last night" = ${yesterdayStr}
 - "Monday" or any day name = find most recent occurrence
 - "for breakfast yesterday" = parse as yesterday's breakfast
 - "earlier today" = ${todayStr}
@@ -273,7 +274,7 @@ CRITICAL:
 - ALWAYS include targetDate in YYYY-MM-DD format
 - ALWAYS include needsDateConfirmation field
 - If unsure about meal type, ask first, THEN provide JSON
-- targetDate must match one of: today (${todayStr}), yesterday (${dateUtils.yesterday()}), or specific YYYY-MM-DD
+- targetDate must match one of: today (${todayStr}), yesterday (${yesterdayStr}), or specific YYYY-MM-DD
 
 IMPORTANT: When a user asks about logging/modifying entries, say things like:
 - For logging: "Here is what I have for your breakfast — tap the button below to save it to your log"
@@ -1929,10 +1930,11 @@ export default function ChefClaudeScreen() {
       try {
         setMealCardStates((prev) => ({ ...prev, [cardId]: 'logging' }));
 
-        // Create a modified analysis with the selected meal type
+        // Create a modified analysis with the selected meal type, preserving targetDate
         const analysisForLogging: MealAnalysis = {
           ...currentMealAnalysis,
           mealType: mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          targetDate: currentMealAnalysis.targetDate || dateUtils.today(),
         };
 
         const result = await logMealFromAnalysis(analysisForLogging);
@@ -1941,8 +1943,18 @@ export default function ChefClaudeScreen() {
           setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
           setShowMealConfirmationModal(false);
 
-          const dailyTotals = getDailyTotals(date);
-          let successMessage = `Logged! Your ${mealType.toLowerCase()} has been added. `;
+          // Use the actual targetDate from the analysis for the success message
+          const loggedDate = currentMealAnalysis.targetDate || dateUtils.today();
+          const dailyTotals = getDailyTotals(loggedDate);
+
+          // Format the date for display
+          const dateStr = new Date(loggedDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          });
+
+          let successMessage = `Logged! Your ${mealType.toLowerCase()} — ${dateStr} has been added. `;
 
           const carbsUsed = Math.round(dailyTotals.netCarbs);
           const carbGoal = userProfile.dailyCarbGoal;
@@ -2009,6 +2021,7 @@ export default function ChefClaudeScreen() {
         const analysisForLogging: MealAnalysis = {
           ...currentMealAnalysis,
           mealType: mealType.toLowerCase() as 'breakfast' | 'lunch' | 'dinner' | 'snack',
+          targetDate: currentMealAnalysis.targetDate || dateUtils.today(),
         };
 
         const result = await logMealFromAnalysis(analysisForLogging);
@@ -2016,8 +2029,18 @@ export default function ChefClaudeScreen() {
         if (result.success && result.entry) {
           setMealCardStates((prev) => ({ ...prev, [cardId]: 'success' }));
 
-          const dailyTotals = getDailyTotals(date);
-          let successMessage = `Logged! Your ${mealType.toLowerCase()} has been added. `;
+          // Use the actual targetDate from the analysis
+          const loggedDate = currentMealAnalysis.targetDate || dateUtils.today();
+          const dailyTotals = getDailyTotals(loggedDate);
+
+          // Format the date for display
+          const dateStr = new Date(loggedDate).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+          });
+
+          let successMessage = `Logged! Your ${mealType.toLowerCase()} — ${dateStr} has been added. `;
 
           const carbsUsed = Math.round(dailyTotals.netCarbs);
           const carbGoal = userProfile.dailyCarbGoal;
@@ -2424,7 +2447,7 @@ export default function ChefClaudeScreen() {
         onConfirm={handleConfirmLogMeal}
         onLogAndAddMore={handleConfirmLogAndAddMore}
         isLoading={isMealLogging}
-        currentDate={new Date().toISOString().split('T')[0]}
+        targetDate={currentMealAnalysis?.targetDate}
       />
 
       {recipeToCapture ? (
