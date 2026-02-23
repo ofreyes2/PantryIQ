@@ -276,7 +276,7 @@ export function MealEntryDetailSheet({
                 ) : null}
               </View>
 
-              {/* Nutrition Breakdown Section */}
+              {/* Food Items List Section */}
               <View
                 style={{
                   paddingHorizontal: 20,
@@ -285,135 +285,201 @@ export function MealEntryDetailSheet({
                   borderColor: Colors.border,
                 }}
               >
-                <Text
+                {/* Single food item row - Like Ready to Log format */}
+                <View
                   style={{
-                    fontFamily: 'DMSans_700Bold',
-                    fontSize: 13,
-                    color: Colors.textSecondary,
-                    marginBottom: 16,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 12,
+                    paddingBottom: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
                   }}
                 >
-                  Nutrition Breakdown
-                </Text>
-
-                {/* Vertical stack of nutrition items */}
-                <View style={{ gap: 12 }}>
-                  {nutritionItems.map((item) => (
-                    <Pressable
-                      key={item.key}
-                      onPress={() => handleNutritionEdit(item.key as string)}
+                  <View style={{ flex: 1 }}>
+                    <Text
                       style={{
-                        backgroundColor: Colors.surface,
-                        borderRadius: BorderRadius.md,
-                        paddingHorizontal: 16,
-                        paddingVertical: 14,
-                        borderWidth: editingNutrition === item.key ? 2 : 1,
-                        borderColor: editingNutrition === item.key ? Colors.green : Colors.border,
+                        fontFamily: 'DMSans_600SemiBold',
+                        fontSize: 14,
+                        color: Colors.textPrimary,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                        {/* Left: Label and value */}
-                        <View style={{ flex: 1 }}>
-                          <Text
-                            style={{
-                              fontFamily: 'DMSans_500Medium',
-                              fontSize: 12,
-                              color: Colors.textSecondary,
-                              marginBottom: 6,
-                            }}
-                          >
-                            {item.label}
-                          </Text>
-                          {editingNutrition === item.key ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <TextInput
-                                value={editValues[item.key] || ''}
-                                onChangeText={(text) =>
-                                  setEditValues({ ...editValues, [item.key]: text })
-                                }
-                                placeholder="0"
-                                placeholderTextColor={Colors.textTertiary}
-                                keyboardType="decimal-pad"
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: Colors.navyCard,
-                                  borderWidth: 1,
-                                  borderColor: Colors.border,
-                                  borderRadius: BorderRadius.sm,
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 8,
-                                  fontFamily: 'DMSans_600SemiBold',
-                                  fontSize: 14,
-                                  color: item.color,
-                                }}
-                              />
-                              <Text
-                                style={{
-                                  fontFamily: 'DMSans_500Medium',
-                                  fontSize: 12,
-                                  color: Colors.textTertiary,
-                                  minWidth: 20,
-                                }}
-                              >
-                                {item.unit}
-                              </Text>
-                              <Pressable
-                                onPress={() => handleNutritionSave(item.key as string)}
-                                style={{
-                                  backgroundColor: Colors.green,
-                                  borderRadius: BorderRadius.sm,
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 6,
-                                }}
-                              >
-                                <Text style={{ color: Colors.navy, fontSize: 11, fontWeight: '600' }}>Save</Text>
-                              </Pressable>
-                            </View>
-                          ) : (
-                            <Text
-                              style={{
-                                fontFamily: 'DMSans_700Bold',
-                                fontSize: 16,
-                                color: item.color,
-                              }}
-                            >
-                              {Math.round(item.value * 10) / 10} {item.unit}
-                            </Text>
-                          )}
-                        </View>
+                      {entry.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end', marginRight: 12 }}>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 14,
+                        color: Colors.green,
+                      }}
+                    >
+                      {Math.round(entry.calories * entry.servings)} cal
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 11,
+                        color: Colors.textSecondary,
+                        marginTop: 2,
+                      }}
+                    >
+                      {Math.round((entry.netCarbs * entry.servings) * 10) / 10}g carbs
+                    </Text>
+                  </View>
+                  <Pressable hitSlop={8}>
+                    <Edit3 size={16} color={Colors.textSecondary} />
+                  </Pressable>
+                </View>
 
-                        {/* Right: +/- buttons */}
-                        {editingNutrition !== item.key && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Pressable
-                              onPress={() => handleNutritionAdjust(item.key as string, -1)}
-                              style={{
-                                backgroundColor: Colors.navyCard,
-                                borderRadius: BorderRadius.sm,
-                                padding: 6,
-                                borderWidth: 1,
-                                borderColor: Colors.border,
-                              }}
-                            >
-                              <Minus size={16} color={Colors.textSecondary} />
-                            </Pressable>
-                            <Pressable
-                              onPress={() => handleNutritionAdjust(item.key as string, 1)}
-                              style={{
-                                backgroundColor: Colors.green,
-                                borderRadius: BorderRadius.sm,
-                                padding: 6,
-                              }}
-                            >
-                              <Plus size={16} color={Colors.navy} />
-                            </Pressable>
-                          </View>
-                        )}
-                      </View>
-                    </Pressable>
-                  ))}
+                {/* Total Row */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 16,
+                    paddingBottom: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_700Bold',
+                      fontSize: 14,
+                      color: Colors.textPrimary,
+                    }}
+                  >
+                    Total
+                  </Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 14,
+                        color: Colors.green,
+                      }}
+                    >
+                      {Math.round(entry.calories * entry.servings)} cal
+                    </Text>
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_700Bold',
+                        fontSize: 14,
+                        color: Colors.green,
+                        marginTop: 2,
+                      }}
+                    >
+                      {Math.round((entry.netCarbs * entry.servings) * 10) / 10}g net carbs
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Nutrition Summary Card */}
+                <View
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderRadius: BorderRadius.lg,
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                    marginBottom: 16,
+                  }}
+                >
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_500Medium',
+                          fontSize: 12,
+                          color: Colors.textSecondary,
+                        }}
+                      >
+                        Protein
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_600SemiBold',
+                          fontSize: 12,
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {Math.round((entry.protein * entry.servings) * 10) / 10}g
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_500Medium',
+                          fontSize: 12,
+                          color: Colors.textSecondary,
+                        }}
+                      >
+                        Fat
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_600SemiBold',
+                          fontSize: 12,
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {Math.round((entry.fat * entry.servings) * 10) / 10}g
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_500Medium',
+                          fontSize: 12,
+                          color: Colors.textSecondary,
+                        }}
+                      >
+                        Fiber
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_600SemiBold',
+                          fontSize: 12,
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {Math.round((entry.fiber * entry.servings) * 10) / 10}g
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_500Medium',
+                          fontSize: 12,
+                          color: Colors.textSecondary,
+                        }}
+                      >
+                        Sugar
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'DMSans_600SemiBold',
+                          fontSize: 12,
+                          color: Colors.textPrimary,
+                        }}
+                      >
+                        {Math.round(((entry.carbs - entry.fiber) * entry.servings) * 10) / 10}g
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
 
@@ -521,7 +587,6 @@ export function MealEntryDetailSheet({
                       gap: 8,
                     }}
                   >
-                    <Edit3 size={16} color="#fff" />
                     <Text
                       style={{
                         fontFamily: 'DMSans_600SemiBold',
@@ -529,7 +594,7 @@ export function MealEntryDetailSheet({
                         color: '#fff',
                       }}
                     >
-                      Edit Entry
+                      Save Changes
                     </Text>
                   </Pressable>
                 ) : null}
@@ -544,7 +609,7 @@ export function MealEntryDetailSheet({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: Colors.navyCard,
+                      backgroundColor: 'transparent',
                       borderWidth: 1,
                       borderColor: Colors.border,
                       borderRadius: BorderRadius.lg,
@@ -552,7 +617,6 @@ export function MealEntryDetailSheet({
                       gap: 8,
                     }}
                   >
-                    <Move size={16} color={Colors.textSecondary} />
                     <Text
                       style={{
                         fontFamily: 'DMSans_600SemiBold',
@@ -575,15 +639,12 @@ export function MealEntryDetailSheet({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: 'rgba(231,76,60,0.15)',
-                      borderWidth: 1,
-                      borderColor: 'rgba(231,76,60,0.3)',
+                      backgroundColor: 'transparent',
                       borderRadius: BorderRadius.lg,
                       paddingVertical: 12,
                       gap: 8,
                     }}
                   >
-                    <Trash2 size={16} color={Colors.error} />
                     <Text
                       style={{
                         fontFamily: 'DMSans_600SemiBold',
@@ -591,7 +652,7 @@ export function MealEntryDetailSheet({
                         color: Colors.error,
                       }}
                     >
-                      Delete Entry
+                      Delete This Entry
                     </Text>
                   </Pressable>
                 ) : null}
