@@ -2338,6 +2338,14 @@ export default function MealsScreen() {
               handleMoveEntry(detailEntry);
             }
           }}
+          onUpdateNutrition={(entryId, updates) => {
+            updateEntry(entryId, updates);
+            // Update the detail entry so the sheet reflects changes immediately
+            if (detailEntry) {
+              setDetailEntry({ ...detailEntry, ...updates });
+            }
+            showToast('Nutrition updated', 'success');
+          }}
         />
 
         <DeleteConfirmationModal
