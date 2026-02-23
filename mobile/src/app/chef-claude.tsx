@@ -31,6 +31,7 @@ import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { useChefPreferencesStore } from '@/lib/stores/chefPreferencesStore';
+import { dateUtils } from '@/lib/dateUtils';
 import {
   detectExplorationTrigger,
   extractFoodsFromMessage,
@@ -112,6 +113,15 @@ function buildSystemPrompt(
     userProfile?.customPersonality ?? null
   );
 
+  // Get current date and time context
+  const now = new Date();
+  const dayOfWeek = dateUtils.dayOfWeek();
+  const timeOfDay = dateUtils.timeOfDay();
+  const currentTime = now.toLocaleTimeString('en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
   const expiringItems = pantryItems.filter((item) => {
     if (!item.expiryDate) return false;
     const expiry = new Date(item.expiryDate);
@@ -135,7 +145,11 @@ function buildSystemPrompt(
 
   return `${personalityInstructions}
 
-Today's date: ${todayStr}
+CURRENT DATE AND TIME CONTEXT:
+- Today: ${dayOfWeek}, ${todayStr}
+- Current time: ${currentTime}
+- Time of day: ${timeOfDay}
+
 User name: ${userProfile.name || 'there'}
 
 HEALTH GOALS:
@@ -204,6 +218,13 @@ When suggesting any recipe, always include:
 - Difficulty rating: ⭐ (1) to ⭐⭐⭐⭐⭐ (5)
 
 MEAL LOGGING PROTOCOL:
+IMPORTANT — DATE AWARENESS FOR MEAL LOGGING:
+- When user describes food TODAY → log to today's log (${todayStr})
+- When user says "yesterday" → log to yesterday (${dateUtils.yesterday()})
+- When user mentions a past date → ask which date they mean
+- ALWAYS verify which date/time they're logging to if there is any ambiguity
+- Never confuse today's entries with previous days
+
 YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
 1. Write friendly response about the food they ate
 2. COPY AND PASTE THIS EXACT JSON BLOCK AT THE END (replace example numbers with real data)
@@ -834,16 +855,14 @@ export default function ChefClaudeScreen() {
   const [duplicateEntry, setDuplicateEntry] = useState<FoodEntry & { id: string } | null>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = dateUtils.today();
   const todayEntries = getEntriesForDate(todayStr);
   const dailyTotals = getDailyTotals(todayStr);
 
   // Get recent meals and favorites for quick log sheet
   const allEntries = useMealsStore((s) => s.entries);
   const recentMeals = useMemo(() => {
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .split('T')[0];
+    const sevenDaysAgo = dateUtils.daysAgo(7);
     return allEntries
       .filter((m) => m.date >= sevenDaysAgo && !m.isFavorite)
       .slice(-5)
@@ -863,7 +882,7 @@ export default function ChefClaudeScreen() {
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = dateUtils.today();
     const todayEntries = getEntriesForDate(todayStr);
     const personalityMode: string = userProfile?.personalityMode ?? 'default';
 
@@ -1367,7 +1386,7 @@ export default function ChefClaudeScreen() {
       try {
         setIsMealLogging(true);
 
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = dateUtils.today();
         const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
           breakfast: 'Breakfast',
           lunch: 'Lunch',

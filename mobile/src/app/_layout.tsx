@@ -2,7 +2,8 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { AppState, View } from 'react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -27,6 +28,8 @@ import { hydrateRecipesStore } from '@/lib/stores/recipesStore';
 import { hydrateKitchenStore } from '@/lib/stores/kitchenStore';
 import { hydrateKitchenMapStore } from '@/lib/stores/kitchenMapStore';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { checkAndHandleDailyReset } from '@/lib/dailyReset';
+import { NewDayGreeting } from '@/components/NewDayGreeting';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,8 +37,39 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const onboardingComplete = useAppStore((s) => s.onboardingComplete);
+  const userName = useAppStore((s) => s.userProfile.name);
   const router = useRouter();
   const segments = useSegments();
+  const [showGreeting, setShowGreeting] = useState(false);
+  const [greetingData, setGreetingData] = useState<any>(null);
+
+  // Handle daily reset on app focus (background to foreground)
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        checkAndHandleDailyReset().then((result) => {
+          if (result.showGreeting && onboardingComplete) {
+            setGreetingData(result);
+            setShowGreeting(true);
+          }
+        });
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [onboardingComplete]);
+
+  // Initial daily reset check on mount
+  useEffect(() => {
+    checkAndHandleDailyReset().then((result) => {
+      if (result.showGreeting && onboardingComplete) {
+        setGreetingData(result);
+        setShowGreeting(true);
+      }
+    });
+  }, [onboardingComplete]);
 
   useEffect(() => {
     const inOnboarding = (segments as string[])[0] === 'onboarding';
@@ -75,6 +109,13 @@ function RootLayoutNav() {
         <Stack.Screen name="macro-calculator" options={{ headerShown: false }} />
         <Stack.Screen name="meal-type-detail" options={{ headerShown: false }} />
       </Stack>
+      {showGreeting ? (
+        <NewDayGreeting
+          userName={userName}
+          yesterdayTotals={greetingData?.yesterdayTotals}
+          onDismiss={() => setShowGreeting(false)}
+        />
+      ) : null}
     </ThemeProvider>
   );
 }

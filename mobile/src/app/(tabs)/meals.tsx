@@ -25,7 +25,8 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { dateUtils } from '@/lib/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -120,31 +121,6 @@ const MEAL_SECTIONS: MealSection[] = [
   { type: 'Dinner', label: 'Dinner', icon: '🌙', color: '#9B59B6' },
   { type: 'Snacks', label: 'Snacks', icon: '🍎', color: '#2ECC71' },
 ];
-
-// ─── Helper functions ─────────────────────────────────────────────────────────
-function formatDate(d: Date): string {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (d.toDateString() === today.toDateString()) return 'Today';
-  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-  if (d.toDateString() === tomorrow.toDateString()) return 'Tomorrow';
-
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
-
-function toDateStr(d: Date): string {
-  return d.toISOString().split('T')[0];
-}
-
-function addDays(d: Date, n: number): Date {
-  const result = new Date(d);
-  result.setDate(result.getDate() + n);
-  return result;
-}
 
 // ─── Circular Progress Ring ───────────────────────────────────────────────────
 function CircularProgress({ size, strokeWidth, progress, color, bg }: {
@@ -924,23 +900,22 @@ function MealSectionCard({
 }
 
 // ─── Weekly Bar Chart ─────────────────────────────────────────────────────────
-function WeeklyChart({ currentDate }: { currentDate: Date }) {
+function WeeklyChart({ selectedDate }: { selectedDate: string }) {
   const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
   const calorieGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
 
   const days = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(currentDate, i - 6);
-    return { date: d, str: toDateStr(d) };
+    const str = dateUtils.daysAgo(6 - i);
+    return { dateStr: str };
   });
 
   const dayData = days.map((d) => {
-    const totals = getDailyTotals(d.str);
+    const totals = getDailyTotals(d.dateStr);
     return { ...d, calories: totals.calories, netCarbs: totals.netCarbs };
   });
 
   const maxCal = Math.max(...dayData.map((d) => d.calories), calorieGoal);
-  const todayStr = toDateStr(currentDate);
   const avgCal = Math.round(dayData.reduce((s, d) => s + d.calories, 0) / 7);
   const avgCarbs = Math.round(dayData.reduce((s, d) => s + d.netCarbs, 0) / 7);
   const bestDay = dayData.reduce((best, d) => (d.calories > best.calories ? d : best), dayData[0]);
@@ -964,14 +939,14 @@ function WeeklyChart({ currentDate }: { currentDate: Date }) {
       {/* Bar chart */}
       <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 100, gap: 4 }}>
         {dayData.map((d) => {
-          const isToday = d.str === todayStr;
-          const isBest = d.str === bestDay.str && bestDay.calories > 0;
+          const isToday = dateUtils.isToday(d.dateStr);
+          const isBest = d.dateStr === bestDay.dateStr && bestDay.calories > 0;
           const barH = maxCal > 0 ? Math.max(4, (d.calories / maxCal) * 80) : 4;
           const carbH = maxCal > 0 ? Math.max(2, (d.netCarbs / (carbGoal * 2)) * 80) : 2;
-          const dayLabel = d.date.toLocaleDateString('en-US', { weekday: 'narrow' });
+          const dayLabel = new Date(d.dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'narrow' });
 
           return (
-            <View key={d.str} style={{ flex: 1, alignItems: 'center' }}>
+            <View key={d.dateStr} style={{ flex: 1, alignItems: 'center' }}>
               {isBest ? (
                 <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 8, color: Colors.green, marginBottom: 2 }}>
                   BEST
@@ -1939,7 +1914,7 @@ function EmptyDayState({ onQuickAdd, selectedMeal }: {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function MealsScreen() {
-  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<string>(dateUtils.today());
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
   const [addFoodModalVisible, setAddFoodModalVisible] = useState(false);
   const [activeMealType, setActiveMealType] = useState<MealType>('Breakfast');
@@ -1960,19 +1935,28 @@ export default function MealsScreen() {
   const calorieGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
 
-  const dateStr = toDateStr(currentDate);
-  const entries = getEntriesForDate(dateStr);
+  // Reset to today whenever the Meals tab is focused
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedDate(dateUtils.today());
+    }, [])
+  );
+
+  const entries = getEntriesForDate(selectedDate);
   const totalCal = entries.reduce((s, e) => s + e.calories * e.servings, 0);
   const totalNetCarbs = entries.reduce((s, e) => s + e.netCarbs * e.servings, 0);
   const hasEntries = entries.length > 0;
 
-  const isToday = toDateStr(currentDate) === toDateStr(new Date());
+  const isToday = dateUtils.isToday(selectedDate);
 
   const navigateDay = (dir: -1 | 1) => {
-    setCurrentDate((d) => addDays(d, dir));
+    const newDate = dir === -1
+      ? dateUtils.daysAgo(dateUtils.daysDifference(dateUtils.today(), selectedDate) - 1)
+      : dateUtils.daysFromNow(dateUtils.daysDifference(selectedDate, dateUtils.today()) + 1);
+    setSelectedDate(newDate);
   };
 
-  const goToToday = () => setCurrentDate(new Date());
+  const goToToday = () => setSelectedDate(dateUtils.today());
 
   const handleAddFood = (mealType: MealType) => {
     setActiveMealType(mealType);
@@ -1984,7 +1968,7 @@ export default function MealsScreen() {
       name: food.name,
       brand: food.brand !== 'Generic' ? food.brand : undefined,
       mealType: activeMealType,
-      date: dateStr,
+      date: selectedDate,
       servings,
       calories: food.caloriesPerServing,
       carbs: food.carbsPerServing,
@@ -2000,7 +1984,7 @@ export default function MealsScreen() {
     addEntry({
       ...entry,
       mealType,
-      date: dateStr,
+      date: selectedDate,
     });
     showToast(`${entry.name} added to ${mealType}`, 'success');
   };
@@ -2010,11 +1994,11 @@ export default function MealsScreen() {
     setAddFoodModalVisible(true);
   };
 
-  const dateLabel = formatDate(currentDate);
-  const fullDateLabel = currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateLabel = dateUtils.displayLabel(selectedDate);
+  const fullDateLabel = new Date(selectedDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   const handleClearMeals = () => {
-    clearMeals(dateStr);
+    clearMeals(selectedDate);
     setClearConfirmVisible(false);
     const dateName = isToday ? "today's" : 'that day\'s';
     showToast(`${dateName} meal log cleared`, 'success');
@@ -2137,48 +2121,50 @@ export default function MealsScreen() {
             </Pressable>
 
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.textPrimary }}>
+              <Text style={{ fontFamily: 'PlayfairDisplay_700Bold', fontSize: 20, color: Colors.green, marginBottom: 2 }}>
                 {dateLabel}
               </Text>
-              {dateLabel === 'Today' ? null : (
-                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 11, color: Colors.textTertiary }}>
+              {!dateUtils.isToday(selectedDate) && (
+                <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
                   {fullDateLabel}
                 </Text>
               )}
             </View>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {!isToday && (
-                <Pressable
-                  onPress={goToToday}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: BorderRadius.full,
-                    backgroundColor: Colors.greenMuted,
-                    borderWidth: 1,
-                    borderColor: `${Colors.green}40`,
-                  }}
-                  testID="today-pill"
-                >
-                  <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: Colors.green }}>Today</Text>
-                </Pressable>
-              )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable
+                onPress={goToToday}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: BorderRadius.full,
+                  backgroundColor: isToday ? Colors.greenMuted : Colors.surface,
+                  borderWidth: 1,
+                  borderColor: isToday ? `${Colors.green}40` : Colors.border,
+                }}
+                testID="today-btn"
+              >
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: isToday ? Colors.green : Colors.textSecondary }}>
+                  Today
+                </Text>
+              </Pressable>
               <Pressable
                 onPress={() => navigateDay(1)}
+                disabled={isToday}
                 style={{
                   width: 32,
                   height: 32,
                   borderRadius: 16,
-                  backgroundColor: Colors.surface,
+                  backgroundColor: isToday ? Colors.surfaceLight : Colors.surface,
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
                   borderColor: Colors.border,
+                  opacity: isToday ? 0.4 : 1,
                 }}
                 testID="next-day-btn"
               >
-                <ChevronRight size={16} color={Colors.textSecondary} />
+                <ChevronRight size={16} color={isToday ? Colors.textTertiary : Colors.textSecondary} />
               </Pressable>
             </View>
           </View>
@@ -2221,7 +2207,7 @@ export default function MealsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {viewMode === 'week' ? (
-            <WeeklyChart currentDate={currentDate} />
+            <WeeklyChart selectedDate={selectedDate} />
           ) : (
             <>
               {!hasEntries && (
@@ -2243,19 +2229,19 @@ export default function MealsScreen() {
                     onToggleFavorite={toggleFavorite}
                     onEditEntry={handleEditEntry}
                     onMoveEntry={handleMoveEntry}
-                    dateStr={dateStr}
+                    dateStr={selectedDate}
                   />
                 );
               })}
 
               {/* Claude coaching card */}
-              <ClaudeCoachingCard dateStr={dateStr} entries={entries} />
+              <ClaudeCoachingCard dateStr={selectedDate} entries={entries} />
             </>
           )}
         </ScrollView>
 
         {/* Bottom summary card */}
-        <DailySummaryCard dateStr={dateStr} />
+        <DailySummaryCard dateStr={selectedDate} />
 
         {/* Add food modal */}
         <AddFoodModal

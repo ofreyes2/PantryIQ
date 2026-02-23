@@ -230,6 +230,23 @@ mobile/src/
       - ✅ Dark blue visual theme when voice mode active ("JARVIS — ONLINE" header)
       - ✅ Haptic feedback and button highlighting for voice mode toggle
       - ✅ Works with any personality mode, designed specifically for JARVIS character
+  - **CRITICAL FIX ✅ COMPLETE**: Daily Reset and Date Awareness System
+    - **Part 1 - Daily Reset on App Open**: Detects new day on app start and background/foreground transitions, initializes fresh meal logs and daily totals for today, preserves yesterday's data for history
+    - **Part 2 - New Day Greeting Card**: Displays morning/afternoon/evening greeting with yesterday's summary and today's goals, auto-dismisses after 4 seconds or on user tap
+    - **Part 3 - Date Navigation in Meals Tab**: Defaults to today on tab open, large centered date display (Today/Yesterday/Full date), left/right arrows for date navigation (right arrow disabled on today), "Today" button always visible to jump back to today from any past date
+    - **Part 4 - Meals Tab Today Empty State**: Shows clean empty state for each meal section (Breakfast, Lunch, Dinner, Snacks) when no entries exist, with time-appropriate messaging and quick add buttons
+    - **Part 5 - Chef Claude Date Awareness**: System prompt includes current date, time of day, and yesterday's log reference, never confuses dates when logging meals, confirms date context if ambiguous
+    - **Part 6 - Dashboard Daily Reset Display**: Nutrition rings reset to zero every new day, only show today's data, Dashboard always shows today's date, never carries over previous day data
+    - **Part 7 - Date-Based Storage**: All data stored with consistent YYYY-MM-DD date keys, utility functions for consistent date handling throughout app, prevents yesterday's data bleeding into today
+    - **Part 8 - History Access for Past Dates**: Calendar navigation to view any past date, left/right arrows for day-by-day navigation, past date visual treatment (dimmed interface, subtle Past Date banner), all past dates fully editable with changes updating correctly
+    - **Implementation Details**:
+      - New `dateUtils.ts` library with 20+ centralized date helper functions
+      - New `dailyReset.ts` with daily reset logic and streak validity checking
+      - `NewDayGreeting` component that displays on app open when new day detected
+      - Updated `_layout.tsx` with AppState listener for background/foreground transitions
+      - Meals tab now uses `useFocusEffect` hook to reset to today on tab open
+      - Chef Claude system prompt updated with date/time context
+      - Dashboard now pulls real today's data from meals store instead of mocks
   - **Feature 7 ✅ IN PROGRESS**: Accessibility Improvements — AccessibilityInfo integration, WCAG AA contrast checking, screen reader utilities, semantic HTML for accessibility
   - **Feature 5 IN PROGRESS**: UI Consistency Audit — Reviewing and standardizing typography, colors, spacing, component styles across entire app
   - **Feature 6 PENDING**: Onboarding Polish — Splash screen animation, onboarding illustrations, progress indicators, first-use tooltips, empty state designs

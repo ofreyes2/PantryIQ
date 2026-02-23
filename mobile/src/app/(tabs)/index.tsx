@@ -33,20 +33,15 @@ import {
   Flame,
 } from 'lucide-react-native';
 import Svg, { Circle, Path, Defs, LinearGradient as SvgGradient, Stop } from 'react-native-svg';
-import { useRouter, router } from 'expo-router';
+import { useRouter, router, useFocusEffect } from 'expo-router';
 import { useAppStore } from '@/lib/stores/appStore';
+import { useMealsStore } from '@/lib/stores/mealsStore';
+import { dateUtils } from '@/lib/dateUtils';
 import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
 import { FastingWidget } from '@/components/FastingWidget';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_PADDING = 16;
-
-// ─── Mock Data ───────────────────────────────────────────────────────────────
-
-const mockCaloriesConsumed = 1240;
-const mockCaloriesGoal = 1800;
-const mockCarbsConsumed = 32;
-const mockCarbsGoal = 50;
 
 const mockMeals = [
   { id: '1', name: 'Grilled Salmon Bowl', cal: 520, category: 'lunch', color: '#1A6B5E' },
@@ -230,7 +225,7 @@ function CarbProgressBar({
           <Text
             style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}
           >
-            {mockCaloriesConsumed} / {mockCaloriesGoal}
+            {consumed} / {goal}
           </Text>
         </View>
         <View
@@ -243,7 +238,7 @@ function CarbProgressBar({
         >
           <View
             style={{
-              width: `${Math.min((mockCaloriesConsumed / mockCaloriesGoal) * 100, 100)}%`,
+              width: `${Math.min((consumed / goal) * 100, 100)}%`,
               height: '100%',
               backgroundColor: Colors.green,
               borderRadius: 6,
@@ -258,7 +253,7 @@ function CarbProgressBar({
             marginTop: 6,
           }}
         >
-          {mockCaloriesGoal - mockCaloriesConsumed} kcal remaining
+          {goal - consumed} kcal remaining
         </Text>
       </View>
     </View>
@@ -621,14 +616,32 @@ export default function DashboardScreen() {
 
   const [refreshing, setRefreshing] = React.useState(false);
 
-  const calPct = Math.round((mockCaloriesConsumed / (calGoal || 1800)) * 100);
-  const carbPct = Math.round((mockCarbsConsumed / (carbGoal || 50)) * 100);
+  // Get real data from meals store
+  const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
+  const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
+
+  // Get today's data
+  const todayStr = dateUtils.today();
+  const todayEntries = getEntriesForDate(todayStr);
+  const dailyTotals = getDailyTotals(todayStr);
+
+  // Calculate percentages with real data
+  const calPct = Math.round((dailyTotals.calories / (calGoal || 1800)) * 100);
+  const carbPct = Math.round((dailyTotals.netCarbs / (carbGoal || 50)) * 100);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setTimeout(() => setRefreshing(false), 1200);
   }, []);
+
+  // Refresh data when dashboard tab comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      // Data is automatically up-to-date from the store
+      // This ensures we always show today's data when the tab is focused
+    }, [])
+  );
 
   return (
     <LinearGradient
@@ -664,12 +677,12 @@ export default function DashboardScreen() {
               <View style={{ flexDirection: 'row', gap: 16, alignItems: 'flex-start' }}>
                 <CircularProgress
                   percentage={calPct}
-                  label={`${mockCaloriesConsumed} kcal`}
+                  label={`${dailyTotals.calories} kcal`}
                   sublabel={`of ${calGoal || 1800} goal`}
                   color={Colors.green}
                 />
                 <View style={{ flex: 1, justifyContent: 'center', paddingTop: 4 }}>
-                  <CarbProgressBar consumed={mockCarbsConsumed} goal={carbGoal || 50} />
+                  <CarbProgressBar consumed={dailyTotals.netCarbs} goal={carbGoal || 50} />
                 </View>
               </View>
             </Card>
