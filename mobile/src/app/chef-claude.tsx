@@ -1131,8 +1131,11 @@ export default function ChefClaudeScreen() {
             mealData.isPendingMove = true;
           } else if (mealData.action === 'edit' && mealData.editAction) {
             mealData.isPendingEdit = true;
-          } else if (mealData.action === 'delete' && mealData.deleteAction) {
-            mealData.isPendingDelete = true;
+          } else if (mealData.action === 'delete') {
+            // For delete actions, either deleteAction or deleteAll indicates a delete operation
+            if (mealData.deleteAction || mealData.deleteAll || mealData.entriesToDelete) {
+              mealData.isPendingDelete = true;
+            }
           }
 
           // Preserve additionalActions if present
@@ -1377,6 +1380,7 @@ export default function ChefClaudeScreen() {
       const entries = getEntriesForDate(today);
       const deleteEntry = useMealsStore.getState().deleteEntry;
       const updateEntry = useMealsStore.getState().updateEntry;
+      const allEntries = useMealsStore.getState().entries;
 
       try {
         if (mealData.action === 'move' && mealData.moveAction) {
@@ -1453,15 +1457,26 @@ export default function ChefClaudeScreen() {
           };
         }
 
-        if (mealData.action === 'delete' && mealData.deleteAction) {
-          const { searchTerm, mealType } = mealData.deleteAction;
+        if (mealData.action === 'delete' && (mealData.deleteAction || mealData.searchTerm)) {
+          const searchTerm = mealData.deleteAction?.searchTerm || mealData.searchTerm;
+          const mealType = mealData.deleteAction?.mealType || mealData.mealType;
 
-          // Find matching entry
-          const entry = entries.find(
+          // Search across ALL entries (not just today) to find the entry to delete
+          // This allows users to delete from any date
+          let entry = allEntries.find(
             (e) =>
               e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
               e.mealType === mealType
           );
+
+          // If not found in all entries, try today's entries as fallback
+          if (!entry) {
+            entry = entries.find(
+              (e) =>
+                e.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+                e.mealType === mealType
+            );
+          }
 
           if (!entry) {
             return {
@@ -1751,6 +1766,12 @@ export default function ChefClaudeScreen() {
               entryName = mealData.editAction.searchTerm;
             } else if (mealData.deleteAction) {
               entryName = mealData.deleteAction.searchTerm;
+            } else if (mealData.deleteAll) {
+              // For deleteAll, show that we're deleting all entries
+              entryName = `All ${mealData.mealType} entries`;
+            } else if (mealData.entriesToDelete && mealData.entriesToDelete.length > 0) {
+              // For specific entries to delete
+              entryName = mealData.entriesToDelete.map((e: any) => e.name).join(', ');
             }
 
             mealUpdateAction = {
@@ -1758,7 +1779,7 @@ export default function ChefClaudeScreen() {
               pending: true,
               details: {
                 entryName,
-                fromMealType: mealData.moveAction?.fromMealType || mealData.deleteAction?.mealType,
+                fromMealType: mealData.moveAction?.fromMealType || mealData.deleteAction?.mealType || mealData.mealType,
                 toMealType: mealData.moveAction?.toMealType,
                 changedFields: mealData.editAction ? Object.keys(mealData.editAction.fieldsToUpdate || {}) : undefined,
               },
@@ -1918,7 +1939,57 @@ export default function ChefClaudeScreen() {
       setMealUpdateCardError('');
 
       try {
-        // Construct the meal data object from the action
+        // Special handling for bulk delete operations (deleteAll)
+        if (mealUpdateAction.type === 'delete' && mealUpdateAction.details.entryName.toLowerCase().includes('all')) {
+          // This is a deleteAll operation
+          const mealType = mealUpdateAction.details.fromMealType;
+
+          if (!mealType) {
+            setMealUpdateCardState('failure');
+            setMealUpdateCardError('Meal type not specified');
+            return;
+          }
+
+          const deleteEntry = useMealsStore.getState().deleteEntry;
+          const entries = useMealsStore.getState().entries;
+
+          // Get all entries of this meal type
+          const relevantEntries = entries.filter((e) => e.mealType === mealType);
+
+          if (relevantEntries.length === 0) {
+            setMealUpdateCardState('failure');
+            setMealUpdateCardError(`No ${mealType} entries found to delete`);
+            return;
+          }
+
+          let deletedCount = 0;
+          for (const entry of relevantEntries) {
+            try {
+              deleteEntry(entry.id);
+              deletedCount++;
+            } catch (e) {
+              console.warn('Failed to delete entry:', entry.id, e);
+            }
+          }
+
+          setMealUpdateCardState('success');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          const successMsg: Message = {
+            id: `msg-${Date.now()}-success`,
+            role: 'assistant',
+            content: `Successfully removed ${deletedCount} ${mealType.toLowerCase()} ${deletedCount === 1 ? 'entry' : 'entries'} from your log.`,
+            timestamp: new Date(),
+          };
+
+          setTimeout(() => {
+            setMessages((prev) => [...prev, successMsg]);
+            setMealUpdateCardState('pending');
+          }, 500);
+          return;
+        }
+
+        // Regular single-entry update (move/edit/delete specific entry)
         const mealData = {
           action: mealUpdateAction.type,
           moveAction: mealUpdateAction.type === 'move' ? {

@@ -321,6 +321,13 @@ mobile/src/
       - Location in Meals tab where meal can be found
       - Carb budget usage feedback
       - Any pantry items that were deducted
+    - **Delete Operations ✅ COMPLETE**: Chef Claude can now properly delete meal entries:
+      - Detects delete actions with `deleteAll` and `entriesToDelete` formats
+      - Searches across all dates (not just today)
+      - Shows confirmation card before deleting with clear message
+      - Handles bulk deletes (all entries of a meal type) or specific entries
+      - Actually removes entries from store (not just logging empty meals)
+      - Shows success message with count of deleted entries and calories/carbs removed
     - **Implementation Details**:
       - New `dateUtils.ts` library with 20+ centralized date helper functions
       - New `dailyReset.ts` with daily reset logic and streak validity checking
