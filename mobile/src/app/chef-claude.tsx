@@ -74,6 +74,7 @@ interface Message {
       toMealType?: string;
       changedFields?: string[];
     };
+    additionalActions?: any[]; // Additional operations like delete duplicates
   };
 }
 
@@ -435,6 +436,7 @@ function MessageBubble({
           isLoading={isMealLogging}
           status={cardStatus === 'logging' ? 'loading' : cardStatus === 'success' ? 'success' : cardStatus === 'failure' ? 'failure' : 'pending'}
           errorMessage={cardError}
+          additionalActions={message.mealUpdateAction.additionalActions}
         />
       </View>
     );
@@ -1133,6 +1135,11 @@ export default function ChefClaudeScreen() {
             mealData.isPendingDelete = true;
           }
 
+          // Preserve additionalActions if present
+          if (mealData.additionalActions && Array.isArray(mealData.additionalActions)) {
+            console.log('✅ Found additionalActions:', mealData.additionalActions);
+          }
+
           return { displayText, mealData };
         } catch (parseError) {
           console.warn('❌ Failed to parse meal data from Claude response:', parseError, 'Raw match:', mealDataMatch[1]);
@@ -1309,6 +1316,57 @@ export default function ChefClaudeScreen() {
     []
   );
 
+  /**
+   * Delete duplicate meal entries
+   */
+  const handleDeleteDuplicates = useCallback(
+    async (date: string, mealType: string, deleteCount: number): Promise<{ success: boolean; message: string }> => {
+      try {
+        const entries = getEntriesForDate(date);
+        const deleteEntry = useMealsStore.getState().deleteEntry;
+
+        // Get all entries for this date/meal type
+        const relevantEntries = entries.filter(
+          (e) => e.mealType === mealType
+        );
+
+        if (relevantEntries.length === 0) {
+          return {
+            success: false,
+            message: `No ${mealType} entries found on this date to delete`,
+          };
+        }
+
+        // Sort by creation time (newest first/by ID) so we delete the most recent duplicates
+        const entriesToDelete = relevantEntries
+          .sort((a, b) => b.id.localeCompare(a.id))
+          .slice(0, Math.min(deleteCount, relevantEntries.length - 1)); // Keep at least 1 entry
+
+        // Delete each entry
+        let deletedCount = 0;
+        for (const entry of entriesToDelete) {
+          try {
+            deleteEntry(entry.id);
+            deletedCount++;
+          } catch (e) {
+            console.warn('Failed to delete entry:', entry.id, e);
+          }
+        }
+
+        return {
+          success: deletedCount > 0,
+          message: `Deleted ${deletedCount} duplicate ${deletedCount === 1 ? 'entry' : 'entries'}`,
+        };
+      } catch (error) {
+        console.error('Error deleting duplicates:', error);
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to delete duplicates',
+        };
+      }
+    },
+    [getEntriesForDate]
+  );
 
   /**
    * Handle move/edit/delete operations
@@ -1704,6 +1762,7 @@ export default function ChefClaudeScreen() {
                 toMealType: mealData.moveAction?.toMealType,
                 changedFields: mealData.editAction ? Object.keys(mealData.editAction.fieldsToUpdate || {}) : undefined,
               },
+              additionalActions: mealData.additionalActions, // Include additional actions (like delete duplicates)
             };
           } else {
             // Regular meal logging
@@ -1881,14 +1940,32 @@ export default function ChefClaudeScreen() {
         const result = await handleMealUpdate(mealData);
 
         if (result.success) {
+          // Process additional actions (like delete duplicates)
+          let additionalActionsMessages = '';
+          if (mealUpdateAction.additionalActions && mealUpdateAction.additionalActions.length > 0) {
+            for (const additionalAction of mealUpdateAction.additionalActions) {
+              if (additionalAction.action === 'delete') {
+                const deleteResult = await handleDeleteDuplicates(
+                  additionalAction.targetDate || new Date().toISOString().split('T')[0],
+                  additionalAction.mealType || mealUpdateAction.details.fromMealType || 'unknown',
+                  additionalAction.deleteCount || 1
+                );
+                if (deleteResult.success) {
+                  additionalActionsMessages += ` ${deleteResult.message}`;
+                  console.log('Deleted duplicates:', deleteResult.message);
+                }
+              }
+            }
+          }
+
           setMealUpdateCardState('success');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-          // Add success message
+          // Add success message with both main action and additional actions
           const successMsg: Message = {
             id: `msg-${Date.now()}-success`,
             role: 'assistant',
-            content: result.message,
+            content: result.message + additionalActionsMessages,
             timestamp: new Date(),
           };
 
@@ -1907,7 +1984,7 @@ export default function ChefClaudeScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     },
-    [handleMealUpdate]
+    [handleMealUpdate, handleDeleteDuplicates]
   );
 
   /**

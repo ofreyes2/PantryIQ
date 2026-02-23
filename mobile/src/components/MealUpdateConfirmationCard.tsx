@@ -18,6 +18,11 @@ interface MealUpdateConfirmationCardProps {
   isLoading?: boolean;
   status?: CardStatus;
   errorMessage?: string;
+  additionalActions?: Array<{
+    action: string;
+    deleteCount?: number;
+    mealType?: string;
+  }>;
 }
 
 export function MealUpdateConfirmationCard({
@@ -29,6 +34,7 @@ export function MealUpdateConfirmationCard({
   isLoading = false,
   status = 'pending',
   errorMessage,
+  additionalActions,
 }: MealUpdateConfirmationCardProps) {
   // Determine styling based on action and status
   const getCardStyle = () => {
@@ -110,16 +116,34 @@ export function MealUpdateConfirmationCard({
   };
 
   const getActionDescription = () => {
+    let baseDescription = '';
     switch (action) {
       case 'move':
-        return `Moving: ${entryName}\nFrom ${details.fromMealType} to ${details.toMealType}`;
+        baseDescription = `Moving: ${entryName}\nFrom ${details.fromMealType} to ${details.toMealType}`;
+        break;
       case 'edit':
-        return `Updating: ${entryName}${details.changedFields && details.changedFields.length > 0 ? `\nChanged: ${details.changedFields.join(', ')}` : ''}`;
+        baseDescription = `Updating: ${entryName}${details.changedFields && details.changedFields.length > 0 ? `\nChanged: ${details.changedFields.join(', ')}` : ''}`;
+        break;
       case 'delete':
-        return `Removing: ${entryName}\nfrom ${details.fromMealType}`;
+        baseDescription = `Removing: ${entryName}\nfrom ${details.fromMealType}`;
+        break;
       default:
-        return entryName;
+        baseDescription = entryName;
     }
+
+    // Add additional actions to description
+    if (additionalActions && additionalActions.length > 0) {
+      const additionalDescriptions = additionalActions
+        .filter(a => a.action === 'delete' && a.deleteCount !== undefined && a.deleteCount > 0)
+        .map(a => `Deleting ${a.deleteCount} duplicate${a.deleteCount !== 1 ? 's' : ''} from ${a.mealType || 'this meal'}`)
+        .join('\n');
+
+      if (additionalDescriptions) {
+        baseDescription += `\n\nAlso: ${additionalDescriptions}`;
+      }
+    }
+
+    return baseDescription;
   };
 
   return (

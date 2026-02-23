@@ -16,6 +16,13 @@ export interface IdentifiedFood {
   confidence: 'high' | 'medium' | 'low';
 }
 
+export interface AdditionalAction {
+  action: 'delete' | 'move';
+  deleteCount?: number; // For delete actions - how many duplicate entries to remove
+  targetDate?: string; // For delete actions - which date to delete from
+  mealType?: string; // For delete actions - which meal type to delete from
+}
+
 export interface MealAnalysis {
   isMealDescription: boolean;
   identifiedFoods: IdentifiedFood[];
@@ -32,6 +39,7 @@ export interface MealAnalysis {
   logConfidenceMessage: string;
   targetDate?: string; // YYYY-MM-DD format, defaults to today if not specified
   displayDate?: string; // Human-readable date like "Today", "Yesterday", or day name
+  additionalActions?: AdditionalAction[]; // Additional operations (delete duplicates, etc.)
 }
 
 /**
