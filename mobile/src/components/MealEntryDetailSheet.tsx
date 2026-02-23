@@ -214,7 +214,7 @@ export function MealEntryDetailSheet({
                 ) : null}
               </View>
 
-              {/* Editable Nutrition Items */}
+              {/* Editable Nutrition Items - Vertical Stack */}
               <View
                 style={{
                   paddingHorizontal: 20,
@@ -229,7 +229,7 @@ export function MealEntryDetailSheet({
                     fontFamily: 'DMSans_700Bold',
                     fontSize: 13,
                     color: Colors.textSecondary,
-                    marginBottom: 12,
+                    marginBottom: 16,
                     textTransform: 'uppercase',
                     letterSpacing: 0.5,
                   }}
@@ -237,235 +237,122 @@ export function MealEntryDetailSheet({
                   Nutrition (per serving)
                 </Text>
 
-                {/* Two-column layout for nutrition items */}
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  {/* Left column */}
-                  <View style={{ flex: 1, gap: 12 }}>
-                    {nutritionItems.slice(0, 3).map((item) => (
-                      <Pressable
-                        key={item.key}
-                        onPress={() => handleNutritionEdit(item.key as string)}
-                        style={{
-                          backgroundColor: Colors.surface,
-                          borderRadius: BorderRadius.md,
-                          paddingHorizontal: 12,
-                          paddingVertical: 10,
-                          borderWidth: editingNutrition === item.key ? 2 : 1,
-                          borderColor: editingNutrition === item.key ? Colors.green : Colors.border,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{
-                                fontFamily: 'DMSans_500Medium',
-                                fontSize: 11,
-                                color: Colors.textSecondary,
-                                marginBottom: 2,
-                              }}
-                            >
-                              {item.label}
-                            </Text>
-                            {editingNutrition === item.key ? (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <TextInput
-                                  value={editValues[item.key] || ''}
-                                  onChangeText={(text) =>
-                                    setEditValues({ ...editValues, [item.key]: text })
-                                  }
-                                  placeholder="0"
-                                  placeholderTextColor={Colors.textTertiary}
-                                  keyboardType="decimal-pad"
-                                  style={{
-                                    flex: 1,
-                                    backgroundColor: Colors.navyCard,
-                                    borderWidth: 1,
-                                    borderColor: Colors.border,
-                                    borderRadius: BorderRadius.sm,
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 6,
-                                    fontFamily: 'DMSans_600SemiBold',
-                                    fontSize: 13,
-                                    color: item.color,
-                                  }}
-                                />
-                                <Text
-                                  style={{
-                                    fontFamily: 'DMSans_500Medium',
-                                    fontSize: 11,
-                                    color: Colors.textTertiary,
-                                  }}
-                                >
-                                  {item.unit}
-                                </Text>
-                                <Pressable
-                                  onPress={() => handleNutritionSave(item.key as string)}
-                                  style={{
-                                    backgroundColor: Colors.green,
-                                    borderRadius: BorderRadius.sm,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 4,
-                                  }}
-                                >
-                                  <Text style={{ color: Colors.navy, fontSize: 10, fontWeight: '600' }}>Save</Text>
-                                </Pressable>
-                              </View>
-                            ) : (
-                              <Text
+                {/* Vertical stack of nutrition items */}
+                <View style={{ gap: 12 }}>
+                  {nutritionItems.map((item) => (
+                    <Pressable
+                      key={item.key}
+                      onPress={() => handleNutritionEdit(item.key as string)}
+                      style={{
+                        backgroundColor: Colors.surface,
+                        borderRadius: BorderRadius.md,
+                        paddingHorizontal: 16,
+                        paddingVertical: 14,
+                        borderWidth: editingNutrition === item.key ? 2 : 1,
+                        borderColor: editingNutrition === item.key ? Colors.green : Colors.border,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                        {/* Left: Label and value */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_500Medium',
+                              fontSize: 12,
+                              color: Colors.textSecondary,
+                              marginBottom: 6,
+                            }}
+                          >
+                            {item.label}
+                          </Text>
+                          {editingNutrition === item.key ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <TextInput
+                                value={editValues[item.key] || ''}
+                                onChangeText={(text) =>
+                                  setEditValues({ ...editValues, [item.key]: text })
+                                }
+                                placeholder="0"
+                                placeholderTextColor={Colors.textTertiary}
+                                keyboardType="decimal-pad"
                                 style={{
-                                  fontFamily: 'DMSans_700Bold',
+                                  flex: 1,
+                                  backgroundColor: Colors.navyCard,
+                                  borderWidth: 1,
+                                  borderColor: Colors.border,
+                                  borderRadius: BorderRadius.sm,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 8,
+                                  fontFamily: 'DMSans_600SemiBold',
                                   fontSize: 14,
                                   color: item.color,
                                 }}
-                              >
-                                {Math.round(item.perServing * 10) / 10} {item.unit}
-                              </Text>
-                            )}
-                          </View>
-                          {editingNutrition !== item.key && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-                              <Pressable
-                                onPress={() => handleNutritionAdjust(item.key as string, -1)}
+                              />
+                              <Text
                                 style={{
-                                  backgroundColor: Colors.navyCard,
-                                  borderRadius: BorderRadius.sm,
-                                  padding: 4,
-                                  borderWidth: 1,
-                                  borderColor: Colors.border,
+                                  fontFamily: 'DMSans_500Medium',
+                                  fontSize: 12,
+                                  color: Colors.textTertiary,
+                                  minWidth: 20,
                                 }}
                               >
-                                <Minus size={14} color={Colors.textSecondary} />
-                              </Pressable>
+                                {item.unit}
+                              </Text>
                               <Pressable
-                                onPress={() => handleNutritionAdjust(item.key as string, 1)}
+                                onPress={() => handleNutritionSave(item.key as string)}
                                 style={{
                                   backgroundColor: Colors.green,
                                   borderRadius: BorderRadius.sm,
-                                  padding: 4,
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 6,
                                 }}
                               >
-                                <Plus size={14} color={Colors.navy} />
+                                <Text style={{ color: Colors.navy, fontSize: 11, fontWeight: '600' }}>Save</Text>
                               </Pressable>
                             </View>
+                          ) : (
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_700Bold',
+                                fontSize: 16,
+                                color: item.color,
+                              }}
+                            >
+                              {Math.round(item.perServing * 10) / 10} {item.unit}
+                            </Text>
                           )}
                         </View>
-                      </Pressable>
-                    ))}
-                  </View>
 
-                  {/* Right column */}
-                  <View style={{ flex: 1, gap: 12 }}>
-                    {nutritionItems.slice(3).map((item) => (
-                      <Pressable
-                        key={item.key}
-                        onPress={() => handleNutritionEdit(item.key as string)}
-                        style={{
-                          backgroundColor: Colors.surface,
-                          borderRadius: BorderRadius.md,
-                          paddingHorizontal: 12,
-                          paddingVertical: 10,
-                          borderWidth: editingNutrition === item.key ? 2 : 1,
-                          borderColor: editingNutrition === item.key ? Colors.green : Colors.border,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <View style={{ flex: 1 }}>
-                            <Text
+                        {/* Right: +/- buttons */}
+                        {editingNutrition !== item.key && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Pressable
+                              onPress={() => handleNutritionAdjust(item.key as string, -1)}
                               style={{
-                                fontFamily: 'DMSans_500Medium',
-                                fontSize: 11,
-                                color: Colors.textSecondary,
-                                marginBottom: 2,
+                                backgroundColor: Colors.navyCard,
+                                borderRadius: BorderRadius.sm,
+                                padding: 6,
+                                borderWidth: 1,
+                                borderColor: Colors.border,
                               }}
                             >
-                              {item.label}
-                            </Text>
-                            {editingNutrition === item.key ? (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <TextInput
-                                  value={editValues[item.key] || ''}
-                                  onChangeText={(text) =>
-                                    setEditValues({ ...editValues, [item.key]: text })
-                                  }
-                                  placeholder="0"
-                                  placeholderTextColor={Colors.textTertiary}
-                                  keyboardType="decimal-pad"
-                                  style={{
-                                    flex: 1,
-                                    backgroundColor: Colors.navyCard,
-                                    borderWidth: 1,
-                                    borderColor: Colors.border,
-                                    borderRadius: BorderRadius.sm,
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 6,
-                                    fontFamily: 'DMSans_600SemiBold',
-                                    fontSize: 13,
-                                    color: item.color,
-                                  }}
-                                />
-                                <Text
-                                  style={{
-                                    fontFamily: 'DMSans_500Medium',
-                                    fontSize: 11,
-                                    color: Colors.textTertiary,
-                                  }}
-                                >
-                                  {item.unit}
-                                </Text>
-                                <Pressable
-                                  onPress={() => handleNutritionSave(item.key as string)}
-                                  style={{
-                                    backgroundColor: Colors.green,
-                                    borderRadius: BorderRadius.sm,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 4,
-                                  }}
-                                >
-                                  <Text style={{ color: Colors.navy, fontSize: 10, fontWeight: '600' }}>Save</Text>
-                                </Pressable>
-                              </View>
-                            ) : (
-                              <Text
-                                style={{
-                                  fontFamily: 'DMSans_700Bold',
-                                  fontSize: 14,
-                                  color: item.color,
-                                }}
-                              >
-                                {Math.round(item.perServing * 10) / 10} {item.unit}
-                              </Text>
-                            )}
+                              <Minus size={16} color={Colors.textSecondary} />
+                            </Pressable>
+                            <Pressable
+                              onPress={() => handleNutritionAdjust(item.key as string, 1)}
+                              style={{
+                                backgroundColor: Colors.green,
+                                borderRadius: BorderRadius.sm,
+                                padding: 6,
+                              }}
+                            >
+                              <Plus size={16} color={Colors.navy} />
+                            </Pressable>
                           </View>
-                          {editingNutrition !== item.key && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-                              <Pressable
-                                onPress={() => handleNutritionAdjust(item.key as string, -1)}
-                                style={{
-                                  backgroundColor: Colors.navyCard,
-                                  borderRadius: BorderRadius.sm,
-                                  padding: 4,
-                                  borderWidth: 1,
-                                  borderColor: Colors.border,
-                                }}
-                              >
-                                <Minus size={14} color={Colors.textSecondary} />
-                              </Pressable>
-                              <Pressable
-                                onPress={() => handleNutritionAdjust(item.key as string, 1)}
-                                style={{
-                                  backgroundColor: Colors.green,
-                                  borderRadius: BorderRadius.sm,
-                                  padding: 4,
-                                }}
-                              >
-                                <Plus size={14} color={Colors.navy} />
-                              </Pressable>
-                            </View>
-                          )}
-                        </View>
-                      </Pressable>
-                    ))}
-                  </View>
+                        )}
+                      </View>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
 
