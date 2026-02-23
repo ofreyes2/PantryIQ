@@ -26,6 +26,7 @@ mobile/src/
 │   ├── macro-calculator.tsx      # Macro Calculator (Mifflin-St Jeor formula, 6-step form)
 │   ├── fasting-timer.tsx         # Fasting Timer (protocol selector, phase display, history)
 │   ├── chef-claude.tsx           # Chef Claude AI chat with personality modes
+│   ├── meal-type-detail.tsx      # Meal type detail view (clickable from meals tab, full item list & edit)
 │   └── (tabs)/
 │       ├── _layout.tsx          # 7-tab navigator (navy theme)
 │       ├── index.tsx            # Dashboard (Phase 1 — complete, now with Fasting Widget)
@@ -270,8 +271,16 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
    - All personality modes now work without errors
 
 **Features In Progress:**
-7. UI Consistency Audit (Typography, colors, spacing, components)
-8. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+7. **Meal Type Detail Screen** — Clickable meal type tabs (Breakfast, Lunch, Dinner, Snacks) navigate to detailed view with:
+   - ✅ Full list of items for selected meal type
+   - ✅ Date navigation (prev/next day)
+   - ✅ Edit/Delete/Favorite actions for each item
+   - ✅ Move item to different meal type
+   - ✅ Nutrition totals (calories, net carbs, protein, fat)
+   - ✅ Add more items button
+   - ✅ Empty state with quick add button
+8. UI Consistency Audit (Typography, colors, spacing, components)
+9. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
 
 **Features Pending:**
 9. Advanced Analytics Dashboard

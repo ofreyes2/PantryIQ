@@ -73,6 +73,7 @@ function RootLayoutNav() {
         <Stack.Screen name="kitchen-equipment" options={{ headerShown: false }} />
         <Stack.Screen name="fasting-timer" options={{ headerShown: false }} />
         <Stack.Screen name="macro-calculator" options={{ headerShown: false }} />
+        <Stack.Screen name="meal-type-detail" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

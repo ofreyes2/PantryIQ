@@ -680,6 +680,7 @@ function MealSectionCard({
   onToggleFavorite,
   onEditEntry,
   onMoveEntry,
+  dateStr,
 }: {
   section: MealSection;
   entries: FoodEntry[];
@@ -688,7 +689,9 @@ function MealSectionCard({
   onToggleFavorite: (id: string) => void;
   onEditEntry?: (entry: FoodEntry) => void;
   onMoveEntry?: (entry: FoodEntry) => void;
+  dateStr: string;
 }) {
+  const router = useRouter();
   const [expanded, setExpanded] = useState(true);
   const [showSectionMenu, setShowSectionMenu] = useState(false);
   const rotateAnim = useSharedValue(expanded ? 1 : 0);
@@ -719,7 +722,12 @@ function MealSectionCard({
       {/* Header */}
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 14 }}>
         <Pressable
-          onPress={toggle}
+          onPress={() => {
+            router.push({
+              pathname: '/meal-type-detail',
+              params: { type: section.type, date: dateStr },
+            });
+          }}
           style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
           testID={`meal-section-${section.type}`}
         >
@@ -749,9 +757,15 @@ function MealSectionCard({
               </Text>
             )}
           </View>
-          <Animated.View style={chevronStyle}>
-            <ChevronDown size={18} color={Colors.textSecondary} />
-          </Animated.View>
+          <Pressable
+            onPress={toggle}
+            hitSlop={8}
+            style={{ padding: 4 }}
+          >
+            <Animated.View style={chevronStyle}>
+              <ChevronDown size={18} color={Colors.textSecondary} />
+            </Animated.View>
+          </Pressable>
         </Pressable>
 
         {/* Section menu button */}
@@ -2229,6 +2243,7 @@ export default function MealsScreen() {
                     onToggleFavorite={toggleFavorite}
                     onEditEntry={handleEditEntry}
                     onMoveEntry={handleMoveEntry}
+                    dateStr={dateStr}
                   />
                 );
               })}
