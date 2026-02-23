@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,13 +13,14 @@ import {
 import { X, Edit3, Trash2, Move, Plus, Minus, ChefHat, Send } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
 import type { FoodEntry } from '@/lib/stores/mealsStore';
+import { useMealsStore } from '@/lib/stores/mealsStore';
 
 interface NutritionItem {
   label: string;
   key: keyof Omit<FoodEntry, 'id' | 'name' | 'brand' | 'mealType' | 'date' | 'servings' | 'photoUri' | 'pantryItemId' | 'isFavorite'>;
   unit: string;
   color: string;
-  perServing: number;
+  value: number;
 }
 
 interface MealEntryDetailSheetProps {
@@ -45,16 +46,25 @@ export function MealEntryDetailSheet({
   const [chefRequest, setChefRequest] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const mealsStore = useMealsStore();
 
   if (!entry) return null;
 
+  // Get all entries for this meal type and date to show them grouped
+  const mealEntries = mealsStore.getEntriesForDate(entry.date).filter(
+    (e) => e.mealType === entry.mealType
+  );
+
+  // Check if this entry is part of a grouped meal (multiple items logged together)
+  const isGroupedMeal = mealEntries.length > 1;
+
   const nutritionItems: NutritionItem[] = [
-    { label: 'Calories', key: 'calories', unit: 'kcal', color: Colors.green, perServing: entry.calories },
-    { label: 'Net Carbs', key: 'netCarbs', unit: 'g', color: Colors.amber, perServing: entry.netCarbs },
-    { label: 'Protein', key: 'protein', unit: 'g', color: Colors.textPrimary, perServing: entry.protein },
-    { label: 'Total Fat', key: 'fat', unit: 'g', color: Colors.textPrimary, perServing: entry.fat },
-    { label: 'Fiber', key: 'fiber', unit: 'g', color: Colors.textPrimary, perServing: entry.fiber },
-    { label: 'Total Carbs', key: 'carbs', unit: 'g', color: Colors.textPrimary, perServing: entry.carbs },
+    { label: 'Calories', key: 'calories', unit: 'kcal', color: Colors.green, value: entry.calories * entry.servings },
+    { label: 'Net Carbs', key: 'netCarbs', unit: 'g', color: Colors.amber, value: entry.netCarbs * entry.servings },
+    { label: 'Protein', key: 'protein', unit: 'g', color: Colors.textPrimary, value: entry.protein * entry.servings },
+    { label: 'Total Fat', key: 'fat', unit: 'g', color: Colors.textPrimary, value: entry.fat * entry.servings },
+    { label: 'Fiber', key: 'fiber', unit: 'g', color: Colors.textPrimary, value: entry.fiber * entry.servings },
+    { label: 'Total Carbs', key: 'carbs', unit: 'g', color: Colors.textPrimary, value: entry.carbs * entry.servings },
   ];
 
   const getMealInfo = () => {
@@ -71,7 +81,7 @@ export function MealEntryDetailSheet({
     const item = nutritionItems.find((n) => n.key === key);
     if (item) {
       setEditingNutrition(key);
-      setEditValues({ [key]: item.perServing.toString() });
+      setEditValues({ [key]: item.value.toString() });
     }
   };
 
@@ -87,7 +97,7 @@ export function MealEntryDetailSheet({
   const handleNutritionAdjust = (key: string, delta: number) => {
     const item = nutritionItems.find((n) => n.key === key);
     if (item && onUpdateNutrition) {
-      const newValue = Math.max(0, item.perServing + delta);
+      const newValue = Math.max(0, item.value + delta);
       onUpdateNutrition(entry.id, { [key]: newValue });
     }
   };
@@ -138,7 +148,8 @@ export function MealEntryDetailSheet({
         <Pressable style={{ flex: 1 }} onPress={onClose} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          style={{ flex: 1, maxHeight: '90%' }}
         >
           <View
             style={{
@@ -148,10 +159,9 @@ export function MealEntryDetailSheet({
               borderTopRightRadius: BorderRadius.xxl,
               borderTopWidth: 1,
               borderTopColor: Colors.border,
-              paddingBottom: 40,
             }}
           >
-            {/* Header */}
+            {/* Header - Fixed at top */}
             <View
               style={{
                 flexDirection: 'row',
@@ -178,35 +188,87 @@ export function MealEntryDetailSheet({
               </Pressable>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-              {/* Entry Name and Meal Info */}
+            {/* ScrollView with proper keyboard handling */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              style={{ flex: 1 }}
+              scrollEnabled={true}
+              nestedScrollEnabled={true}
+            >
+              {/* Grouped Meal Indicator */}
+              {isGroupedMeal ? (
+                <View
+                  style={{
+                    paddingHorizontal: 20,
+                    paddingTop: 12,
+                    paddingBottom: 8,
+                  }}
+                >
+                  <View
+                    style={{
+                      backgroundColor: 'rgba(52, 211, 153, 0.1)',
+                      borderRadius: BorderRadius.md,
+                      borderWidth: 1,
+                      borderColor: Colors.green,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_500Medium',
+                        fontSize: 12,
+                        color: Colors.green,
+                      }}
+                    >
+                      Part of a meal with {mealEntries.length} items
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* This Food Item - Main content */}
               <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12 }}>
                 <Text
                   style={{
                     fontFamily: 'DMSans_700Bold',
-                    fontSize: 16,
+                    fontSize: 18,
                     color: Colors.textPrimary,
-                    marginBottom: 4,
+                    marginBottom: 8,
                   }}
                 >
                   {entry.name}
                 </Text>
-                <Text
-                  style={{
-                    fontFamily: 'DMSans_400Regular',
-                    fontSize: 13,
-                    color: Colors.textSecondary,
-                  }}
-                >
-                  {getMealInfo()} {entry.mealType} · {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_500Medium',
+                      fontSize: 13,
+                      color: Colors.textSecondary,
+                      backgroundColor: Colors.surface,
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: BorderRadius.sm,
+                    }}
+                  >
+                    {entry.servings} {entry.servings === 1 ? 'serving' : 'servings'}
+                  </Text>
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_400Regular',
+                      fontSize: 12,
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    {getMealInfo()} {entry.mealType}
+                  </Text>
+                </View>
                 {entry.brand ? (
                   <Text
                     style={{
                       fontFamily: 'DMSans_400Regular',
                       fontSize: 12,
                       color: Colors.textTertiary,
-                      marginTop: 2,
                     }}
                   >
                     Brand: {entry.brand}
@@ -214,13 +276,12 @@ export function MealEntryDetailSheet({
                 ) : null}
               </View>
 
-              {/* Editable Nutrition Items - Vertical Stack */}
+              {/* Nutrition Breakdown Section */}
               <View
                 style={{
                   paddingHorizontal: 20,
                   paddingVertical: 16,
                   borderTopWidth: 1,
-                  borderBottomWidth: 1,
                   borderColor: Colors.border,
                 }}
               >
@@ -234,7 +295,7 @@ export function MealEntryDetailSheet({
                     letterSpacing: 0.5,
                   }}
                 >
-                  Nutrition (per serving)
+                  Nutrition Breakdown
                 </Text>
 
                 {/* Vertical stack of nutrition items */}
@@ -318,7 +379,7 @@ export function MealEntryDetailSheet({
                                 color: item.color,
                               }}
                             >
-                              {Math.round(item.perServing * 10) / 10} {item.unit}
+                              {Math.round(item.value * 10) / 10} {item.unit}
                             </Text>
                           )}
                         </View>
@@ -361,7 +422,7 @@ export function MealEntryDetailSheet({
                 style={{
                   paddingHorizontal: 20,
                   paddingVertical: 16,
-                  borderBottomWidth: 1,
+                  borderTopWidth: 1,
                   borderColor: Colors.border,
                 }}
               >
@@ -435,12 +496,12 @@ export function MealEntryDetailSheet({
                 </View>
               </View>
 
-              {/* Action Buttons */}
+              {/* Action Buttons - At bottom with spacing for keyboard */}
               <View
                 style={{
                   paddingHorizontal: 20,
                   paddingTop: 16,
-                  paddingBottom: 8,
+                  paddingBottom: 24,
                   gap: 10,
                 }}
               >
