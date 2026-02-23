@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Dimensions } from 'react-native';
-import { useRouter } from 'expo-router';
 import Svg, { Circle } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { Play, Flame } from 'lucide-react-native';
@@ -12,7 +11,6 @@ interface FastingWidgetProps {
 }
 
 export const FastingWidget = ({ onOpenTimer }: FastingWidgetProps) => {
-  const router = useRouter();
   const store = useFastingStore();
   const session = store.history.currentSession;
 
@@ -47,7 +45,7 @@ export const FastingWidget = ({ onOpenTimer }: FastingWidgetProps) => {
       <Pressable
         onPress={() => {
           Haptics.selectionAsync();
-          router.push('/fasting-timer');
+          onOpenTimer?.();
         }}
         className="rounded-2xl p-5 bg-gradient-to-br from-green-600 to-green-700 mb-4 active:opacity-75"
       >
@@ -75,7 +73,7 @@ export const FastingWidget = ({ onOpenTimer }: FastingWidgetProps) => {
     <Pressable
       onPress={() => {
         Haptics.selectionAsync();
-        router.push('/fasting-timer');
+        onOpenTimer?.();
       }}
       className="rounded-2xl p-4 mb-4 active:opacity-75"
       style={{ backgroundColor: Colors.navyCard }}
