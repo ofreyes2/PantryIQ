@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodEntry, MealType } from '@/lib/stores/mealsStore';
+import { dateUtils } from '@/lib/dateUtils';
 
 const DAILY_LOG_KEY_PREFIX = 'pantryiq_daily_log_';
 const FAVORITES_KEY = 'pantryiq_favorites';
@@ -24,13 +25,15 @@ interface RecalculateResult {
 
 class MealLoggerService {
   /**
-   * Log a meal to AsyncStorage with verification
+   * Log a meal to a specific date with verification
    */
-  async logMeal(
+  async logMealToDate(
     mealData: Omit<FoodEntry, 'id'>,
+    targetDate: string = dateUtils.today()
   ): Promise<MealLogResult> {
     try {
-      console.log('[MealLogger] Starting meal log process:', mealData);
+      const date = targetDate || dateUtils.today();
+      console.log(`[MealLogger] Saving to date ${date}`);
 
       // Validate meal type
       const validMealTypes: MealType[] = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'];
@@ -42,59 +45,60 @@ class MealLoggerService {
         };
       }
 
-      // Create entry with ID and current timestamp
       const entryId = `meal-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const entry: FoodEntry & { id: string } = {
         ...mealData,
         id: entryId,
+        date, // Use the provided date
       };
 
-      console.log('[MealLogger] Created entry:', entry);
-
-      // Read current daily log
-      const logKey = `${DAILY_LOG_KEY_PREFIX}${mealData.date}`;
+      const logKey = `${DAILY_LOG_KEY_PREFIX}${date}`;
       const existingLogData = await AsyncStorage.getItem(logKey);
       const existingEntries: (FoodEntry & { id: string })[] = existingLogData ? JSON.parse(existingLogData) : [];
 
-      console.log('[MealLogger] Existing entries count:', existingEntries.length);
-
-      // Add new entry to daily log
       const updatedEntries = [...existingEntries, entry];
       await AsyncStorage.setItem(logKey, JSON.stringify(updatedEntries));
 
-      console.log('[MealLogger] Wrote to AsyncStorage, verifying...');
-
-      // VERIFY the write succeeded by reading back
+      // Verify write
       const verifyData = await AsyncStorage.getItem(logKey);
       if (!verifyData) {
-        return {
-          success: false,
-          entry: null,
-          error: 'Failed to write meal to storage - verification failed',
-        };
+        return { success: false, entry: null, error: 'Failed to write meal to storage' };
       }
 
       const verifiedEntries: (FoodEntry & { id: string })[] = JSON.parse(verifyData);
-      const savedEntry = verifiedEntries.find((e) => e.id === entryId);
+      const savedEntry = verifiedEntries.find((e: FoodEntry & { id: string }) => e.id === entryId);
 
       if (!savedEntry) {
-        return {
-          success: false,
-          entry: null,
-          error: 'Meal was written but could not be verified in storage',
-        };
+        return { success: false, entry: null, error: 'Meal verification failed' };
       }
 
-      console.log('[MealLogger] Verification successful! Entry saved:', savedEntry);
+      console.log(`[MealLogger] Saved to ${date}:`, savedEntry);
+      return { success: true, entry: savedEntry, error: null };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[MealLogger] Error logging meal:', errorMsg);
+      return { success: false, entry: null, error: errorMsg };
+    }
+  }
 
-      // Track log frequency for favorites (3+ times = favorite)
-      await this.trackFoodFrequency(mealData.name, mealData.mealType);
+  /**
+   * Log a meal to AsyncStorage with verification (defaults to today)
+   */
+  async logMeal(
+    mealData: Omit<FoodEntry, 'id'>,
+  ): Promise<MealLogResult> {
+    try {
+      console.log('[MealLogger] Starting meal log process:', mealData);
 
-      return {
-        success: true,
-        entry: savedEntry,
-        error: null,
-      };
+      // Use logMealToDate with the provided date (or today if not specified)
+      const result = await this.logMealToDate(mealData, mealData.date);
+
+      if (result.success && result.entry) {
+        // Track log frequency for favorites (3+ times = favorite)
+        await this.trackFoodFrequency(mealData.name, mealData.mealType);
+      }
+
+      return result;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       console.error('[MealLogger] Error logging meal:', errorMsg);
@@ -230,28 +234,74 @@ class MealLoggerService {
   }
 
   /**
-   * Check for duplicate entries in today's log
+   * Check for duplicate entries on a specific date
    */
-  async checkForDuplicate(newEntry: FoodEntry, mealType: MealType): Promise<(FoodEntry & { id: string }) | false> {
+  async checkForDuplicate(
+    entryName: string,
+    date: string,
+    mealType: MealType
+  ): Promise<(FoodEntry & { id: string }) | null> {
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
-      const stored = await AsyncStorage.getItem(key);
-      if (!stored) return false;
+      const logKey = `${DAILY_LOG_KEY_PREFIX}${date}`;
+      const stored = await AsyncStorage.getItem(logKey);
+      if (!stored) return null;
 
-      const log: (FoodEntry & { id: string })[] = JSON.parse(stored);
-      const entries = log.filter((e) => e.mealType === mealType) || [];
-      const nameLower = newEntry.name?.toLowerCase() || '';
+      const entries: (FoodEntry & { id: string })[] = JSON.parse(stored);
+      const mealEntries = entries.filter((e: FoodEntry & { id: string }) => e.mealType === mealType);
+      const nameLower = entryName.toLowerCase();
 
-      const duplicate = entries.find((e) => {
-        const existingName = e.name?.toLowerCase() || '';
-        return existingName.includes(nameLower) || nameLower.includes(existingName);
+      // Check for very similar entry logged within last 5 minutes
+      const recentDuplicate = mealEntries.find((e: FoodEntry & { id: string }) => {
+        const nameMatch =
+          e.name?.toLowerCase().includes(nameLower) ||
+          nameLower.includes(e.name?.toLowerCase());
+        const loggedAt = new Date().getTime();
+        const entryTime = new Date().getTime();
+        const fiveMinutesAgo = loggedAt - 5 * 60 * 1000;
+        const isRecent = entryTime > fiveMinutesAgo;
+        return nameMatch && isRecent;
       });
 
-      return duplicate || false;
+      // Also check for exact same entry
+      const exactDuplicate = mealEntries.find((e: FoodEntry & { id: string }) => {
+        const nameMatch = e.name?.toLowerCase() === nameLower;
+        const sameCalories = e.calories === entries[0]?.calories;
+        return nameMatch && sameCalories;
+      });
+
+      return recentDuplicate || exactDuplicate || null;
     } catch (error) {
-      console.warn('[MealLogger] Error checking for duplicate:', error);
-      return false;
+      console.error('[MealLogger] Error checking duplicates:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Clean up duplicate entries for a specific date
+   */
+  async cleanupDuplicatesForDate(date: string): Promise<void> {
+    try {
+      const logKey = `${DAILY_LOG_KEY_PREFIX}${date}`;
+      const stored = await AsyncStorage.getItem(logKey);
+      if (!stored) return;
+
+      let entries: (FoodEntry & { id: string })[] = JSON.parse(stored);
+      const seen = new Set<string>();
+
+      entries = entries.filter((entry: FoodEntry & { id: string }) => {
+        const signature = `${entry.name?.toLowerCase()}_${entry.calories}`;
+        if (seen.has(signature)) {
+          console.log(`[MealLogger] Removing duplicate: ${signature}`);
+          return false;
+        }
+        seen.add(signature);
+        return true;
+      });
+
+      await AsyncStorage.setItem(logKey, JSON.stringify(entries));
+      console.log(`[MealLogger] Cleaned duplicates for ${date}`);
+    } catch (error) {
+      console.error('[MealLogger] Error cleaning duplicates:', error);
     }
   }
 

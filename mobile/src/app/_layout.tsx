@@ -30,6 +30,8 @@ import { hydrateKitchenMapStore } from '@/lib/stores/kitchenMapStore';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { checkAndHandleDailyReset } from '@/lib/dailyReset';
 import { NewDayGreeting } from '@/components/NewDayGreeting';
+import { MealLogger } from '@/lib/mealLogger';
+import { dateUtils } from '@/lib/dateUtils';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -70,6 +72,22 @@ function RootLayoutNav() {
       }
     });
   }, [onboardingComplete]);
+
+  // Run duplicate cleanup on app load
+  useEffect(() => {
+    const cleanup = async () => {
+      try {
+        const today = dateUtils.today();
+        const yesterday = dateUtils.yesterday();
+        await MealLogger.cleanupDuplicatesForDate(today);
+        await MealLogger.cleanupDuplicatesForDate(yesterday);
+        console.log('[DailyReset] Cleaned duplicates for today and yesterday');
+      } catch (error) {
+        console.error('[DailyReset] Error cleaning duplicates:', error);
+      }
+    };
+    cleanup();
+  }, []);
 
   useEffect(() => {
     const inOnboarding = (segments as string[])[0] === 'onboarding';

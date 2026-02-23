@@ -30,6 +30,8 @@ export interface MealAnalysis {
   totalEstimatedFat: number;
   pantryItemsToDeduct: string[];
   logConfidenceMessage: string;
+  targetDate?: string; // YYYY-MM-DD format, defaults to today if not specified
+  displayDate?: string; // Human-readable date like "Today", "Yesterday", or day name
 }
 
 /**

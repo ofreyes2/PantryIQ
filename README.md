@@ -258,6 +258,42 @@ mobile/src/
       - MealConfirmationModal now accepts optional currentDate prop
       - Chef Claude explicitly passes today's date to ensure meals are always logged to today from Claude
       - Improved robustness of seed entry cleanup to preserve all user-created entries regardless of date
+  - **BUG FIX ✅ COMPLETE**: Chef Claude Date Intelligence & Multi-Date Meal Management — Comprehensive date handling system:
+    - **Part 1 - Date Parsing Rules**: Chef Claude understands natural language date references:
+      - "yesterday" → yesterday's date
+      - "today" → today's date
+      - "this morning" → context-aware (before/after 2pm)
+      - "last night" → yesterday
+      - Day names (Monday, Tuesday, etc.) → finds most recent occurrence
+      - CRITICAL: Always confirms date before logging, never assumes today
+    - **Part 2 - MealLogger Date Support**: Enhanced MealLogger service with date-aware methods:
+      - `logMealToDate(mealData, targetDate)` - logs meals to any specific date with verification
+      - `checkForDuplicate(entryName, date, mealType)` - detects duplicate entries
+      - `cleanupDuplicatesForDate(date)` - removes duplicate entries with signature matching
+    - **Part 3 - MEAL_DATA Structure**: Extended JSON block includes:
+      - `targetDate`: YYYY-MM-DD format (date to log to)
+      - `displayDate`: Human-readable date (Today/Yesterday/Monday Feb 24)
+      - `needsDateConfirmation`: Boolean flag for confirmation requirement
+      - `confirmationMessage`: Clear message showing target date and meal type
+    - **Part 4 - Date-Aware Confirmation Cards**: New DateAwareMealConfirmationCard component:
+      - Green header for today's entries
+      - Amber header with warning for past date entries ("This will update a past date")
+      - Prominent date display (e.g., "Sunday, February 23")
+      - "Change Date" button to modify target before logging
+      - Status states: pending → logging → success/failure
+    - **Part 5 - Automatic Duplicate Cleanup**: Runs on app load:
+      - Cleans duplicates for today and yesterday automatically
+      - Removes entries with same name and calorie signature
+      - Fixes current visible duplicate breakfast entry in screenshot
+    - **Part 6 - Natural Language Date Commands**: Chef Claude understands:
+      - Logging: "Log yesterday's breakfast — I had eggs and bacon"
+      - Moving: "Move my breakfast from today to yesterday"
+      - Moving meal types: "Move my string cheese from breakfast to snacks"
+      - Deleting: "Delete the duplicate eggs from today's breakfast"
+    - **Part 7 - Extended MealAnalysis Type**: Updated to track:
+      - `targetDate`: specific date for logging
+      - `displayDate`: human-readable date format
+      - Ensures date information flows through entire logging pipeline
     - **Implementation Details**:
       - New `dateUtils.ts` library with 20+ centralized date helper functions
       - New `dailyReset.ts` with daily reset logic and streak validity checking

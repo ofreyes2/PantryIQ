@@ -219,11 +219,23 @@ When suggesting any recipe, always include:
 
 MEAL LOGGING PROTOCOL:
 IMPORTANT — DATE AWARENESS FOR MEAL LOGGING:
-- When user describes food TODAY → log to today's log (${todayStr})
-- When user says "yesterday" → log to yesterday (${dateUtils.yesterday()})
-- When user mentions a past date → ask which date they mean
-- ALWAYS verify which date/time they're logging to if there is any ambiguity
+
+CRITICAL DATE PARSING RULES:
+- "yesterday" = use ${dateUtils.yesterday()}
+- "today" = use ${todayStr}
+- "this morning" = today if before 2pm, yesterday if after 2pm
+- "last night" = ${dateUtils.yesterday()}
+- "Monday" or any day name = find most recent occurrence
+- "for breakfast yesterday" = parse as yesterday's breakfast
+- "earlier today" = ${todayStr}
+- "just now" = ${todayStr}
+
+IMPORTANT:
+- ALWAYS confirm the date before logging any meal
+- Never assume today if user mentions past time reference
+- If unsure which date user means, ASK before logging
 - Never confuse today's entries with previous days
+- Show confirmation card with target date prominently displayed
 
 YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
 1. Write friendly response about the food they ate
@@ -233,8 +245,10 @@ YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
 {
   "hasMealData": true,
   "action": "log",
+  "targetDate": "YYYY-MM-DD",
+  "displayDate": "Today | Yesterday | specific day name",
   "mealName": "two eggs with bacon",
-  "mealType": "breakfast",
+  "mealType": "Breakfast",
   "mealTypeConfidence": "high",
   "foods": [
     {"name": "eggs", "quantity": "2", "unit": "count", "calories": 140, "netCarbs": 1, "protein": 12, "fat": 10},
@@ -244,6 +258,8 @@ YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
   "totalNetCarbs": 1,
   "totalProtein": 20,
   "totalFat": 20,
+  "needsDateConfirmation": true,
+  "confirmationMessage": "Logging to YESTERDAY — Sunday February 23 — Breakfast",
   "needsMealType": false,
   "missingInfo": null
 }
@@ -254,13 +270,44 @@ CRITICAL:
 - ALWAYS set hasMealData to true for meals
 - NEVER skip the JSON block
 - ALWAYS estimate nutrition from the description
+- ALWAYS include targetDate in YYYY-MM-DD format
+- ALWAYS include needsDateConfirmation field
 - If unsure about meal type, ask first, THEN provide JSON
+- targetDate must match one of: today (${todayStr}), yesterday (${dateUtils.yesterday()}), or specific YYYY-MM-DD
 
 IMPORTANT: When a user asks about logging/modifying entries, say things like:
 - For logging: "Here is what I have for your breakfast — tap the button below to save it to your log"
 - For moving: "I'll move that to snacks for you — just confirm below"
 - For editing: "Let me update that entry with the new nutrition — confirm below"
 - For deleting: "I'll remove that from your log — confirm below"
+
+NATURAL LANGUAGE COMMAND HANDLING:
+
+Date-specific logging commands:
+- "Log yesterday's breakfast — I had eggs and bacon" → action: "log", targetDate: yesterday
+- "Add this to last night's dinner" → action: "log", targetDate: yesterday
+- "I forgot to log my lunch on Sunday" → action: "log", targetDate: find most recent Sunday
+- "Put this under Monday's dinner" → action: "log", targetDate: find most recent Monday
+
+Moving entries between dates:
+- "Move my breakfast from today to yesterday" → action: "move", fromDate: today, toDate: yesterday
+- "That omelette should be under yesterday not today" → action: "move", fromDate: today, toDate: yesterday
+- "Move this to Monday's log" → action: "move", toDate: find most recent Monday
+
+Moving entries between meal types:
+- "Move my string cheese from breakfast to snacks" → action: "move", fromMealType: Breakfast, toMealType: Snacks
+- "That should be lunch not dinner" → action: "move", fromMealType: Dinner, toMealType: Lunch
+
+Deleting from specific dates:
+- "Delete the duplicate eggs from today's breakfast" → action: "delete", targetDate: today, mealType: Breakfast
+- "Remove the second entry from this morning" → action: "delete", targetDate: today, mealType: Breakfast
+
+WHEN HANDLING THESE COMMANDS:
+1. Parse the date reference correctly using the date parsing rules
+2. Extract the food/entry name being modified
+3. If action is ambiguous, ASK the user to clarify
+4. ALWAYS provide confirmation card before executing the action
+5. Return appropriate MEAL_DATA structure with action type (log, move, delete)
 
 INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
@@ -1221,6 +1268,10 @@ export default function ChefClaudeScreen() {
       }
 
       try {
+        // Use targetDate from Claude data, or default to today
+        const targetDate = claudeMealData.targetDate || dateUtils.today();
+        const displayDate = claudeMealData.displayDate || dateUtils.displayLabel(targetDate);
+
         return {
           isMealDescription: claudeMealData.hasMealData ?? false,
           identifiedFoods: (claudeMealData.foods || []).map((food: any) => ({
@@ -1246,6 +1297,8 @@ export default function ChefClaudeScreen() {
           totalEstimatedFat: claudeMealData.totalFat || 0,
           pantryItemsToDeduct: [],
           logConfidenceMessage: '',
+          targetDate,
+          displayDate,
         };
       } catch (error) {
         console.warn('Failed to convert Claude meal data:', error);
@@ -1386,7 +1439,9 @@ export default function ChefClaudeScreen() {
       try {
         setIsMealLogging(true);
 
-        const todayStr = dateUtils.today();
+        // Use targetDate from analysis if available, otherwise default to today
+        const targetDate = analysis.targetDate || dateUtils.today();
+
         const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
           breakfast: 'Breakfast',
           lunch: 'Lunch',
@@ -1417,7 +1472,7 @@ export default function ChefClaudeScreen() {
         const entry: Omit<FoodEntry, 'id'> = {
           name: foodNames,
           mealType: mealTypeMap[analysis.mealType] || 'Snacks',
-          date: todayStr,
+          date: targetDate,
           servings: 1,
           calories: Math.round(totalCalories),
           carbs: Math.round(totalCarbs * 10) / 10,
@@ -1428,18 +1483,29 @@ export default function ChefClaudeScreen() {
           isFavorite: false,
         };
 
-        // Add entry to store
+        // Use logMealToDate to save to the specific date
+        const logResult = await MealLogger.logMealToDate(entry, targetDate);
+
+        if (!logResult.success) {
+          return {
+            success: false,
+            entry: null,
+            error: logResult.error || 'Failed to log meal',
+          };
+        }
+
+        // Add entry to store for UI updates
         addMealEntry(entry);
 
         // Verify the entry was actually saved by reading back from store
-        const savedEntries = getEntriesForDate(todayStr);
+        const savedEntries = getEntriesForDate(targetDate);
         const verifiedEntry = savedEntries.find((e) => e.name === entry.name && e.mealType === entry.mealType);
 
         if (!verifiedEntry) {
           return {
             success: false,
             entry: null,
-            error: 'Meal was not saved. Please try again.',
+            error: 'Meal was not verified in store',
           };
         }
 
@@ -1742,20 +1808,8 @@ export default function ChefClaudeScreen() {
     const mealType = mealTypeFormatted as 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks';
 
     const duplicate = await MealLogger.checkForDuplicate(
-      {
-        id: 'temp',
-        name: foodName,
-        mealType,
-        date: new Date().toISOString().split('T')[0],
-        servings: 1,
-        calories: 0,
-        carbs: 0,
-        protein: 0,
-        fat: 0,
-        fiber: 0,
-        netCarbs: 0,
-        isFavorite: false,
-      },
+      foodName,
+      dateUtils.today(),
       mealType
     );
 
