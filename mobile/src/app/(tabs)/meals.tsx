@@ -2051,37 +2051,22 @@ export default function MealsScreen() {
       // If moving to a different date, we need to handle this differently
       if (targetDate !== selectedDate) {
         console.log('[Move] Cross-date move detected');
-        // Delete from current date in both storage and store
-        await MealLogger.deleteEntry(movingEntry.id);
+        // Delete from current date in the store
         deleteEntry(movingEntry.id);
 
-        // Add to target date with the new meal type in both storage and store
+        // Add to target date with the new meal type in the store
         const newEntry = {
           ...movingEntry,
           date: targetDate,
           mealType: targetMealType,
         };
-        const result = await MealLogger.logMealToDate(newEntry, targetDate);
-        console.log('[Move] LogMealToDate result:', result);
-        if (result.success) {
-          addEntry(newEntry);
-          showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
-        } else {
-          // Revert if logging failed
-          addEntry(movingEntry);
-          showToast('Failed to move entry to new date', 'error');
-        }
+        addEntry(newEntry);
+        showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
       } else {
-        // Same date, just change meal type
+        // Same date, just change meal type - update store directly
         console.log('[Move] Same-date move detected');
-        const result = await MealLogger.moveEntry(movingEntry.id, movingEntry.mealType, targetMealType, selectedDate);
-        console.log('[Move] MoveEntry result:', result);
-        if (result.success) {
-          updateEntry(movingEntry.id, { mealType: targetMealType });
-          showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
-        } else {
-          showToast(result.error || 'Failed to move entry', 'error');
-        }
+        updateEntry(movingEntry.id, { mealType: targetMealType });
+        showToast(`${movingEntry.name} moved to ${targetMealType}`, 'success');
       }
       setMoveSheetVisible(false);
       setMovingEntry(null);
