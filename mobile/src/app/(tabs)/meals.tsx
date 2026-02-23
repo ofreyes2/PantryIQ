@@ -629,7 +629,10 @@ function FoodItemRow({
               </Text>
             </Pressable>
             <Pressable
-              onPress={handleDeletePress}
+              onPress={() => {
+                handleDeletePress();
+                setContextMenuVisible(false);
+              }}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
