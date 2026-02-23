@@ -26,7 +26,7 @@ import { useMealsStore, FoodEntry, MealType } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { DeleteConfirmationModal } from '@/components/DeleteConfirmationModal';
 import { useToast } from '@/components/Toast';
-import { EditEntrySheet } from '@/components/EditEntrySheet';
+import { MealEntryDetailSheet } from '@/components/MealEntryDetailSheet';
 import { MoveToMealSheet } from '@/components/MoveToMealSheet';
 import { MealLogger } from '@/lib/mealLogger';
 
@@ -363,7 +363,7 @@ export default function MealTypeDetail() {
   // State
   const [currentDate, setCurrentDate] = useState(new Date(dateParam));
   const [selectedEntry, setSelectedEntry] = useState<FoodEntry | null>(null);
-  const [editSheetVisible, setEditSheetVisible] = useState(false);
+  const [detailSheetVisible, setDetailSheetVisible] = useState(false);
   const [moveSheetVisible, setMoveSheetVisible] = useState(false);
 
   // Store hooks
@@ -395,7 +395,7 @@ export default function MealTypeDetail() {
 
   const handleEditEntry = useCallback((entry: FoodEntry) => {
     setSelectedEntry(entry);
-    setEditSheetVisible(true);
+    setDetailSheetVisible(true);
   }, []);
 
   const handleMoveEntry = useCallback((entry: FoodEntry) => {
@@ -406,7 +406,7 @@ export default function MealTypeDetail() {
   const handleSaveEdit = useCallback((updatedEntry: Partial<FoodEntry>) => {
     if (selectedEntry) {
       updateEntry(selectedEntry.id, updatedEntry);
-      setEditSheetVisible(false);
+      setDetailSheetVisible(false);
       showToast('Meal entry updated', 'success');
     }
   }, [selectedEntry, updateEntry, showToast]);
@@ -746,13 +746,28 @@ export default function MealTypeDetail() {
         )}
       </View>
 
-      {/* Edit Entry Sheet */}
+      {/* Meal Entry Detail Sheet */}
       {selectedEntry ? (
-        <EditEntrySheet
-          visible={editSheetVisible}
+        <MealEntryDetailSheet
+          visible={detailSheetVisible}
           entry={selectedEntry}
-          onSave={handleSaveEdit}
-          onCancel={() => setEditSheetVisible(false)}
+          onClose={() => setDetailSheetVisible(false)}
+          onEdit={() => {
+            // Edit button in detail sheet - could open EditEntrySheet if needed
+            setDetailSheetVisible(false);
+          }}
+          onDelete={() => {
+            handleDeleteEntry(selectedEntry.id);
+            setDetailSheetVisible(false);
+          }}
+          onMove={() => {
+            setDetailSheetVisible(false);
+            setMoveSheetVisible(true);
+          }}
+          onUpdateNutrition={(entryId, updates) => {
+            updateEntry(entryId, updates);
+            showToast('Nutrition updated', 'success');
+          }}
         />
       ) : null}
 

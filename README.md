@@ -398,6 +398,13 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
      - Modified `NutritionProgressBars` component with separate calorie and carb tracking
      - Dashboard uses `dashboardKey` state to force re-renders on tab focus
 9. UI Consistency Audit (Typography, colors, spacing, components)
+10. **Meal Details Display Fix ✅ COMPLETE** — Replaced EditEntrySheet with MealEntryDetailSheet in meal-type-detail.tsx:
+   - Meal details no longer hidden behind edit modal
+   - Individual food items displayed with full nutrition breakdown (calories, net carbs, protein, fat, fiber, total carbs)
+   - Each item shows quantity/servings in detail view
+   - Edit, Delete, Move, and Favorite actions available directly in detail sheet
+   - Chef Claude integration for nutrition refinement with natural language requests
+   - Clean, beautiful detail display matching design patterns from Chef Claude meal display
 10. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
 
 
