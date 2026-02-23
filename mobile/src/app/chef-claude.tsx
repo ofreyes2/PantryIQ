@@ -31,6 +31,7 @@ import { useMealsStore } from '@/lib/stores/mealsStore';
 import { useAppStore } from '@/lib/stores/appStore';
 import { useKitchenStore } from '@/lib/stores/kitchenStore';
 import { useChefPreferencesStore } from '@/lib/stores/chefPreferencesStore';
+import { useSyncChefConversation } from '@/lib/hooks/useSyncChefConversation';
 import { dateUtils } from '@/lib/dateUtils';
 import {
   detectExplorationTrigger,
@@ -904,6 +905,11 @@ export default function ChefClaudeScreen() {
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [duplicateEntry, setDuplicateEntry] = useState<FoodEntry & { id: string } | null>(null);
   const flatListRef = useRef<FlatList<Message>>(null);
+
+  // Sync messages with persistent Zustand store for cross-tab persistence
+  useSyncChefConversation(messages, conversationIdRef.current, (loadedMessages) => {
+    setMessages(loadedMessages);
+  });
 
   const todayStr = dateUtils.today();
   const todayEntries = getEntriesForDate(todayStr);

@@ -27,6 +27,7 @@ import { hydrateShoppingStore } from '@/lib/stores/shoppingStore';
 import { hydrateRecipesStore } from '@/lib/stores/recipesStore';
 import { hydrateKitchenStore } from '@/lib/stores/kitchenStore';
 import { hydrateKitchenMapStore } from '@/lib/stores/kitchenMapStore';
+import { hydrateChefConversationStore } from '@/lib/stores/chefConversationStore';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { checkAndHandleDailyReset } from '@/lib/dailyReset';
 import { NewDayGreeting } from '@/components/NewDayGreeting';
@@ -161,6 +162,7 @@ export default function RootLayout() {
         hydrateRecipesStore(),
         hydrateKitchenStore(),
         hydrateKitchenMapStore(),
+        hydrateChefConversationStore(),
       ]);
 
       await SplashScreen.hideAsync();
