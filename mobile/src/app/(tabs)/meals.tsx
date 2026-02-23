@@ -25,7 +25,6 @@ import Animated, {
   SlideOutDown,
 } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
-import { LongPressGestureHandler, State } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
@@ -382,10 +381,8 @@ function FoodItemRow({
     showToast(`${entry.name} deleted`, 'success');
   };
 
-  const handleLongPress = (event: any) => {
-    if (event.nativeEvent.state === State.ACTIVE) {
-      setContextMenuVisible(true);
-    }
+  const handleLongPress = () => {
+    setContextMenuVisible(true);
   };
 
   const renderRightActions = () => (
@@ -430,27 +427,25 @@ function FoodItemRow({
 
   return (
     <>
-      <LongPressGestureHandler
-        onHandlerStateChange={handleLongPress}
-        minDurationMs={500}
+      <Swipeable
+        ref={swipeRef}
+        renderRightActions={renderRightActions}
+        friction={2}
+        overshootRight={false}
       >
-        <Swipeable
-          ref={swipeRef}
-          renderRightActions={renderRightActions}
-          friction={2}
-          overshootRight={false}
+        <Pressable
+          onLongPress={handleLongPress}
+          delayLongPress={500}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 10,
+            paddingHorizontal: 14,
+            backgroundColor: Colors.navyCard,
+            borderRadius: BorderRadius.md,
+            marginBottom: 6,
+          }}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              backgroundColor: Colors.navyCard,
-              borderRadius: BorderRadius.md,
-              marginBottom: 6,
-            }}
-          >
             <View style={{ flex: 1 }}>
               <Text
                 style={{
@@ -529,9 +524,8 @@ function FoodItemRow({
                 />
               </Pressable>
             </View>
-          </View>
-        </Swipeable>
-      </LongPressGestureHandler>
+        </Pressable>
+      </Swipeable>
 
       {/* Long Press Context Menu */}
       <Modal visible={contextMenuVisible} transparent animationType="fade">
