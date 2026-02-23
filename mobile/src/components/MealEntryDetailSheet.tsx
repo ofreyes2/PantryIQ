@@ -65,7 +65,7 @@ export function MealEntryDetailSheet({
             borderTopWidth: 1,
             borderTopColor: Colors.border,
             paddingBottom: 40,
-            maxHeight: '85%',
+            maxHeight: '95%',
           }}
         >
           {/* Header */}
