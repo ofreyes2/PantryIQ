@@ -1165,14 +1165,16 @@ Keep response under 80 words. No bullet points, just conversational text.`,
 // ─── Bottom summary card ──────────────────────────────────────────────────────
 function DailySummaryCard({ dateStr }: { dateStr: string }) {
   const getDailyTotals = useMealsStore((s) => s.getDailyTotals);
-  const getWaterForDate = useMealsStore((s) => s.getWaterForDate);
   const logWater = useMealsStore((s) => s.logWater);
   const removeWaterEntry = useMealsStore((s) => s.removeWaterEntry);
+  const water = useMealsStore((s) => {
+    const entry = s.waterIntake.find((w) => w.date === dateStr);
+    return entry?.glasses ?? 0;
+  });
   const calorieGoal = useAppStore((s) => s.userProfile.dailyCalorieGoal);
   const carbGoal = useAppStore((s) => s.userProfile.dailyCarbGoal);
 
   const totals = getDailyTotals(dateStr);
-  const water = getWaterForDate(dateStr);
   const calProgress = calorieGoal > 0 ? totals.calories / calorieGoal : 0;
 
   const proteinPct = totals.calories > 0 ? (totals.protein * 4 / totals.calories) * 100 : 0;
@@ -1920,6 +1922,90 @@ function EmptyDayState({ onQuickAdd, selectedMeal }: {
   );
 }
 
+// ─── Water Tracking Section ───────────────────────────────────────────────────
+function WaterTrackingSection({ dateStr }: { dateStr: string }) {
+  const waterIntake = useMealsStore((s) => {
+    const entry = s.waterIntake.find((w) => w.date === dateStr);
+    return entry?.glasses ?? 0;
+  });
+  const logWater = useMealsStore((s) => s.logWater);
+  const removeWaterEntry = useMealsStore((s) => s.removeWaterEntry);
+
+  return (
+    <View
+      style={{
+        backgroundColor: Colors.navyCard,
+        borderRadius: BorderRadius.lg,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: Colors.border,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Text style={{ fontSize: 24 }}>💧</Text>
+          <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.textPrimary }}>
+            Water Intake
+          </Text>
+        </View>
+        <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.textSecondary }}>
+          Goal: 8 glasses
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <View style={{ flex: 1, height: 8, backgroundColor: Colors.navy, borderRadius: 4, overflow: 'hidden' }}>
+          <View
+            style={{
+              height: '100%',
+              width: `${Math.min((waterIntake / 8) * 100, 100)}%`,
+              backgroundColor: '#3498DB',
+            }}
+          />
+        </View>
+        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary, minWidth: 45 }}>
+          {waterIntake}/8
+        </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Pressable
+          onPress={() => {
+            if (waterIntake > 0) removeWaterEntry(dateStr);
+          }}
+          disabled={waterIntake === 0}
+          style={{
+            flex: 1,
+            backgroundColor: waterIntake > 0 ? Colors.surface : Colors.surface + '80',
+            borderRadius: BorderRadius.md,
+            paddingVertical: 10,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.textSecondary }}>
+            − Remove
+          </Text>
+        </Pressable>
+        <Pressable
+          onPress={() => logWater(dateStr)}
+          style={{
+            flex: 1,
+            backgroundColor: Colors.green,
+            borderRadius: BorderRadius.md,
+            paddingVertical: 10,
+            alignItems: 'center',
+          }}
+        >
+          <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.navy }}>
+            + Add Glass
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function MealsScreen() {
   const [selectedDate, setSelectedDate] = useState<string>(dateUtils.today());
@@ -1942,7 +2028,6 @@ export default function MealsScreen() {
   const clearMeals = useMealsStore((s) => s.clearMeals);
   const cleanupOldSeedEntries = useMealsStore((s) => s.cleanupOldSeedEntries);
   const { showToast } = useToast();
-  const getWaterForDate = useMealsStore((s) => s.getWaterForDate);
   const logWater = useMealsStore((s) => s.logWater);
   const removeWaterEntry = useMealsStore((s) => s.removeWaterEntry);
 
@@ -2270,82 +2355,7 @@ export default function MealsScreen() {
               })}
 
               {/* Water Tracking Section */}
-              {(() => {
-                const waterIntake = getWaterForDate(selectedDate);
-                return (
-                  <View
-                    style={{
-                      backgroundColor: Colors.navyCard,
-                      borderRadius: BorderRadius.lg,
-                      padding: 16,
-                      marginBottom: 12,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ fontSize: 24 }}>💧</Text>
-                        <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.textPrimary }}>
-                          Water Intake
-                        </Text>
-                      </View>
-                      <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.textSecondary }}>
-                        Goal: 8 glasses
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                      <View style={{ flex: 1, height: 8, backgroundColor: Colors.navy, borderRadius: 4, overflow: 'hidden' }}>
-                        <View
-                          style={{
-                            height: '100%',
-                            width: `${Math.min((waterIntake / 8) * 100, 100)}%`,
-                            backgroundColor: '#3498DB',
-                          }}
-                        />
-                      </View>
-                      <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.textPrimary, minWidth: 45 }}>
-                        {waterIntake}/8
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <Pressable
-                        onPress={() => {
-                          if (waterIntake > 0) removeWaterEntry(selectedDate);
-                        }}
-                        disabled={waterIntake === 0}
-                        style={{
-                          flex: 1,
-                          backgroundColor: waterIntake > 0 ? Colors.surface : Colors.surface + '80',
-                          borderRadius: BorderRadius.md,
-                          paddingVertical: 10,
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.textSecondary }}>
-                          − Remove
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => logWater(selectedDate)}
-                        style={{
-                          flex: 1,
-                          backgroundColor: Colors.green,
-                          borderRadius: BorderRadius.md,
-                          paddingVertical: 10,
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Text style={{ fontFamily: 'DMSans_600SemiBold', fontSize: 13, color: Colors.navy }}>
-                          + Add Glass
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                );
-              })()}
+              <WaterTrackingSection dateStr={selectedDate} />
 
 
 

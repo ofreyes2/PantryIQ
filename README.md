@@ -173,7 +173,7 @@ mobile/src/
         - User can immediately type next meal without reopening forms
       - Prevents accidental meal logging to wrong meal type or wrong date
       - Success messages show in chat with carb budget tracking
-  - **ROOT CAUSE FIX ✅ COMPLETE**: Chef Claude Cannot Write to Meal Log — Fixed critical architecture problem:
+  - **BUG FIX ✅ COMPLETE**: Chef Claude Cannot Write to Meal Log — Fixed critical architecture problem:
     - **The Problem**: Claude API only returns text; it cannot write to AsyncStorage, databases, or any storage. Previous implementation tried to have Claude handle meal logging directly, which is architecturally impossible.
     - **The Solution - Response Interceptor Pattern**:
       - Claude now returns conversational responses + hidden structured `<MEAL_DATA>` JSON block at end
@@ -425,6 +425,13 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
    - **Easy dismissal** — Tap X button or outside drawer to close
    - **Meal badges** — Each meal section shows count of logged items in color-coded badges
 13. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+14. **Water Tracking Buttons Fix ✅ COMPLETE** — Fixed water glasses add/remove buttons not responding:
+   - **Root Cause**: `getWaterForDate()` is a function, not state. When selected as `useMealsStore((s) => s.getWaterForDate)`, it doesn't subscribe to `waterIntake` changes. Zustand only re-renders when the selected value changes, and a function reference doesn't change when its data does.
+   - **Solution**: Refactored water intake selectors to directly access `waterIntake` state instead of calling a function:
+     - `DailySummaryCard`: Changed from calling `getWaterForDate(dateStr)` to selecting `waterIntake` directly with filter
+     - Created `WaterTrackingSection` component with inline state selector: `useMealsStore((s) => { const entry = s.waterIntake.find((w) => w.date === dateStr); return entry?.glasses ?? 0; })`
+     - Both components now properly re-render when water data changes
+   - **Result**: Add/Remove glass buttons now work instantly with proper state updates
 
 
 **Features Pending:**
