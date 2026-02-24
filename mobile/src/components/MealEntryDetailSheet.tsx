@@ -102,12 +102,12 @@ export function MealEntryDetailSheet({
   return (
     <Modal
       visible={visible}
+      transparent
       animationType="slide"
       statusBarTranslucent
       onRequestClose={onClose}
-      presentationStyle="formSheet"
     >
-      <View style={{ flex: 1, backgroundColor: Colors.navy }}>
+      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={80}
