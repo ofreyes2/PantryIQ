@@ -776,7 +776,7 @@ function ApiKeyModal({
 }
 
 export default function ChefClaudeScreen() {
-  const { conversationId: paramConversationId } = useLocalSearchParams<{ conversationId?: string }>();
+  const { conversationId: paramConversationId, mealType: paramMealType } = useLocalSearchParams<{ conversationId?: string; mealType?: string }>();
   const pantryItems = usePantryStore((s) => s.items);
   const userProfile = useAppStore((s) => s.userProfile);
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
@@ -787,6 +787,7 @@ export default function ChefClaudeScreen() {
   const deductPantryServings = usePantryStore((s) => s.deductServings);
 
   const conversationIdRef = useRef<string>(paramConversationId || `conv-${Date.now()}`);
+  const contextMealType = paramMealType as 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks' | undefined;
 
   const findPantryItem = useCallback(
     (name: string) => {
@@ -910,6 +911,20 @@ export default function ChefClaudeScreen() {
   useSyncChefConversation(messages, conversationIdRef.current, (loadedMessages) => {
     setMessages(loadedMessages);
   });
+
+  // If opened from Add Food modal with a specific meal type, send a context message
+  useEffect(() => {
+    if (contextMealType && messages.length === 0) {
+      const contextMessage = `I'm looking to add something to my ${contextMealType.toLowerCase()}. What should I log?`;
+      const assistantMsg: Message = {
+        id: `msg-${Date.now()}`,
+        role: 'assistant',
+        content: `Sure! I'll help you log something for your ${contextMealType.toLowerCase()}. What did you eat or drink?`,
+        timestamp: new Date(),
+      };
+      setMessages([assistantMsg]);
+    }
+  }, [contextMealType]);
 
   const todayStr = dateUtils.today();
   const todayEntries = getEntriesForDate(todayStr);

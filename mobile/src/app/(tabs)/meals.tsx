@@ -49,6 +49,7 @@ import {
   Share2,
   Move,
   MoreVertical,
+  ChefHat,
 } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { useMealsStore, FoodEntry, MealType } from '@/lib/stores/mealsStore';
@@ -1617,6 +1618,17 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry
                       bg: 'rgba(243,156,18,0.15)',
                       onPress: () => setView('manual'),
                       testID: 'manual-entry-option',
+                    },
+                    {
+                      icon: <ChefHat size={24} color="#E67E22" />,
+                      title: 'Ask Chef Claude',
+                      subtitle: 'Describe what you ate',
+                      bg: 'rgba(230,126,34,0.15)',
+                      onPress: () => {
+                        handleClose();
+                        router.push(`/chef-claude?mealType=${mealType}`);
+                      },
+                      testID: 'chef-claude-option',
                     },
                   ].map((opt) => (
                     <Pressable
