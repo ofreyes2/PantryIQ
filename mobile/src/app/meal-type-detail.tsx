@@ -358,10 +358,14 @@ export default function MealTypeDetail() {
   const { showToast } = useToast();
 
   const mealType = params.type as MealType || 'Breakfast';
-  const dateParam = params.date || toDateStr(new Date());
+  const dateParam = (params.date && typeof params.date === 'string') ? params.date : toDateStr(new Date());
 
-  // State
-  const [currentDate, setCurrentDate] = useState(new Date(dateParam));
+  // State - Parse date string to local date (not UTC)
+  const parseLocalDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+  const [currentDate, setCurrentDate] = useState(parseLocalDate(dateParam));
   const [selectedEntry, setSelectedEntry] = useState<FoodEntry | null>(null);
   const [detailSheetVisible, setDetailSheetVisible] = useState(false);
   const [moveSheetVisible, setMoveSheetVisible] = useState(false);
