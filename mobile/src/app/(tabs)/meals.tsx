@@ -2167,7 +2167,10 @@ export default function MealsScreen() {
           mealType: targetMealType,
         };
         addEntry(newEntry);
-        showToast(`${movingEntry.name} moved to ${targetMealType} on ${new Date(targetDate + 'T00:00:00').toLocaleDateString()}`, 'success');
+        // Format date properly for display
+        const [year, month, day] = targetDate.split('-').map(Number);
+        const displayDate = new Date(year, month - 1, day).toLocaleDateString();
+        showToast(`${movingEntry.name} moved to ${targetMealType} on ${displayDate}`, 'success');
       } else {
         // Same date, just change meal type - update store directly
         console.log('[Move] Same-date move detected');
