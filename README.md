@@ -451,6 +451,26 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
      - Created `WaterTrackingSection` component with inline state selector: `useMealsStore((s) => { const entry = s.waterIntake.find((w) => w.date === dateStr); return entry?.glasses ?? 0; })`
      - Both components now properly re-render when water data changes
    - **Result**: Add/Remove glass buttons now work instantly with proper state updates
+15. **Chef Claude Chat Enhancements ✅ COMPLETE** — Enhanced Chef Claude AI agent with rich message features:
+   - **Copyable Messages**: Long-press on any message (user or Claude) to copy to clipboard with haptic feedback
+   - **Hyperlink Support**: URLs in Claude's responses are automatically detected and made clickable:
+     - Supports http://, https://, www., and generic domain patterns
+     - Links appear in green with underlines for clear discoverability
+     - Tap to open in browser without breaking chat flow
+   - **Image Generation Placeholder**: When Claude mentions generating images, a visual placeholder appears:
+     - Shows image icon with description extracted from Claude's message
+     - Placeholder indicates "Image display support coming soon"
+     - Future-ready for when image generation is fully integrated
+   - **Consistent Avatar System**: Chef Claude avatar now respects personality modes:
+     - Default mode: 👨‍🍳 (Chef)
+     - Coach mode: 💪 (Flexed biceps)
+     - Gordon Ramsay mode: 🔥 (Fire)
+     - Scientist mode: 🧪 (Test tube)
+     - Zen mode: 🧘 (Meditating person)
+     - JARVIS mode: 🤖 (Robot)
+     - Custom mode: ✨ (Sparkles)
+     - Avatar changes dynamically when personality mode is switched in Settings
+     - Used consistently in message bubbles, welcome card, and API key modal
 
 
 **Features Pending:**

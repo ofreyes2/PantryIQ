@@ -9,6 +9,7 @@ import {
   Platform,
   ActivityIndicator,
   Modal,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -46,6 +47,7 @@ import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityM
 import { getMealTypeEmoji, formatMealType } from '@/lib/mealAnalysis';
 import { MealLogger } from '@/lib/mealLogger';
 import { api } from '@/lib/api/api';
+import { parseMessageSegments, openURL, detectImageReference, extractImageDescription } from '@/lib/messageFormatter';
 import { MealConfirmationCard } from '@/components/MealConfirmationCard';
 import { MealConfirmationModal } from '@/components/MealConfirmationModal';
 import { MealUpdateConfirmationCard } from '@/components/MealUpdateConfirmationCard';
@@ -54,6 +56,7 @@ import { RecipeCaptureCard } from '@/components/RecipeCaptureCard';
 import { RecipeCreationModal } from '@/components/RecipeCreationModal';
 import { DuplicateWarningCard } from '@/components/DuplicateWarningCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ChatImagePlaceholder } from '@/components/ChatImagePlaceholder';
 import type { PantryItem } from '@/lib/stores/pantryStore';
 import type { FoodEntry, DailyTotals } from '@/lib/stores/mealsStore';
 import type { UserProfile } from '@/lib/stores/appStore';
@@ -402,6 +405,45 @@ function TypingIndicator() {
   );
 }
 
+interface MessageBubbleProps {
+  message: Message;
+  onMealConfirm?: () => void;
+  onMealUpdate?: (action: any) => Promise<void>;
+  onMealUpdateCancel?: () => void;
+  isMealLogging?: boolean;
+  cardStatus?: MealCardStatus;
+  cardError?: string;
+  onRetry?: () => void;
+}
+
+// Link-aware text component
+function LinkAwareText({ text, style }: { text: string; style?: any }) {
+  const segments = parseMessageSegments(text);
+
+  return (
+    <Text style={style}>
+      {segments.map((segment, idx) => {
+        if (segment.type === 'link') {
+          return (
+            <Text
+              key={idx}
+              style={[style, { color: Colors.green, textDecorationLine: 'underline' }]}
+              onPress={() => openURL(segment.url!)}
+            >
+              {segment.content}
+            </Text>
+          );
+        }
+        return (
+          <Text key={idx} style={style}>
+            {segment.content}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
 function MessageBubble({
   message,
   onMealConfirm,
@@ -411,18 +453,21 @@ function MessageBubble({
   cardStatus,
   cardError,
   onRetry,
-}: {
-  message: Message;
-  onMealConfirm?: () => void;
-  onMealUpdate?: (action: any) => Promise<void>;
-  onMealUpdateCancel?: () => void;
-  isMealLogging?: boolean;
-  cardStatus?: MealCardStatus;
-  cardError?: string;
-  onRetry?: () => void;
-}) {
+}: MessageBubbleProps) {
   const isUser = message.role === 'user';
   const time = message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const userProfile = useAppStore((s) => s.userProfile);
+  const personalityIcon = getPersonalityConfig(userProfile?.personalityMode)?.icon ?? '👨‍🍳';
+
+  const handleCopy = useCallback(async () => {
+    try {
+      Clipboard.setString(message.content);
+      // Show feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      console.error('Error copying text:', error);
+    }
+  }, [message.content]);
 
   // Show meal update confirmation card if this message has a meal update action pending
   if (message.mealUpdateAction?.pending && onMealUpdate && onMealUpdateCancel) {
@@ -464,8 +509,9 @@ function MessageBubble({
 
   if (isUser) {
     return (
-      <View
+      <Pressable
         testID="message-bubble-user"
+        onLongPress={handleCopy}
         style={{ alignItems: 'flex-end', marginBottom: 12, paddingHorizontal: 16 }}
       >
         <View
@@ -495,16 +541,17 @@ function MessageBubble({
         >
           {time}
         </Text>
-      </View>
+      </Pressable>
     );
   }
 
   return (
-    <View
+    <Pressable
       testID="message-bubble-assistant"
+      onLongPress={handleCopy}
       style={{
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'flex-start',
         marginBottom: 12,
         paddingHorizontal: 16,
       }}
@@ -520,12 +567,16 @@ function MessageBubble({
           alignItems: 'center',
           justifyContent: 'center',
           marginRight: 10,
+          marginTop: 4,
           flexShrink: 0,
         }}
       >
-        <ChefHat size={18} color={Colors.green} />
+        <Text style={{ fontSize: 16 }}>{personalityIcon}</Text>
       </View>
       <View style={{ flex: 1 }}>
+        {detectImageReference(message.content) ? (
+          <ChatImagePlaceholder description={extractImageDescription(message.content) || undefined} />
+        ) : null}
         <View
           style={{
             backgroundColor: Colors.navyCard,
@@ -539,16 +590,15 @@ function MessageBubble({
             ...Shadows.card,
           }}
         >
-          <Text
+          <LinkAwareText
+            text={message.content}
             style={{
               fontFamily: 'DMSans_400Regular',
               fontSize: 15,
               color: Colors.textPrimary,
               lineHeight: 22,
             }}
-          >
-            {message.content}
-          </Text>
+          />
         </View>
         <Text
           style={{
@@ -561,11 +611,14 @@ function MessageBubble({
           {time}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
 function WelcomeCard({ onSelectPrompt }: { onSelectPrompt: (p: string) => void }) {
+  const userProfile = useAppStore((s) => s.userProfile);
+  const personalityIcon = getPersonalityConfig(userProfile?.personalityMode)?.icon ?? '👨‍🍳';
+
   return (
     <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
       <View
@@ -584,7 +637,7 @@ function WelcomeCard({ onSelectPrompt }: { onSelectPrompt: (p: string) => void }
             marginRight: 10,
           }}
         >
-          <ChefHat size={18} color={Colors.green} />
+          <Text style={{ fontSize: 16 }}>{personalityIcon}</Text>
         </View>
         <View
           style={{
@@ -675,6 +728,9 @@ function ApiKeyModal({
   onClose: () => void;
   onGoToSettings: () => void;
 }) {
+  const userProfile = useAppStore((s) => s.userProfile);
+  const personalityIcon = getPersonalityConfig(userProfile?.personalityMode)?.icon ?? '👨‍🍳';
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View
@@ -709,7 +765,7 @@ function ApiKeyModal({
               alignSelf: 'center',
             }}
           >
-            <ChefHat size={26} color={Colors.green} />
+            <Text style={{ fontSize: 28 }}>{personalityIcon}</Text>
           </View>
           <Text
             style={{
