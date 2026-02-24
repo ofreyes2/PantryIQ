@@ -35,7 +35,14 @@ const CATEGORIES: PantryCategory[] = [
 
 const UNITS: PantryUnit[] = ['oz', 'lbs', 'count', 'cups', 'g', 'kg', 'ml', 'L'];
 const INVENTORY_UNITS: InventoryUnit[] = ['loaf', 'dozen', 'package', 'bag', 'bottle', 'can', 'box', 'lb', 'oz', 'count', 'other'];
-const SERVING_UNITS: ServingUnit[] = ['slice', 'egg', 'strip', 'piece', 'cup', 'oz', 'tbsp', 'g', 'serving'];
+const SERVING_UNITS: ServingUnit[] = [
+  'slice', 'egg', 'strip', 'piece',
+  'cup', '1/2 cup', '1/3 cup', '1/4 cup',
+  'tbsp', '1 tbsp', '2 tbsp', '1/2 tbsp',
+  'tsp', '1/2 tsp', '1/3 tsp', '1/4 tsp',
+  'oz', 'g', 'ml',
+  'serving'
+];
 
 function SectionLabel({ title }: { title: string }) {
   return (

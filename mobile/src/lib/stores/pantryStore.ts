@@ -37,8 +37,19 @@ export type ServingUnit =
   | 'cup'
   | 'oz'
   | 'tbsp'
+  | 'tsp'
   | 'g'
-  | 'serving';
+  | 'ml'
+  | 'serving'
+  | '1/2 cup'
+  | '1/3 cup'
+  | '1/4 cup'
+  | '1/2 tsp'
+  | '1/3 tsp'
+  | '1/4 tsp'
+  | '1 tbsp'
+  | '2 tbsp'
+  | '1/2 tbsp';
 
 export interface PantryItem {
   id: string;

@@ -2,6 +2,20 @@
 
 A premium React Native Expo iOS app for pantry management, meal tracking, and personal health monitoring.
 
+## Latest Updates
+
+### Detailed Serving Size Options (v1.2.0)
+- **Enhanced serving unit picker** with fractional measurements for precise tracking
+- **New units available:**
+  - Cup sizes: 1 cup, 1/2 cup, 1/3 cup, 1/4 cup
+  - Teaspoon sizes: 1 tsp, 1/2 tsp, 1/3 tsp, 1/4 tsp
+  - Tablespoon sizes: 1 tbsp, 2 tbsp, 1/2 tbsp
+  - Volume measures: ml (milliliters)
+  - Base units: oz, g, serving
+  - Specialty: slice, egg, strip, piece
+- Available in both **barcode scanner** and **manual entry** screens
+- Helps track items that have non-standard serving sizes (e.g., 1/4 cup flour, 1/3 tsp vanilla)
+
 ## Tech Stack
 - React Native / Expo SDK 53
 - Expo Router (file-based navigation)

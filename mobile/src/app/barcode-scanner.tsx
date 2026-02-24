@@ -104,7 +104,7 @@ interface ProductSheetProps {
 // ─── Smart Unit Detection ─────────────────────────────────────────────────────
 
 type InventoryUnit = 'loaf' | 'dozen' | 'package' | 'bag' | 'bottle' | 'can' | 'box' | 'lb' | 'oz' | 'count' | 'other';
-type ServingUnit = 'slice' | 'egg' | 'strip' | 'piece' | 'cup' | 'oz' | 'tbsp' | 'g' | 'serving';
+type ServingUnit = 'slice' | 'egg' | 'strip' | 'piece' | 'cup' | 'oz' | 'tbsp' | 'tsp' | 'g' | 'ml' | 'serving' | '1/2 cup' | '1/3 cup' | '1/4 cup' | '1/2 tsp' | '1/3 tsp' | '1/4 tsp' | '1 tbsp' | '2 tbsp' | '1/2 tbsp';
 
 interface SmartUnits {
   inventoryUnit: InventoryUnit;
@@ -153,7 +153,14 @@ function detectSmartUnits(productName: string, servingSize: string): SmartUnits 
 }
 
 const INVENTORY_UNITS: InventoryUnit[] = ['loaf', 'dozen', 'package', 'bag', 'bottle', 'can', 'box', 'lb', 'oz', 'count', 'other'];
-const SERVING_UNITS: ServingUnit[] = ['slice', 'egg', 'strip', 'piece', 'cup', 'oz', 'tbsp', 'g', 'serving'];
+const SERVING_UNITS: ServingUnit[] = [
+  'slice', 'egg', 'strip', 'piece',
+  'cup', '1/2 cup', '1/3 cup', '1/4 cup',
+  'tbsp', '1 tbsp', '2 tbsp', '1/2 tbsp',
+  'tsp', '1/2 tsp', '1/3 tsp', '1/4 tsp',
+  'oz', 'g', 'ml',
+  'serving'
+];
 
 function ProductSheet({ product, visible, onAddToPantry, onScanAnother }: ProductSheetProps) {
   const smartUnits = detectSmartUnits(product?.name ?? '', product?.servingSize ?? '');
