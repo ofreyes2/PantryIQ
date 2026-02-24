@@ -1511,10 +1511,11 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry
       onRequestClose={handleClose}
     >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' }}>
-        <Pressable style={{ flex: 1 }} onPress={handleClose} />
-        <Animated.View
-          entering={SlideInDown.springify().damping(20)}
-          exiting={SlideOutDown}
+        <Pressable style={{ flex: 1 }} onPress={handleClose} pointerEvents="box-none" />
+        <View style={{ pointerEvents: 'box-none' }}>
+          <Animated.View
+            entering={SlideInDown.springify().damping(20)}
+            exiting={SlideOutDown}
           style={{
             backgroundColor: Colors.navyCard,
             borderTopLeftRadius: BorderRadius.xxl,
@@ -1843,6 +1844,7 @@ function AddFoodModal({ visible, mealType, onClose, onAddEntry, onAddManualEntry
             </ScrollView>
           )}
         </Animated.View>
+        </View>
       </View>
     </Modal>
   );
