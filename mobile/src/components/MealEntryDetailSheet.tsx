@@ -144,11 +144,12 @@ export function MealEntryDetailSheet({
               >
                 <Pressable
                   onPress={onClose}
-                  hitSlop={12}
+                  hitSlop={16}
                   style={{
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    marginLeft: -8,
+                    paddingVertical: 16,
+                    paddingHorizontal: 20,
+                    marginLeft: -12,
+                    marginTop: -6,
                   }}
                 >
                   <Text
