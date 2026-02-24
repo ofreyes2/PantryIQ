@@ -1,14 +1,24 @@
 /**
  * Centralized date utility functions for consistent date handling across PantryIQ
- * All dates are stored as YYYY-MM-DD strings and derived from UTC to avoid timezone issues
+ * All dates are stored as YYYY-MM-DD strings using device local timezone
  */
+
+/**
+ * Get local date string (YYYY-MM-DD) accounting for device timezone
+ */
+const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export const dateUtils = {
   /**
    * Get today's date as YYYY-MM-DD string
    */
   today: (): string => {
-    return new Date().toISOString().split('T')[0];
+    return getLocalDateString(new Date());
   },
 
   /**
@@ -17,7 +27,7 @@ export const dateUtils = {
   yesterday: (): string => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   },
 
   /**
@@ -26,7 +36,7 @@ export const dateUtils = {
   daysAgo: (days: number): string => {
     const d = new Date();
     d.setDate(d.getDate() - days);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   },
 
   /**
@@ -35,7 +45,7 @@ export const dateUtils = {
   daysFromNow: (days: number): string => {
     const d = new Date();
     d.setDate(d.getDate() + days);
-    return d.toISOString().split('T')[0];
+    return getLocalDateString(d);
   },
 
   /**
@@ -77,9 +87,11 @@ export const dateUtils = {
    * Get the difference in days between two dates (negative if date1 is before date2)
    */
   daysDifference: (date1: string, date2: string): number => {
-    const d1 = new Date(date1 + 'T12:00:00');
-    const d2 = new Date(date2 + 'T12:00:00');
-    const diffTime = d1.getTime() - d2.getTime();
+    const [y1, m1, d1] = date1.split('-').map(Number);
+    const [y2, m2, d2] = date2.split('-').map(Number);
+    const d1Date = new Date(y1, m1 - 1, d1);
+    const d2Date = new Date(y2, m2 - 1, d2);
+    const diffTime = d1Date.getTime() - d2Date.getTime();
     return Math.round(diffTime / (1000 * 60 * 60 * 24));
   },
 
@@ -93,7 +105,8 @@ export const dateUtils = {
     if (dateUtils.isToday(date)) return 'Today';
     if (dateUtils.isYesterday(date)) return 'Yesterday';
 
-    return new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
@@ -107,7 +120,8 @@ export const dateUtils = {
     if (dateUtils.isToday(date)) return 'Today';
     if (dateUtils.isYesterday(date)) return 'Yesterday';
 
-    return new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
@@ -118,7 +132,8 @@ export const dateUtils = {
    * Get full date and time string
    */
   fullDateTime: (date: string): string => {
-    return new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
