@@ -106,6 +106,7 @@ export function MealEntryDetailSheet({
       animationType="slide"
       statusBarTranslucent
       onRequestClose={onClose}
+      presentationStyle="formSheet"
     >
       <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
         <KeyboardAvoidingView
@@ -400,15 +401,17 @@ export function MealEntryDetailSheet({
                         </View>
                       </View>
                     ) : (
-                      // NORMAL ROW VIEW
+                      // NORMAL ROW VIEW - Like food log entry style
                       <Pressable
                         onPress={() => handleEditItem(food.id, food)}
                         style={{
-                          backgroundColor: Colors.surface,
+                          backgroundColor: Colors.navyCard,
                           borderRadius: BorderRadius.md,
                           paddingVertical: 12,
                           paddingHorizontal: 12,
-                          marginBottom: 8,
+                          marginBottom: 10,
+                          borderWidth: 1,
+                          borderColor: Colors.border,
                           flexDirection: 'row',
                           justifyContent: 'space-between',
                           alignItems: 'center',
@@ -418,8 +421,8 @@ export function MealEntryDetailSheet({
                           <Text
                             style={{
                               fontFamily: 'DMSans_600SemiBold',
-                              fontSize: 15,
-                              color: '#FFFFFF',
+                              fontSize: 14,
+                              color: Colors.textPrimary,
                               marginBottom: 4,
                             }}
                           >
@@ -428,7 +431,7 @@ export function MealEntryDetailSheet({
                           <View style={{ flexDirection: 'row', gap: 12 }}>
                             <Text
                               style={{
-                                fontFamily: 'DMSans_500Medium',
+                                fontFamily: 'DMSans_400Regular',
                                 fontSize: 12,
                                 color: Colors.textSecondary,
                               }}
@@ -437,7 +440,7 @@ export function MealEntryDetailSheet({
                             </Text>
                             <Text
                               style={{
-                                fontFamily: 'DMSans_500Medium',
+                                fontFamily: 'DMSans_400Regular',
                                 fontSize: 12,
                                 color: Colors.green,
                               }}
@@ -446,7 +449,7 @@ export function MealEntryDetailSheet({
                             </Text>
                             <Text
                               style={{
-                                fontFamily: 'DMSans_500Medium',
+                                fontFamily: 'DMSans_400Regular',
                                 fontSize: 12,
                                 color: Colors.textSecondary,
                               }}
@@ -456,7 +459,18 @@ export function MealEntryDetailSheet({
                           </View>
                         </View>
 
-                        <Edit2 size={16} color={Colors.textTertiary} />
+                        <View style={{ marginLeft: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text
+                            style={{
+                              fontFamily: 'DMSans_700Bold',
+                              fontSize: 13,
+                              color: Colors.textPrimary,
+                            }}
+                          >
+                            {Math.round(food.calories * food.quantity)} cal
+                          </Text>
+                          <Edit2 size={16} color={Colors.textTertiary} />
+                        </View>
                       </Pressable>
                     )}
                   </View>

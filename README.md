@@ -407,11 +407,13 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
    - **Back navigation** — Back button returns to meal list, smooth full-screen transitions
 11. **Meal Details Sheet UI Improvements ✅ COMPLETE** — Enhanced MealEntryDetailSheet with:
    - **Clear close button** — Back/close button prominently positioned on left side of header for easy dismissal
-   - **Food items list layout** — Food items now displayed in cleaner card-based list with:
+   - **Food items list layout** — Food items now displayed in cleaner card-based list matching the food log entry style:
      - Item name and quantity at top
-     - Nutrition breakdown (calories, carbs, protein) below in a row for quick scanning
+     - Nutrition breakdown (calories, carbs, protein) displayed in a compact row for quick scanning
+     - Calories repeated on right side for visual emphasis (matching food log entries in meals tab)
      - Editable by tapping the card or edit icon
-     - Better visual separation with background cards and rounded corners
+     - Better visual separation with navyCard background, borders, and proper spacing
+   - **Modal positioning FIX** — Now uses `presentationStyle="formSheet"` to appear above tab bar instead of behind it
    - **Timezone fix** — Updated dateUtils.ts to use device local timezone instead of UTC:
      - `getLocalDateString()` now uses `getFullYear()`, `getMonth()`, `getDate()` for timezone-aware dates
      - All date calculations now respect device's local timezone
