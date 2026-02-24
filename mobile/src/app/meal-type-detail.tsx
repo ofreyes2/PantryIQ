@@ -418,54 +418,35 @@ export default function MealTypeDetail() {
 
   return (
     <>
-      {detailSheetVisible && selectedEntry ? (
-        <MealEntryDetailSheet
-          visible={detailSheetVisible}
-          entry={selectedEntry}
-          onClose={() => setDetailSheetVisible(false)}
-          onDelete={() => {
-            handleDeleteEntry(selectedEntry.id);
-            setDetailSheetVisible(false);
-          }}
-          onMove={() => {
-            setDetailSheetVisible(false);
-            setMoveSheetVisible(true);
-          }}
-          onUpdateNutrition={(entryId, updates) => {
-            updateEntry(entryId, updates);
-            showToast('Nutrition updated', 'success');
-          }}
-        />
-      ) : (
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }}>
-          <View style={{ flex: 1 }}>
-            {/* Header */}
-            <View
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }}>
+        <View style={{ flex: 1 }}>
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: Colors.border,
+              backgroundColor: Colors.surface,
+            }}
+          >
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={8}
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 16,
-                paddingVertical: 12,
-                borderBottomWidth: 1,
-                borderBottomColor: Colors.border,
-                backgroundColor: Colors.surface,
+                padding: 8,
+                marginLeft: -8,
               }}
             >
-              <Pressable
-                onPress={() => router.back()}
-                hitSlop={8}
-                style={{
-                  padding: 8,
-                  marginLeft: -8,
-                }}
-              >
-                <ChevronLeft size={24} color={Colors.textPrimary} />
-              </Pressable>
+              <ChevronLeft size={24} color={Colors.textPrimary} />
+            </Pressable>
 
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ fontSize: 20 }}>{mealConfig.icon}</Text>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 20 }}>{mealConfig.icon}</Text>
                   <Text
                     style={{
                       fontFamily: 'DMSans_700Bold',
@@ -793,7 +774,26 @@ export default function MealTypeDetail() {
             />
           ) : null}
         </SafeAreaView>
-      )}
+
+      {detailSheetVisible && selectedEntry ? (
+        <MealEntryDetailSheet
+          visible={detailSheetVisible}
+          entry={selectedEntry}
+          onClose={() => setDetailSheetVisible(false)}
+          onDelete={() => {
+            handleDeleteEntry(selectedEntry.id);
+            setDetailSheetVisible(false);
+          }}
+          onMove={() => {
+            setDetailSheetVisible(false);
+            setMoveSheetVisible(true);
+          }}
+          onUpdateNutrition={(entryId, updates) => {
+            updateEntry(entryId, updates);
+            showToast('Nutrition updated', 'success');
+          }}
+        />
+      ) : null}
     </>
   );
 }
