@@ -2059,6 +2059,7 @@ export default function MealsScreen() {
   const goToToday = () => setSelectedDate(dateUtils.today());
 
   const handleAddFood = (mealType: MealType) => {
+    console.log('[Meals] handleAddFood called for:', mealType);
     setActiveMealType(mealType);
     setAddFoodModalVisible(true);
   };
