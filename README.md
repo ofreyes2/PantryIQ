@@ -413,12 +413,18 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
      - Calories repeated on right side for visual emphasis (matching food log entries in meals tab)
      - Editable by tapping the card or edit icon
      - Better visual separation with navyCard background, borders, and proper spacing
-   - **Modal positioning FIX** — Now uses `presentationStyle="formSheet"` without transparent overlay to appear above tab bar
+   - **Modal positioning FIX** — Properly positioned overlay to work with tab navigation
    - **Timezone fix** — Updated dateUtils.ts to use device local timezone instead of UTC:
      - `getLocalDateString()` now uses `getFullYear()`, `getMonth()`, `getDate()` for timezone-aware dates
      - All date calculations now respect device's local timezone
      - Works across any timezone automatically
-12. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+12. **Meals Drawer Navigation ✅ COMPLETE** — Converted Meals tab to slide-out left drawer:
+   - **Left sidebar drawer** — Meals icon in tab bar opens a left-side drawer instead of navigating to a screen
+   - **Quick meal selection** — Drawer shows Breakfast, Lunch, Dinner, Snacks sections with item counts
+   - **Smooth animations** — Drawer slides in from left with overlay backdrop
+   - **Easy dismissal** — Tap X button or outside drawer to close
+   - **Meal badges** — Each meal section shows count of logged items in color-coded badges
+13. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
 
 
 **Features Pending:**
