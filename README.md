@@ -200,16 +200,23 @@ mobile/src/
       6. Meal saved to AsyncStorage
       7. Success: "Logged! Your breakfast has been added..."
       8. Opens Meals tab → meal is there
-  - **BUG FIX ✅ COMPLETE**: Snack Meal Logging — Two critical bugs fixed:
-    - **Bug 1 - AsyncStorage vs Store Sync**: The `logMealFromAnalysis` function was verifying meals against the Zustand store instead of trusting AsyncStorage's verified result. This caused successful AsyncStorage saves to fail verification when the store was out of sync. Fixed by:
-      - Trusting `MealLogger.logMealToDate()` result directly (it already does thorough verification)
-      - Using the verified entry with ID from AsyncStorage instead of searching the store
-      - Adding comprehensive console logs to track the entire flow
-    - **Bug 2 - Modal Defaulting to Breakfast**: The `MealConfirmationModal` was hardcoded to default to "Breakfast" regardless of what Chef Claude detected. This forced users to manually change "Snacks" to "Snacks" every time. Fixed by:
-      - Created `getDefaultMealType()` function that maps detected meal type (snack, lunch, dinner) to proper case (Snacks, Lunch, Dinner)
-      - Initialize state with detected meal type instead of hardcoded 'Breakfast'
-      - Added `useEffect` to update selected meal type when analysis changes
-      - Now when user describes a snack, the modal pre-selects "Snacks" automatically
+  - **BUG FIX ✅ COMPLETE**: Snack Meal Logging — Three critical issues fixed:
+    - **Issue 1 - Dual Storage Locations**: System was saving meals to TWO separate locations:
+      - `MealLogger.logMealToDate()` saved to `pantryiq_daily_log_<date>` (per-day storage)
+      - `addMealEntry()` saved to Zustand store (`pantryiq-meals-store`)
+      - Meals tab only read from Zustand store, so meals logged via MealLogger never appeared
+      - **FIXED**: Removed MealLogger completely. Now only use Zustand store for all meal storage. Zustand's persist middleware auto-saves to AsyncStorage using `pantryiq-meals-store` key
+    - **Issue 2 - AsyncStorage vs Store Sync**: Earlier implementation tried to verify meals against store instead of trusting AsyncStorage.
+      - **FIXED**: Now trusts the Zustand store directly as single source of truth
+    - **Issue 3 - Modal Defaulting to Breakfast**: MealConfirmationModal always defaulted to "Breakfast" regardless of detected meal type, forcing users to manually change "Snacks" to "Snacks"
+      - **FIXED**: Created `getDefaultMealType()` function that maps detected meal types to proper case (snack → Snacks)
+      - Modal pre-selects detected meal type on open
+      - Updated when analysis.mealType changes via useEffect
+    - **Architecture**:
+      - Chef Claude calls `addMealEntry(entry)` → Zustand store receives entry → persist middleware saves to AsyncStorage
+      - Meals tab reads from same Zustand store → no sync issues
+      - Single source of truth eliminates data duplication and sync bugs
+      - Meals now appear immediately in Meals tab when logged via Chef Claude
   - **ENHANCEMENT ✅ COMPLETE**: Meal Entry Management & JARVIS Voice Mode — Comprehensive meal editing system plus AI voice assistant:
     - **Meal Entry Editing & Moving**:
       - ✅ Swipe left on any meal entry to reveal Edit (blue) and Delete (red) action buttons
