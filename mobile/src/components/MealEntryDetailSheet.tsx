@@ -111,19 +111,16 @@ export function MealEntryDetailSheet({
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={80}
-          style={{ flex: 1 }}
+          style={{
+            flex: 1,
+            backgroundColor: Colors.navy,
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            borderTopWidth: 1,
+            borderTopColor: Colors.border,
+            overflow: 'hidden',
+          }}
         >
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: Colors.navy,
-              borderTopLeftRadius: 24,
-              borderTopRightRadius: 24,
-              borderTopWidth: 1,
-              borderTopColor: Colors.border,
-              overflow: 'hidden',
-            }}
-          >
             <ScrollView
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{ paddingBottom: 40 }}
@@ -744,7 +741,6 @@ export function MealEntryDetailSheet({
                 </Pressable>
               ) : null}
             </View>
-          </View>
         </KeyboardAvoidingView>
       </View>
     </Modal>
