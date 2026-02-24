@@ -2023,6 +2023,8 @@ export default function MealsScreen() {
   const [detailSheetVisible, setDetailSheetVisible] = useState(false);
 
   const getEntriesForDate = useMealsStore((s) => s.getEntriesForDate);
+  // Subscribe to ALL entries from store - this triggers re-renders when entries change
+  const allEntries = useMealsStore((s) => s.entries);
   const addEntry = useMealsStore((s) => s.addEntry);
   const deleteEntry = useMealsStore((s) => s.deleteEntry);
   const updateEntry = useMealsStore((s) => s.updateEntry);
@@ -2044,7 +2046,8 @@ export default function MealsScreen() {
     }, [cleanupOldSeedEntries])
   );
 
-  const entries = getEntriesForDate(selectedDate);
+  // Filter entries for the selected date - when allEntries changes, component re-renders
+  const entries = allEntries.filter((e: FoodEntry) => e.date === selectedDate);
   const totalCal = entries.reduce((s, e) => s + e.calories * e.servings, 0);
   const totalNetCarbs = entries.reduce((s, e) => s + e.netCarbs * e.servings, 0);
   const hasEntries = entries.length > 0;

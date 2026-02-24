@@ -206,15 +206,17 @@ mobile/src/
       - `addMealEntry()` saved to Zustand store (`pantryiq-meals-store`)
       - Meals tab only read from Zustand store, so meals logged via MealLogger never appeared
       - **FIXED**: Removed MealLogger completely. Now only use Zustand store for all meal storage. Zustand's persist middleware auto-saves to AsyncStorage using `pantryiq-meals-store` key
-    - **Issue 2 - AsyncStorage vs Store Sync**: Earlier implementation tried to verify meals against store instead of trusting AsyncStorage.
-      - **FIXED**: Now trusts the Zustand store directly as single source of truth
+    - **Issue 2 - No Zustand Subscription in Meals Tab**: The Meals tab was calling `getEntriesForDate()` as a function, which doesn't subscribe to store changes:
+      - Component didn't re-render when new entries were added
+      - Meals logged via Chef Claude appeared in logs but not in UI
+      - **FIXED**: Added `allEntries` selector to subscribe to `s.entries` from store. Now component re-renders when store entries change
     - **Issue 3 - Modal Defaulting to Breakfast**: MealConfirmationModal always defaulted to "Breakfast" regardless of detected meal type, forcing users to manually change "Snacks" to "Snacks"
       - **FIXED**: Created `getDefaultMealType()` function that maps detected meal types to proper case (snack → Snacks)
       - Modal pre-selects detected meal type on open
       - Updated when analysis.mealType changes via useEffect
     - **Architecture**:
       - Chef Claude calls `addMealEntry(entry)` → Zustand store receives entry → persist middleware saves to AsyncStorage
-      - Meals tab reads from same Zustand store → no sync issues
+      - Meals tab subscribes to `s.entries` → component re-renders when entries change
       - Single source of truth eliminates data duplication and sync bugs
       - Meals now appear immediately in Meals tab when logged via Chef Claude
   - **ENHANCEMENT ✅ COMPLETE**: Meal Entry Management & JARVIS Voice Mode — Comprehensive meal editing system plus AI voice assistant:
