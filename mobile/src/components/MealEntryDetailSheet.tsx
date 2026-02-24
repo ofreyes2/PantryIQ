@@ -142,6 +142,9 @@ export function MealEntryDetailSheet({
                   borderBottomColor: Colors.border,
                 }}
               >
+                <Pressable onPress={onClose} hitSlop={8} style={{ padding: 4, marginLeft: -4 }}>
+                  <X size={24} color={Colors.textPrimary} />
+                </Pressable>
                 <Text
                   style={{
                     fontFamily: 'DMSans_700Bold',
@@ -151,9 +154,7 @@ export function MealEntryDetailSheet({
                 >
                   Meal Details
                 </Text>
-                <Pressable onPress={onClose} hitSlop={8}>
-                  <X size={24} color={Colors.textSecondary} />
-                </Pressable>
+                <View style={{ width: 32 }} />
               </View>
 
               {/* Meal type and time */}
@@ -176,6 +177,18 @@ export function MealEntryDetailSheet({
 
               {/* FOOD ITEMS LIST */}
               <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+                <Text
+                  style={{
+                    fontFamily: 'DMSans_600SemiBold',
+                    fontSize: 13,
+                    color: Colors.textSecondary,
+                    marginBottom: 12,
+                    textTransform: 'uppercase',
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  Food Items
+                </Text>
                 {foods.map((food, idx) => (
                   <View key={food.id}>
                     {isItemExpanded(food.id) ? (
@@ -388,14 +401,17 @@ export function MealEntryDetailSheet({
                       </View>
                     ) : (
                       // NORMAL ROW VIEW
-                      <View
+                      <Pressable
+                        onPress={() => handleEditItem(food.id, food)}
                         style={{
+                          backgroundColor: Colors.surface,
+                          borderRadius: BorderRadius.md,
+                          paddingVertical: 12,
+                          paddingHorizontal: 12,
+                          marginBottom: 8,
                           flexDirection: 'row',
                           justifyContent: 'space-between',
                           alignItems: 'center',
-                          paddingVertical: 12,
-                          borderBottomWidth: 1,
-                          borderBottomColor: Colors.border,
                         }}
                       >
                         <View style={{ flex: 1 }}>
@@ -409,42 +425,39 @@ export function MealEntryDetailSheet({
                           >
                             {food.quantity} {food.unit} {food.name}
                           </Text>
+                          <View style={{ flexDirection: 'row', gap: 12 }}>
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_500Medium',
+                                fontSize: 12,
+                                color: Colors.textSecondary,
+                              }}
+                            >
+                              {Math.round(food.calories * food.quantity)} cal
+                            </Text>
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_500Medium',
+                                fontSize: 12,
+                                color: Colors.green,
+                              }}
+                            >
+                              {Math.round(food.netCarbs * food.quantity * 10) / 10}g carbs
+                            </Text>
+                            <Text
+                              style={{
+                                fontFamily: 'DMSans_500Medium',
+                                fontSize: 12,
+                                color: Colors.textSecondary,
+                              }}
+                            >
+                              {Math.round(food.protein * food.quantity)}g protein
+                            </Text>
+                          </View>
                         </View>
 
-                        <View
-                          style={{
-                            alignItems: 'flex-end',
-                            marginRight: 12,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontFamily: 'DMSans_700Bold',
-                              fontSize: 15,
-                              color: '#FFFFFF',
-                            }}
-                          >
-                            {Math.round(food.calories * food.quantity)} cal
-                          </Text>
-                          <Text
-                            style={{
-                              fontFamily: 'DMSans_500Medium',
-                              fontSize: 12,
-                              color: Colors.green,
-                              marginTop: 2,
-                            }}
-                          >
-                            {Math.round(food.netCarbs * food.quantity * 10) / 10}g carbs
-                          </Text>
-                        </View>
-
-                        <Pressable
-                          onPress={() => handleEditItem(food.id, food)}
-                          hitSlop={8}
-                        >
-                          <Edit2 size={16} color={Colors.textSecondary} />
-                        </Pressable>
-                      </View>
+                        <Edit2 size={16} color={Colors.textTertiary} />
+                      </Pressable>
                     )}
                   </View>
                 ))}

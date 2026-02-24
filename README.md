@@ -405,7 +405,18 @@ Smart unit detection in the barcode scanner automatically suggests the right uni
    - **Chef Claude refinement** — "Refine with Chef Claude" section allows natural language nutrition updates
    - **Action buttons** — Add to Favorites, Move to Different Meal, Delete Entry buttons with clear visual hierarchy
    - **Back navigation** — Back button returns to meal list, smooth full-screen transitions
-10. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
+11. **Meal Details Sheet UI Improvements ✅ COMPLETE** — Enhanced MealEntryDetailSheet with:
+   - **Clear close button** — Back/close button prominently positioned on left side of header for easy dismissal
+   - **Food items list layout** — Food items now displayed in cleaner card-based list with:
+     - Item name and quantity at top
+     - Nutrition breakdown (calories, carbs, protein) below in a row for quick scanning
+     - Editable by tapping the card or edit icon
+     - Better visual separation with background cards and rounded corners
+   - **Timezone fix** — Updated dateUtils.ts to use device local timezone instead of UTC:
+     - `getLocalDateString()` now uses `getFullYear()`, `getMonth()`, `getDate()` for timezone-aware dates
+     - All date calculations now respect device's local timezone
+     - Works across any timezone automatically
+12. Onboarding Polish (Splash screen, illustrations, tooltips, empty states)
 
 
 **Features Pending:**
