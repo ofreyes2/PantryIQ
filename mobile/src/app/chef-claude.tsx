@@ -1184,7 +1184,7 @@ export default function ChefClaudeScreen() {
     };
 
     loadConversation();
-  }, [loadConversationFromStorage, getProactiveMealPrompt]);
+  }, [loadConversationFromStorage]);
 
   /**
    * Process Claude's raw response and extract meal data if present
