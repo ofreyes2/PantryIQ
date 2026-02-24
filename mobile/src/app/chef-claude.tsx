@@ -1575,7 +1575,16 @@ export default function ChefClaudeScreen() {
         // Use logMealToDate to save to the specific date
         const logResult = await MealLogger.logMealToDate(entry, targetDate);
 
+        console.log('[ChefClaude] Meal logging result:', {
+          mealType: entry.mealType,
+          name: entry.name,
+          date: targetDate,
+          success: logResult.success,
+          entryId: logResult.entry?.id,
+        });
+
         if (!logResult.success) {
+          console.error('[ChefClaude] Failed to log meal to AsyncStorage:', logResult.error);
           return {
             success: false,
             entry: null,
@@ -1583,20 +1592,25 @@ export default function ChefClaudeScreen() {
           };
         }
 
-        // Add entry to store for UI updates
-        addMealEntry(entry);
-
-        // Verify the entry was actually saved by reading back from store
-        const savedEntries = getEntriesForDate(targetDate);
-        const verifiedEntry = savedEntries.find((e) => e.name === entry.name && e.mealType === entry.mealType);
-
-        if (!verifiedEntry) {
+        // MealLogger.logMealToDate already verified the entry and returned it with ID
+        // Use the verified entry directly from logResult instead of relying on store
+        if (!logResult.entry) {
+          console.error('[ChefClaude] MealLogger returned success but no entry object');
           return {
             success: false,
             entry: null,
-            error: 'Meal was not verified in store',
+            error: 'Meal saved but entry data missing',
           };
         }
+
+        // Add entry to store for UI updates
+        addMealEntry(logResult.entry);
+
+        console.log('[ChefClaude] Meal entry added to store:', {
+          mealType: logResult.entry.mealType,
+          name: logResult.entry.name,
+          entryId: logResult.entry.id,
+        });
 
         // Deduct from pantry items if they exist
         analysis.pantryItemsToDeduct.forEach((itemName) => {
@@ -1612,9 +1626,16 @@ export default function ChefClaudeScreen() {
           await saveConversationToStorage(currentConversationId, messages);
         }
 
+        console.log('[ChefClaude] Meal successfully logged:', {
+          mealType: logResult.entry.mealType,
+          name: logResult.entry.name,
+          date: targetDate,
+          entryId: logResult.entry.id,
+        });
+
         return {
           success: true,
-          entry: verifiedEntry,
+          entry: logResult.entry,
           error: null,
         };
       } catch (error) {
@@ -1628,7 +1649,7 @@ export default function ChefClaudeScreen() {
         setIsMealLogging(false);
       }
     },
-    [addMealEntry, findPantryItem, deductPantryServings, getEntriesForDate, messages, inputText]
+    [addMealEntry, findPantryItem, deductPantryServings, messages, inputText]
   );
 
 
