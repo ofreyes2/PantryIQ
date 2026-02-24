@@ -200,6 +200,16 @@ mobile/src/
       6. Meal saved to AsyncStorage
       7. Success: "Logged! Your breakfast has been added..."
       8. Opens Meals tab → meal is there
+  - **BUG FIX ✅ COMPLETE**: Snack Meal Logging — Two critical bugs fixed:
+    - **Bug 1 - AsyncStorage vs Store Sync**: The `logMealFromAnalysis` function was verifying meals against the Zustand store instead of trusting AsyncStorage's verified result. This caused successful AsyncStorage saves to fail verification when the store was out of sync. Fixed by:
+      - Trusting `MealLogger.logMealToDate()` result directly (it already does thorough verification)
+      - Using the verified entry with ID from AsyncStorage instead of searching the store
+      - Adding comprehensive console logs to track the entire flow
+    - **Bug 2 - Modal Defaulting to Breakfast**: The `MealConfirmationModal` was hardcoded to default to "Breakfast" regardless of what Chef Claude detected. This forced users to manually change "Snacks" to "Snacks" every time. Fixed by:
+      - Created `getDefaultMealType()` function that maps detected meal type (snack, lunch, dinner) to proper case (Snacks, Lunch, Dinner)
+      - Initialize state with detected meal type instead of hardcoded 'Breakfast'
+      - Added `useEffect` to update selected meal type when analysis changes
+      - Now when user describes a snack, the modal pre-selects "Snacks" automatically
   - **ENHANCEMENT ✅ COMPLETE**: Meal Entry Management & JARVIS Voice Mode — Comprehensive meal editing system plus AI voice assistant:
     - **Meal Entry Editing & Moving**:
       - ✅ Swipe left on any meal entry to reveal Edit (blue) and Delete (red) action buttons

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -36,11 +36,33 @@ export function MealConfirmationModal({
   currentDate,
   targetDate,
 }: MealConfirmationModalProps) {
-  const [selectedMealType, setSelectedMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'>('Breakfast');
+  // Map detected meal type to proper case, default to Breakfast if not detected
+  const getDefaultMealType = (): 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks' => {
+    if (!analysis) return 'Breakfast';
+
+    const mealTypeMap: Record<string, 'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'> = {
+      breakfast: 'Breakfast',
+      lunch: 'Lunch',
+      dinner: 'Dinner',
+      snack: 'Snacks',
+      snacks: 'Snacks',
+    };
+
+    return mealTypeMap[analysis.mealType.toLowerCase()] || 'Breakfast';
+  };
+
+  const [selectedMealType, setSelectedMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'>(getDefaultMealType());
   // Use targetDate from analysis/props if available, otherwise default to today
   const selectedDate = targetDate || currentDate || new Date().toISOString().split('T')[0];
   const [isConfirming, setIsConfirming] = useState(false);
   const [isFavoritingLoading, setIsFavoritingLoading] = useState(false);
+
+  // Update selectedMealType when analysis changes
+  useEffect(() => {
+    if (analysis) {
+      setSelectedMealType(getDefaultMealType());
+    }
+  }, [analysis?.mealType]);
 
   // Favorites store
   const addFavorite = useFavoritesStore((s) => s.addFavorite);
