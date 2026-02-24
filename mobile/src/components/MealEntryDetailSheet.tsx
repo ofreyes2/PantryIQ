@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { X, Edit2 } from 'lucide-react-native';
+import { Edit2 } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
 import type { FoodEntry } from '@/lib/stores/mealsStore';
 
@@ -102,13 +102,12 @@ export function MealEntryDetailSheet({
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
       statusBarTranslucent
       onRequestClose={onClose}
       presentationStyle="formSheet"
     >
-      <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+      <View style={{ flex: 1, backgroundColor: Colors.navy }}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={80}
@@ -143,8 +142,23 @@ export function MealEntryDetailSheet({
                   borderBottomColor: Colors.border,
                 }}
               >
-                <Pressable onPress={onClose} hitSlop={8} style={{ padding: 4, marginLeft: -4 }}>
-                  <X size={24} color={Colors.textPrimary} />
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={8}
+                  style={{
+                    paddingVertical: 8,
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_600SemiBold',
+                      fontSize: 16,
+                      color: Colors.textSecondary,
+                    }}
+                  >
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Text
                   style={{
@@ -155,7 +169,7 @@ export function MealEntryDetailSheet({
                 >
                   Meal Details
                 </Text>
-                <View style={{ width: 32 }} />
+                <View style={{ width: 60 }} />
               </View>
 
               {/* Meal type and time */}
