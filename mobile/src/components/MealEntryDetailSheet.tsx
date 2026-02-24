@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,11 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
-import { Edit2 } from 'lucide-react-native';
+import { Edit2, Sparkles } from 'lucide-react-native';
 import { Colors, BorderRadius } from '@/constants/theme';
+import { useAppStore } from '@/lib/stores/appStore';
 import type { FoodEntry } from '@/lib/stores/mealsStore';
 
 interface MealEntryDetailSheetProps {
@@ -32,6 +34,55 @@ export function MealEntryDetailSheet({
 }: MealEntryDetailSheetProps) {
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [claudeInsight, setClaudeInsight] = useState<string>('');
+  const [claudeLoading, setClaudeLoading] = useState(false);
+  const claudeApiKey = useAppStore((s) => s.userProfile.claudeApiKey);
+
+  // Define callbacks and effects BEFORE any early returns
+  const fetchClaudeInsight = useCallback(async () => {
+    if (!claudeApiKey || !entry) return;
+    setClaudeLoading(true);
+    setClaudeInsight('');
+    try {
+      const summary = `${entry.name} (${entry.servings} serving${entry.servings !== 1 ? 's' : ''}, ${Math.round(entry.calories * entry.servings)} cal, ${Math.round(entry.netCarbs * entry.servings)}g net carbs) logged for ${entry.mealType}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeApiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 150,
+          messages: [{
+            role: 'user',
+            content: `You are a friendly nutrition coach. Give brief, personalized feedback about this meal log entry. Be encouraging and specific.
+
+${summary}
+
+Keep response under 80 words. No bullet points, just conversational text.`,
+          }],
+        }),
+      });
+
+      if (!response.ok) throw new Error('API error');
+      const data = await response.json() as { content: { type: string; text: string }[] };
+      const text = data.content?.[0]?.text ?? '';
+      setClaudeInsight(text);
+    } catch {
+      setClaudeInsight('Unable to fetch coaching insight. Please check your API key in Settings.');
+    } finally {
+      setClaudeLoading(false);
+    }
+  }, [claudeApiKey, entry]);
+
+  useEffect(() => {
+    if (claudeApiKey && claudeInsight === '') {
+      fetchClaudeInsight();
+    }
+  }, [claudeApiKey, fetchClaudeInsight]);
 
   if (!entry) return null;
 
@@ -654,6 +705,62 @@ export function MealEntryDetailSheet({
                 </View>
               </View>
             </ScrollView>
+
+            {/* Claude Coaching Card */}
+            {claudeApiKey ? (
+              <View
+                style={{
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  backgroundColor: Colors.navyCard,
+                  borderTopWidth: 1,
+                  borderTopColor: Colors.border,
+                  flexDirection: 'row',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                }}
+              >
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: BorderRadius.md,
+                    backgroundColor: 'rgba(155,89,182,0.15)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Sparkles size={20} color="#9B59B6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      fontFamily: 'DMSans_700Bold',
+                      fontSize: 13,
+                      color: Colors.textPrimary,
+                      marginBottom: 6,
+                    }}
+                  >
+                    Nutrition Coach
+                  </Text>
+                  {claudeLoading ? (
+                    <ActivityIndicator size="small" color={Colors.green} />
+                  ) : null}
+                  {!claudeLoading && claudeInsight ? (
+                    <Text
+                      style={{
+                        fontFamily: 'DMSans_400Regular',
+                        fontSize: 12,
+                        color: Colors.textSecondary,
+                        lineHeight: 18,
+                      }}
+                    >
+                      {claudeInsight}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : null}
 
             {/* ACTION BUTTONS - Always above keyboard */}
             <View
