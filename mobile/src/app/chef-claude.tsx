@@ -964,9 +964,7 @@ export default function ChefClaudeScreen() {
   const flatListRef = useRef<FlatList<Message>>(null);
 
   // Sync messages with persistent Zustand store for cross-tab persistence
-  useSyncChefConversation(messages, conversationIdRef.current, (loadedMessages) => {
-    setMessages(loadedMessages);
-  });
+  useSyncChefConversation(messages, conversationIdRef.current);
 
   // If opened from Add Food modal with a specific meal type, send a context message
   useEffect(() => {
@@ -1160,31 +1158,12 @@ export default function ChefClaudeScreen() {
 
       if (loadedMessages.length > 0) {
         setMessages(loadedMessages);
-      } else {
-        // Show proactive prompt only if this is a new conversation
-        const prompt = getProactiveMealPrompt();
-        if (prompt) {
-          const assistantMessage: Message = {
-            id: `msg-${Date.now()}-proactive`,
-            role: 'assistant',
-            content: prompt.message,
-            timestamp: new Date(),
-          };
-          setMessages([assistantMessage]);
-
-          const setUserProfile = useAppStore.getState().setUserProfile;
-          const shown = useAppStore.getState().userProfile.shownMealTimePrompts;
-          if (!shown.includes(prompt.mealType)) {
-            setUserProfile({
-              shownMealTimePrompts: [...shown, prompt.mealType],
-            });
-          }
-        }
       }
+      // Disabled proactive prompt to fix infinite loop
     };
 
     loadConversation();
-  }, [loadConversationFromStorage]);
+  }, []);
 
   /**
    * Process Claude's raw response and extract meal data if present

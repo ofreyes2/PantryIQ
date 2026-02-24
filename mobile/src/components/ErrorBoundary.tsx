@@ -41,7 +41,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught error:', error, errorInfo);
+    // Use __DEV__ check to avoid console.error in dev mode which can cause loops
+    if (!__DEV__) {
+      console.error('ErrorBoundary caught error:', error, errorInfo);
+    }
 
     // Log error details to AsyncStorage for debugging
     try {
@@ -53,10 +56,14 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
       };
       console.log('Error logged:', JSON.stringify(errorLog));
     } catch (e) {
-      console.error('Failed to log error:', e);
+      // Silent catch
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch {
+      // Silent catch
+    }
   }
 
   handleRetry = () => {
