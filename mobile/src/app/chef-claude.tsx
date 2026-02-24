@@ -1173,7 +1173,7 @@ export default function ChefClaudeScreen() {
           setMessages([assistantMessage]);
 
           const setUserProfile = useAppStore.getState().setUserProfile;
-          const shown = userProfile.shownMealTimePrompts;
+          const shown = useAppStore.getState().userProfile.shownMealTimePrompts;
           if (!shown.includes(prompt.mealType)) {
             setUserProfile({
               shownMealTimePrompts: [...shown, prompt.mealType],
@@ -1184,7 +1184,7 @@ export default function ChefClaudeScreen() {
     };
 
     loadConversation();
-  }, [loadConversationFromStorage, getProactiveMealPrompt, userProfile]);
+  }, [loadConversationFromStorage, getProactiveMealPrompt]);
 
   /**
    * Process Claude's raw response and extract meal data if present
