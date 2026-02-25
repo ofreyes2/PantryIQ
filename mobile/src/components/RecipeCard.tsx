@@ -3,6 +3,7 @@ import { View, Text, Pressable, ScrollView } from 'react-native';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { Clock, Users, Flame, AlertCircle, Heart, ChevronDown } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
+import { openURL } from '@/lib/messageFormatter';
 import * as Haptics from 'expo-haptics';
 
 interface RecipeCardProps {
@@ -15,6 +16,11 @@ interface RecipeCardProps {
   netCarbsPerServing: number;
   caloriesPerServing: number;
   description?: string;
+  difficulty?: number;
+  crispiness?: number;
+  equipment?: string;
+  videoUrl?: string;
+  imageUrl?: string;
   onSave?: () => void;
 }
 
@@ -28,6 +34,11 @@ export function RecipeCard({
   netCarbsPerServing,
   caloriesPerServing,
   description,
+  difficulty,
+  crispiness,
+  equipment,
+  videoUrl,
+  imageUrl,
   onSave,
 }: RecipeCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
@@ -286,9 +297,10 @@ export function RecipeCard({
               borderTopWidth: 1,
               borderTopColor: Colors.border,
               gap: Spacing.md,
+              flexWrap: 'wrap',
             }}
           >
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 100 }}>
               <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: Colors.textTertiary, marginBottom: 4 }}>
                 Calories
               </Text>
@@ -296,7 +308,7 @@ export function RecipeCard({
                 {caloriesPerServing}
               </Text>
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 100 }}>
               <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: Colors.textTertiary, marginBottom: 4 }}>
                 Net Carbs
               </Text>
@@ -304,7 +316,57 @@ export function RecipeCard({
                 {netCarbsPerServing}g
               </Text>
             </View>
+            {difficulty ? (
+              <View style={{ flex: 1, minWidth: 100 }}>
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: Colors.textTertiary, marginBottom: 4 }}>
+                  Difficulty
+                </Text>
+                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: Colors.amber }}>
+                  {'⭐'.repeat(difficulty)}
+                </Text>
+              </View>
+            ) : null}
+            {crispiness ? (
+              <View style={{ flex: 1, minWidth: 100 }}>
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 11, color: Colors.textTertiary, marginBottom: 4 }}>
+                  Crispiness
+                </Text>
+                <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 14, color: '#F39C12' }}>
+                  {'🥨'.repeat(crispiness)}
+                </Text>
+              </View>
+            ) : null}
           </View>
+
+          {/* Equipment info */}
+          {equipment ? (
+            <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border }}>
+              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 13, color: Colors.textPrimary, marginBottom: 8 }}>
+                Equipment
+              </Text>
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textSecondary }}>
+                {equipment}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Video link */}
+          {videoUrl ? (
+            <View style={{ paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm, borderTopWidth: 1, borderTopColor: Colors.border }}>
+              <Pressable
+                onPress={() => openURL(videoUrl)}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: 8,
+                }}
+              >
+                <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.green }}>
+                  📺 Watch Cooking Video
+                </Text>
+              </Pressable>
+            </View>
+          ) : null}
         </>
       ) : null}
 

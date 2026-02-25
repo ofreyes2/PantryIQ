@@ -41,6 +41,7 @@ import {
   buildExplorationContext,
   detectPositiveResponse,
   extractRecipeFromResponse,
+  extractMultipleRecipesFromResponse,
 } from '@/lib/foodExplorationUtil';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
@@ -91,6 +92,22 @@ interface Message {
     netCarbsPerServing?: number;
     caloriesPerServing?: number;
   };
+  recipesData?: Array<{
+    recipeName?: string;
+    description?: string;
+    ingredients?: string[];
+    instructions?: string[];
+    prepTime?: number;
+    cookTime?: number;
+    servings?: number;
+    netCarbsPerServing?: number;
+    caloriesPerServing?: number;
+    difficulty?: number;
+    crispiness?: number;
+    equipment?: string;
+    videoUrl?: string;
+    imageUrl?: string;
+  }>;
 }
 
 interface ConversationMetadata {
@@ -495,6 +512,37 @@ function MessageBubble({
           errorMessage={cardError}
           additionalActions={message.mealUpdateAction.additionalActions}
         />
+      </View>
+    );
+  }
+
+  // Show multiple recipe cards if this message has recipes data
+  if (message.recipesData && message.recipesData.length > 0) {
+    return (
+      <View style={{ marginBottom: 12 }}>
+        {message.recipesData.map((recipe, idx) => (
+          <View key={`recipe-${idx}`} style={{ marginBottom: 12 }}>
+            <RecipeCard
+              recipeName={recipe.recipeName || `Recipe ${idx + 1}`}
+              ingredients={recipe.ingredients || []}
+              instructions={recipe.instructions || []}
+              prepTime={recipe.prepTime ?? 10}
+              cookTime={recipe.cookTime ?? 15}
+              servings={recipe.servings ?? 1}
+              netCarbsPerServing={recipe.netCarbsPerServing ?? 0}
+              caloriesPerServing={recipe.caloriesPerServing ?? 0}
+              description={recipe.description}
+              difficulty={recipe.difficulty}
+              crispiness={recipe.crispiness}
+              equipment={recipe.equipment}
+              videoUrl={recipe.videoUrl}
+              imageUrl={recipe.imageUrl}
+              onSave={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }}
+            />
+          </View>
+        ))}
       </View>
     );
   }
@@ -1920,10 +1968,11 @@ export default function ChefClaudeScreen() {
           }
         }
 
-        // Check for recipe in response and positive user response
+        // Check for recipes in response
         const hasPositiveResponse = detectPositiveResponse(trimmed);
         const lastAssistantMsg = messages.filter((m) => m.role === 'assistant').pop();
         const recipeData = extractRecipeFromResponse(lastAssistantMsg?.content || '');
+        const multipleRecipes = extractMultipleRecipesFromResponse(displayText);
 
         // Show recipe capture card if:
         // 1. User gave positive response to a suggestion
@@ -1960,6 +2009,7 @@ export default function ChefClaudeScreen() {
             netCarbsPerServing: recipeData.netCarbsPerServing,
             caloriesPerServing: recipeData.caloriesPerServing,
           } : undefined,
+          recipesData: multipleRecipes.length > 0 ? multipleRecipes : undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);

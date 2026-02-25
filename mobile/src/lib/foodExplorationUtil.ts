@@ -217,7 +217,127 @@ export function detectPositiveResponse(userMessage: string): boolean {
 }
 
 /**
- * Extract recipe from Claude response when it contains preparation instructions
+ * Extract multiple recipes from Claude response in markdown table format
+ */
+export function extractMultipleRecipesFromResponse(claudeResponse: string): Array<{
+  recipeName?: string;
+  description?: string;
+  prepTime?: number;
+  cookTime?: number;
+  servings?: number;
+  ingredients?: string[];
+  instructions?: string[];
+  netCarbsPerServing?: number;
+  caloriesPerServing?: number;
+  difficulty?: number;
+  crispiness?: number;
+  equipment?: string;
+  videoUrl?: string;
+  imageUrl?: string;
+}> {
+  const recipes: Array<{
+    recipeName?: string;
+    description?: string;
+    prepTime?: number;
+    cookTime?: number;
+    servings?: number;
+    ingredients?: string[];
+    instructions?: string[];
+    netCarbsPerServing?: number;
+    caloriesPerServing?: number;
+    difficulty?: number;
+    crispiness?: number;
+    equipment?: string;
+    videoUrl?: string;
+    imageUrl?: string;
+  }> = [];
+
+  // Split by markdown recipe headers (## emoji NAME or # NAME)
+  const recipeBlocks = claudeResponse.split(/\n##\s+(?:🍳|🧀|🍛|[^\n]*?)\s+([^\n]+)\n/);
+
+  // First block is usually intro text, skip it
+  for (let i = 1; i < recipeBlocks.length; i += 2) {
+    const recipeName = recipeBlocks[i]?.trim();
+    const recipeContent = recipeBlocks[i + 1] || '';
+
+    if (!recipeName || !recipeContent) continue;
+
+    // Extract description (text before table or bullet points)
+    const descMatch = recipeContent.match(/^([^|•-]+?)(?=\||•|-|\n\n|$)/);
+    const description = descMatch ? descMatch[1].trim() : undefined;
+
+    // Extract table-based nutrition info
+    const tableLines = recipeContent.split('\n').filter(line => line.includes('|'));
+
+    let netCarbsPerServing: number | undefined;
+    let caloriesPerServing: number | undefined;
+    let cookTime: number | undefined;
+    let equipment: string | undefined;
+    let crispiness: number | undefined;
+    let difficulty: number | undefined;
+    let videoUrl: string | undefined;
+
+    for (const line of tableLines) {
+      if (line.includes('Net Carbs')) {
+        const carbMatch = line.match(/(\d+)\s*g/);
+        if (carbMatch) netCarbsPerServing = parseInt(carbMatch[1]);
+      }
+      if (line.includes('Calories')) {
+        const calMatch = line.match(/~?(\d+)/);
+        if (calMatch) caloriesPerServing = parseInt(calMatch[1]);
+      }
+      if (line.includes('Cook Time')) {
+        const timeMatch = line.match(/(\d+)\s*(?:minute|min)/i);
+        if (timeMatch) cookTime = parseInt(timeMatch[1]);
+      }
+      if (line.includes('Equipment')) {
+        const eqMatch = line.match(/\|\s*([^|]+)\s*\|/);
+        if (eqMatch) equipment = eqMatch[1].trim();
+      }
+      if (line.includes('Crispiness')) {
+        const cripMatch = line.match(/🥨/g);
+        if (cripMatch) crispiness = cripMatch.length;
+      }
+      if (line.includes('Difficulty')) {
+        const diffMatch = line.match(/⭐/g);
+        if (diffMatch) difficulty = diffMatch.length;
+      }
+    }
+
+    // Extract ingredients (lines with bullet points or dashes)
+    const ingredients: string[] = [];
+    const ingredientRegex = /^\s*[-•]\s+(.+?)$/gm;
+    let match;
+    while ((match = ingredientRegex.exec(recipeContent)) !== null) {
+      const ingredient = match[1].trim();
+      if (!ingredient.match(/^(mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve|Table|\|)/i)) {
+        ingredients.push(ingredient);
+      }
+    }
+
+    recipes.push({
+      recipeName,
+      description,
+      prepTime: undefined, // Can extract if needed
+      cookTime,
+      servings: 1, // Default
+      ingredients: ingredients.length > 0 ? ingredients : undefined,
+      instructions: undefined, // Not in table format
+      netCarbsPerServing,
+      caloriesPerServing,
+      difficulty,
+      crispiness,
+      equipment,
+      videoUrl,
+      imageUrl: undefined, // Can be added from external API
+    });
+  }
+
+  return recipes;
+}
+
+/**
+ * Extract single recipe from Claude response when it contains preparation instructions
  */
 export function extractRecipeFromResponse(claudeResponse: string): {
   hasRecipe: boolean;
