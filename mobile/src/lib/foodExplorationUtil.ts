@@ -217,7 +217,7 @@ export function detectPositiveResponse(userMessage: string): boolean {
 }
 
 /**
- * Extract multiple recipes from Claude response in markdown table format
+ * Extract multiple recipes from Claude response in numbered list or markdown format
  */
 export function extractMultipleRecipesFromResponse(claudeResponse: string): Array<{
   recipeName?: string;
@@ -252,19 +252,28 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
     imageUrl?: string;
   }> = [];
 
-  // Split by markdown recipe headers (## emoji NAME or # NAME)
-  const recipeBlocks = claudeResponse.split(/\n##\s+(?:🍳|🧀|🍛|[^\n]*?)\s+([^\n]+)\n/);
+  // Try markdown format first (## emoji NAME or # NAME)
+  let recipeBlocks: string[];
+  let isMarkdownFormat = false;
+
+  if (claudeResponse.includes('##')) {
+    recipeBlocks = claudeResponse.split(/\n##\s+(?:🍳|🧀|🍛|[^\n]*?)\s+([^\n]+)\n/);
+    isMarkdownFormat = true;
+  } else {
+    // Fall back to numbered list format (1. Name, 2. Name, etc.)
+    recipeBlocks = claudeResponse.split(/\n\d+\.\s+([^\n]+)\n/);
+  }
 
   // First block is usually intro text, skip it
   for (let i = 1; i < recipeBlocks.length; i += 2) {
     const recipeName = recipeBlocks[i]?.trim();
     const recipeContent = recipeBlocks[i + 1] || '';
 
-    if (!recipeName || !recipeContent) continue;
+    if (!recipeName || !recipeContent.trim()) continue;
 
     // Extract description (text before table or bullet points)
-    const descMatch = recipeContent.match(/^([^|•-]+?)(?=\||•|-|\n\n|$)/);
-    const description = descMatch ? descMatch[1].trim() : undefined;
+    const descMatch = recipeContent.match(/^([^|•\-*]+?)(?=\||•|\-|\*|\n\n|$)/);
+    const description = descMatch ? descMatch[1].trim().substring(0, 150) : undefined;
 
     // Extract table-based nutrition info
     const tableLines = recipeContent.split('\n').filter(line => line.includes('|'));
@@ -306,7 +315,7 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
 
     // Extract ingredients (lines with bullet points or dashes)
     const ingredients: string[] = [];
-    const ingredientRegex = /^\s*[-•]\s+(.+?)$/gm;
+    const ingredientRegex = /^\s*[-•*]\s+(.+?)$/gm;
     let match;
     while ((match = ingredientRegex.exec(recipeContent)) !== null) {
       const ingredient = match[1].trim();
@@ -322,22 +331,25 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       instructions.push(match[1].trim());
     }
 
-    recipes.push({
-      recipeName,
-      description,
-      prepTime: undefined, // Can extract if needed
-      cookTime,
-      servings: 1, // Default
-      ingredients: ingredients.length > 0 ? ingredients : undefined,
-      instructions: instructions.length > 0 ? instructions : undefined,
-      netCarbsPerServing,
-      caloriesPerServing,
-      difficulty,
-      crispiness,
-      equipment,
-      videoUrl,
-      imageUrl: undefined, // Can be added from external API
-    });
+    // Only add if it has a name and at least some content
+    if (recipeName) {
+      recipes.push({
+        recipeName,
+        description,
+        prepTime: undefined,
+        cookTime,
+        servings: 1,
+        ingredients: ingredients.length > 0 ? ingredients : undefined,
+        instructions: instructions.length > 0 ? instructions : undefined,
+        netCarbsPerServing,
+        caloriesPerServing,
+        difficulty,
+        crispiness,
+        equipment,
+        videoUrl,
+        imageUrl: undefined,
+      });
+    }
   }
 
   return recipes;
