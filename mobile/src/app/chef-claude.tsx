@@ -626,6 +626,16 @@ function MessageBubble({
     );
   }
 
+  // Clean markdown from assistant message text
+  const cleanMarkdownText = message.content
+    .replace(/#{1,6}\s+/g, '') // Remove markdown headers (# ## ### etc)
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove **bold**
+    .replace(/\*(.*?)\*/g, '$1') // Remove *italic*
+    .replace(/`(.*?)`/g, '$1') // Remove `code`
+    .replace(/---/g, '──────────') // Replace --- dividers with visual separator
+    .replace(/\n\n+/g, '\n\n') // Clean up extra newlines
+    .trim();
+
   return (
     <Pressable
       testID="message-bubble-assistant"
@@ -672,7 +682,7 @@ function MessageBubble({
           }}
         >
           <LinkAwareText
-            text={message.content}
+            text={cleanMarkdownText}
             style={{
               fontFamily: 'DMSans_400Regular',
               fontSize: 15,

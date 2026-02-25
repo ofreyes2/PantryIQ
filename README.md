@@ -4,10 +4,19 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
-### Chef Claude Recipe Card Feature (v1.3.0) ✅ COMPLETE
-- **Structured Recipe Cards in Chat**: Chef Claude now displays recipes as beautiful, interactive recipe cards instead of plain text
+### Chef Claude Recipe Card Feature (v1.3.1) ✅ COMPLETE
+- **Markdown Recipe Detection & Parsing**: Fixed Chef Claude responses showing raw markdown characters
+  - **Problem**: Chef Claude returns recipe markdown (###, **, etc.) but parser only supported ## headers
+  - **Solution**: Updated `extractMultipleRecipesFromResponse()` to:
+    - Support both ### (3 hashes) and ## (2 hashes) markdown headers
+    - Extract recipe metadata from key-value pairs (Equipment, Time, Net Carbs, Crispiness, Difficulty)
+    - Parse emoji indicators (🥇🥈🥉 medals, 🥨 crispiness scale, ⭐ difficulty stars)
+    - Clean markdown formatting (**bold**, etc.) from extracted text
+  - **Result**: Raw markdown no longer appears in message bubbles; recipes render as beautiful cards
+- **Structured Recipe Cards in Chat**: Chef Claude displays recipes as beautiful, interactive recipe cards instead of plain text
   - Recipe name, ingredients list, step-by-step instructions
   - Prep/cook time, servings, nutrition info (net carbs, calories)
+  - Equipment, crispiness rating, difficulty level
   - Expandable/collapsible details with smooth animations
   - Heart button to save recipes directly from the card
 - **Single Save Path**: All recipes save to one unified `useRecipesStore` data source via `toggleFavorite()` method
@@ -15,17 +24,26 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
   - Recipes saved from Chef Claude appear immediately in Recipe Box
   - Recipes can be unsaved from anywhere (Card, Recipe Box tab, heart button)
   - Unsave action reflects immediately across all screens
-- **Enhanced Recipe Extraction**: Updated `extractRecipeFromResponse()` to extract:
-  - Recipe name, ingredients, instructions with better parsing
-  - Prep time, cook time, servings size from natural language
-  - Nutritional info (net carbs, calories per serving)
-  - Cooking method and equipment if mentioned
+- **Markdown Cleaning in Chat Messages**: All assistant messages clean markdown formatting before display
+  - Removes markdown headers (#, ##, ###)
+  - Removes **bold** and *italic* formatting
+  - Replaces --- dividers with visual separators
+  - Maintains clean text-only appearance in message bubbles
+- **Enhanced Recipe Extraction**: `extractMultipleRecipesFromResponse()` now extracts:
+  - Recipe name from numbered headers (### 1. **Name** format)
+  - Description (first paragraph before metadata)
+  - Prep time, cook time from "Time:" fields
+  - Net carbs, calories from nutrition lines
+  - Equipment from equipment field
+  - Crispiness rating (count of 🥨 emojis)
+  - Difficulty level (count of ⭐ stars)
+  - Ingredients from bulleted lines
 - **Functional Heart Button**: Recipe cards in the Recipes tab now have a working favorite button
   - Tapping heart saves/unsaves recipes immediately
   - Heart fills red when recipe is saved
   - Haptic feedback on interaction
   - Works across all recipe displays (suggested, keto, quick, recently viewed)
-- **Message Type Enhancement**: Messages in Chef Claude now include optional `recipeData` property
+- **Message Type Enhancement**: Messages in Chef Claude now include optional `recipeData` or `recipesData` properties
   - Automatically rendered as structured RecipeCard when present
   - Preserves all recipe metadata for future use
 

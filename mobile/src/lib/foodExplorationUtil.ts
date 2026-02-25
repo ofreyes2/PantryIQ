@@ -252,95 +252,136 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
     imageUrl?: string;
   }> = [];
 
-  // Try markdown format first (## emoji NAME or # NAME)
-  let recipeBlocks: string[];
-  let isMarkdownFormat = false;
+  // Split by ### or ## headers (handle both formats)
+  // Pattern matches "### 1. **Recipe Name**" or "## Recipe Name" or variations
+  const headerPattern = /^#{2,3}\s+(?:\d+\.\s+)?(?:🥇|🥈|🥉|🍳|🧀|🍛)?\s*(?:\*\*)?([^*\n]+?)(?:\*\*)?\s*(?:\([^)]*\))?$/gm;
 
-  if (claudeResponse.includes('##')) {
-    recipeBlocks = claudeResponse.split(/\n##\s+(?:🍳|🧀|🍛|[^\n]*?)\s+([^\n]+)\n/);
-    isMarkdownFormat = true;
-  } else {
-    // Fall back to numbered list format (1. Name, 2. Name, etc.)
-    recipeBlocks = claudeResponse.split(/\n\d+\.\s+([^\n]+)\n/);
+  let match;
+  const headerMatches: Array<{ name: string; index: number }> = [];
+
+  while ((match = headerPattern.exec(claudeResponse)) !== null) {
+    headerMatches.push({
+      name: match[1].trim(),
+      index: match.index,
+    });
   }
 
-  // First block is usually intro text, skip it
-  for (let i = 1; i < recipeBlocks.length; i += 2) {
-    const recipeName = recipeBlocks[i]?.trim();
-    const recipeContent = recipeBlocks[i + 1] || '';
+  // If no headers found, return empty array
+  if (headerMatches.length === 0) {
+    return recipes;
+  }
 
-    if (!recipeName || !recipeContent.trim()) continue;
+  // Extract recipe content between each header
+  for (let i = 0; i < headerMatches.length; i++) {
+    const currentHeader = headerMatches[i];
+    const nextHeader = headerMatches[i + 1];
 
-    // Extract description (text before table or bullet points)
-    const descMatch = recipeContent.match(/^([^|•\-*]+?)(?=\||•|\-|\*|\n\n|$)/);
-    const description = descMatch ? descMatch[1].trim().substring(0, 150) : undefined;
+    // Get the content from current header to next header (or end of string)
+    const startIdx = currentHeader.index;
+    const endIdx = nextHeader ? nextHeader.index : claudeResponse.length;
+    const recipeContent = claudeResponse.substring(startIdx, endIdx);
 
-    // Extract table-based nutrition info
-    const tableLines = recipeContent.split('\n').filter(line => line.includes('|'));
+    const recipeName = currentHeader.name;
+
+    if (!recipeName) continue;
+
+    // Extract description - first paragraph before any dashes or bullet points
+    const descMatch = recipeContent.match(/(?:###.*?\n)([\s\S]*?)(?=\n-|\n•|\*\*|---|\n\n|$)/);
+    let description: string | undefined;
+    if (descMatch && descMatch[1]) {
+      description = descMatch[1]
+        .trim()
+        .replace(/\*\*/g, '') // Remove markdown bold
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .substring(0, 150);
+    }
 
     let netCarbsPerServing: number | undefined;
     let caloriesPerServing: number | undefined;
     let cookTime: number | undefined;
+    let prepTime: number | undefined;
     let equipment: string | undefined;
     let crispiness: number | undefined;
     let difficulty: number | undefined;
+    let servings: number | undefined;
     let videoUrl: string | undefined;
 
-    for (const line of tableLines) {
-      if (line.includes('Net Carbs')) {
-        const carbMatch = line.match(/(\d+)\s*g/);
+    // Extract key-value pairs from markdown format
+    // Matches patterns like "- **Equipment:** Deep Fryer" or "- Time: ~15 min"
+    const keyValueRegex = /[-•]\s+(?:\*\*)?([^:*]+?)(?:\*\*)?\s*:\s*\*?\*?(.+?)(?:\*\*)?(?=\n|$)/g;
+    let kvMatch;
+    while ((kvMatch = keyValueRegex.exec(recipeContent)) !== null) {
+      const key = kvMatch[1].trim().toLowerCase();
+      let value = kvMatch[2].trim();
+      // Remove trailing markdown
+      value = value.replace(/\*\*\s*$/, '').trim();
+
+      if (key.includes('net carb')) {
+        const carbMatch = value.match(/(\d+)\s*g/);
         if (carbMatch) netCarbsPerServing = parseInt(carbMatch[1]);
-      }
-      if (line.includes('Calories')) {
-        const calMatch = line.match(/~?(\d+)/);
+      } else if (key.includes('calorie')) {
+        const calMatch = value.match(/~?(\d+)/);
         if (calMatch) caloriesPerServing = parseInt(calMatch[1]);
-      }
-      if (line.includes('Cook Time')) {
-        const timeMatch = line.match(/(\d+)\s*(?:minute|min)/i);
+      } else if (key.includes('time') && !key.includes('prep')) {
+        const timeMatch = value.match(/~?(\d+)\s*(?:minute|min)/i);
         if (timeMatch) cookTime = parseInt(timeMatch[1]);
-      }
-      if (line.includes('Equipment')) {
-        const eqMatch = line.match(/\|\s*([^|]+)\s*\|/);
-        if (eqMatch) equipment = eqMatch[1].trim();
-      }
-      if (line.includes('Crispiness')) {
-        const cripMatch = line.match(/🥨/g);
-        if (cripMatch) crispiness = cripMatch.length;
-      }
-      if (line.includes('Difficulty')) {
-        const diffMatch = line.match(/⭐/g);
-        if (diffMatch) difficulty = diffMatch.length;
+      } else if (key.includes('prep')) {
+        const timeMatch = value.match(/(\d+)\s*(?:minute|min)/i);
+        if (timeMatch) prepTime = parseInt(timeMatch[1]);
+      } else if (key.includes('equipment')) {
+        equipment = value.replace(/\*\*/g, '').trim();
+      } else if (key.includes('serving')) {
+        const servMatch = value.match(/(\d+)/);
+        if (servMatch) servings = parseInt(servMatch[1]);
       }
     }
 
-    // Extract ingredients (lines with bullet points or dashes)
+    // Count difficulty stars ⭐
+    const diffMatch = recipeContent.match(/Difficulty[^:]*:\s*(\*\*)?([⭐]+)/i);
+    if (diffMatch) {
+      difficulty = diffMatch[2].length;
+    }
+
+    // Count crispiness pretzels 🥨
+    const crispMatch = recipeContent.match(/Crispiness[^:]*:\s*(\*\*)?([🥨]+)/i);
+    if (crispMatch) {
+      crispiness = crispMatch[2].length;
+    }
+
+    // Extract ingredients (lines starting with - or •)
     const ingredients: string[] = [];
-    const ingredientRegex = /^\s*[-•*]\s+(.+?)$/gm;
-    let match;
-    while ((match = ingredientRegex.exec(recipeContent)) !== null) {
-      const ingredient = match[1].trim();
-      if (!ingredient.match(/^(mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve|Table|\|)/i)) {
+    const ingredientLines = recipeContent.split('\n').filter(line => /^[-•]\s/.test(line));
+
+    for (const line of ingredientLines) {
+      // Remove bullet points and clean markdown
+      let ingredient = line.replace(/^[-•]\s+/, '').trim();
+
+      // Skip non-ingredient lines
+      if (ingredient.match(/^(?:mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve|you have|missing|✅|⚠️|equipment|time|carb|difficulty|crispiness|net|calories)/i)) {
+        continue;
+      }
+
+      // Remove markdown formatting
+      ingredient = ingredient
+        .replace(/\*\*(.*?)\*\*/g, '$1')
+        .replace(/`(.*?)`/g, '$1')
+        .trim();
+
+      if (ingredient && ingredient.length > 0) {
         ingredients.push(ingredient);
       }
     }
 
-    // Extract instructions (numbered steps)
-    const instructions: string[] = [];
-    const instructionRegex = /^\s*\d+\.\s+(.+?)$/gm;
-    while ((match = instructionRegex.exec(recipeContent)) !== null) {
-      instructions.push(match[1].trim());
-    }
-
-    // Only add if it has a name and at least some content
+    // Only add if it has a name
     if (recipeName) {
       recipes.push({
         recipeName,
-        description,
-        prepTime: undefined,
+        description: description || undefined,
+        prepTime,
         cookTime,
-        servings: 1,
+        servings: servings || 1,
         ingredients: ingredients.length > 0 ? ingredients : undefined,
-        instructions: instructions.length > 0 ? instructions : undefined,
+        instructions: undefined, // Claude's format doesn't include detailed instructions in list format
         netCarbsPerServing,
         caloriesPerServing,
         difficulty,
