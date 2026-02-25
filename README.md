@@ -4,6 +4,24 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Chef Claude Recipe Card Complete Fix (v1.3.2) ✅ COMPLETE
+- **System Prompt Recipe Format Enhancement** — Updated Chef Claude system prompt to return recipes in a standardized structured format:
+  - Each recipe now includes: `### [NUMBER]. [NAME]`, description, Equipment, Time, Servings, Net Carbs, Calories, Crispiness (🥨 scale), Difficulty (⭐ scale)
+  - **INGREDIENTS** section with dash-bulleted items (quantity, unit, ingredient name)
+  - **INSTRUCTIONS** section with numbered steps (1. 2. 3.)
+  - **⚠️ Missing** section lists any pantry items user doesn't have or "None — you have everything"
+  - Recipe separator (`---`) between each recipe for clear parsing
+- **Recipe Parser Enhancement** — Updated `extractMultipleRecipesFromResponse()` to properly extract:
+  - **Ingredients**: Now correctly parses `INGREDIENTS:` section and extracts all dash-bulleted items
+  - **Instructions**: Now correctly parses `INSTRUCTIONS:` section and extracts all numbered steps
+  - Both sections are properly separated from metadata and stop at next section boundary
+  - Markdown formatting is cleaned from extracted text
+- **Result**: Recipe cards now display complete ingredients list and step-by-step instructions
+  - Previously showed only recipe name, stats, and equipment
+  - Cards expand to show full ingredient list with green bullet points
+  - Cards expand to show numbered instruction steps with green circle numbers
+  - RecipeCard already had the display layout; parser was returning empty ingredients/instructions arrays
+
 ### Chef Claude Recipe Card Feature (v1.3.1) ✅ COMPLETE
 - **Markdown Recipe Detection & Parsing**: Fixed Chef Claude responses showing raw markdown characters
   - **Problem**: Chef Claude returns recipe markdown (###, **, etc.) but parser only supported ## headers

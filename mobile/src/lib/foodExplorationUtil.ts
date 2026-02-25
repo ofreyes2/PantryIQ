@@ -348,29 +348,52 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       crispiness = crispMatch[2].length;
     }
 
-    // Extract ingredients (lines starting with - or •)
+    // Extract ingredients - look for INGREDIENTS: section
     const ingredients: string[] = [];
-    const ingredientLines = recipeContent.split('\n').filter(line => /^[-•]\s/.test(line));
+    const ingredientSectionMatch = recipeContent.match(/INGREDIENTS:\s*([\s\S]*?)(?=INSTRUCTIONS:|⚠️|$)/i);
 
-    for (const line of ingredientLines) {
-      // Remove bullet points and clean markdown
-      let ingredient = line.replace(/^[-•]\s+/, '').trim();
+    if (ingredientSectionMatch && ingredientSectionMatch[1]) {
+      const ingredientBlock = ingredientSectionMatch[1];
+      const ingredientLines = ingredientBlock.split('\n').filter(line => /^[-•]\s/.test(line.trim()));
 
-      // Skip non-ingredient lines
-      if (ingredient.match(/^(?:mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve|you have|missing|✅|⚠️|equipment|time|carb|difficulty|crispiness|net|calories)/i)) {
-        continue;
-      }
+      for (const line of ingredientLines) {
+        let ingredient = line.trim().replace(/^[-•]\s+/, '').trim();
 
-      // Remove markdown formatting
-      ingredient = ingredient
-        .replace(/\*\*(.*?)\*\*/g, '$1')
-        .replace(/`(.*?)`/g, '$1')
-        .trim();
+        // Remove markdown formatting
+        ingredient = ingredient
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/`(.*?)`/g, '$1')
+          .trim();
 
-      if (ingredient && ingredient.length > 0) {
-        ingredients.push(ingredient);
+        if (ingredient && ingredient.length > 0) {
+          ingredients.push(ingredient);
+        }
       }
     }
+
+    // Extract instructions - look for INSTRUCTIONS: section
+    let instructions: string[] = [];
+    const instructionSectionMatch = recipeContent.match(/INSTRUCTIONS:\s*([\s\S]*?)(?=⚠️|$)/i);
+
+    if (instructionSectionMatch && instructionSectionMatch[1]) {
+      const instructionBlock = instructionSectionMatch[1];
+      const instructionLines = instructionBlock.split('\n').filter(line => /^\d+\.\s/.test(line.trim()));
+
+      for (const line of instructionLines) {
+        let instruction = line.trim().replace(/^\d+\.\s+/, '').trim();
+
+        // Remove markdown formatting
+        instruction = instruction
+          .replace(/\*\*(.*?)\*\*/g, '$1')
+          .replace(/`(.*?)`/g, '$1')
+          .trim();
+
+        if (instruction && instruction.length > 0) {
+          instructions.push(instruction);
+        }
+      }
+    }
+
 
     // Only add if it has a name
     if (recipeName) {
@@ -381,7 +404,7 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
         cookTime,
         servings: servings || 1,
         ingredients: ingredients.length > 0 ? ingredients : undefined,
-        instructions: undefined, // Claude's format doesn't include detailed instructions in list format
+        instructions: instructions.length > 0 ? instructions : undefined,
         netCarbsPerServing,
         caloriesPerServing,
         difficulty,
