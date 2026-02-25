@@ -1,11 +1,15 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, Pressable, ScrollView, TouchableOpacity, Modal, Share } from 'react-native';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { Clock, Users, Flame, AlertCircle, Heart, ChevronDown } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { openURL } from '@/lib/messageFormatter';
 import * as Haptics from 'expo-haptics';
 import { useToast } from './Toast';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import * as Print from 'expo-print';
+import * as MediaLibrary from 'expo-media-library';
 
 interface RecipeCardProps {
   recipeName: string;
@@ -51,7 +55,9 @@ export function RecipeCard({
   const [descExpanded, setDescExpanded] = React.useState(false);
   const [isFavorite, setIsFavorite] = React.useState(false);
   const [savedToBox, setSavedToBox] = React.useState(false);
+  const [showShareOptions, setShowShareOptions] = React.useState(false);
   const { showToast } = useToast();
+  const cardRef = React.useRef(null);
 
   // Check if this recipe exists in store to show correct heart state
   const recipes = useRecipesStore((s) => s.recipes);
@@ -157,22 +163,301 @@ export function RecipeCard({
     }
   };
 
+  const handleShareRecipe = () => {
+    setShowShareOptions(true);
+  };
+
+  const shareAsImage = async () => {
+    setShowShareOptions(false);
+    try {
+      showToast('Preparing image...');
+
+      const uri = await captureRef(cardRef, {
+        format: 'png',
+        quality: 1.0,
+        result: 'tmpfile',
+      });
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'image/png',
+          dialogTitle: `Share ${recipeName}`,
+          UTI: 'public.png',
+        });
+      } else {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          await MediaLibrary.saveToLibraryAsync(uri);
+          showToast('Recipe card saved to Photos ✓', 'success');
+        }
+      }
+    } catch (error) {
+      console.error('Share image error:', error);
+      showToast('Could not share image — try sharing as text instead', 'error');
+    }
+  };
+
+  const shareAsPDF = async () => {
+    setShowShareOptions(false);
+    try {
+      showToast('Creating PDF...');
+
+      const ingredientsList = (ingredients || [])
+        .map((i) => `<li style="margin-bottom: 6px; color: #333;">${i}</li>`)
+        .join('');
+
+      const instructionsList = (instructions || [])
+        .map(
+          (step, idx) => `
+        <div style="display: flex; margin-bottom: 12px; align-items: flex-start;">
+          <span style="
+            background: #2ECC71;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 12px;
+            margin-right: 12px;
+            flex-shrink: 0;
+            line-height: 24px;
+            text-align: center;
+          ">${idx + 1}</span>
+          <span style="color: #333; font-size: 14px; line-height: 1.6;">${step}</span>
+        </div>
+      `
+        )
+        .join('');
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+              margin: 0;
+              padding: 0;
+              background: white;
+            }
+            .header {
+              background: linear-gradient(135deg, #0A1628, #1A2B4A);
+              padding: 32px 24px;
+              color: white;
+            }
+            .app-badge {
+              display: inline-block;
+              background: #2ECC71;
+              color: #0A1628;
+              font-size: 11px;
+              font-weight: 800;
+              letter-spacing: 2px;
+              padding: 4px 12px;
+              border-radius: 20px;
+              margin-bottom: 12px;
+              text-transform: uppercase;
+            }
+            .recipe-name {
+              font-size: 28px;
+              font-weight: 800;
+              color: white;
+              margin: 0 0 8px 0;
+              line-height: 1.2;
+            }
+            .description {
+              color: rgba(255,255,255,0.7);
+              font-size: 14px;
+              line-height: 1.6;
+              margin: 0;
+            }
+            .stats-row {
+              display: flex;
+              gap: 16px;
+              padding: 20px 24px;
+              background: #f8f9fa;
+              border-bottom: 1px solid #eee;
+              flex-wrap: wrap;
+            }
+            .stat-pill {
+              background: white;
+              border: 1px solid #e0e0e0;
+              border-radius: 20px;
+              padding: 6px 14px;
+              font-size: 13px;
+              color: #333;
+              font-weight: 600;
+            }
+            .stat-pill.green { color: #2ECC71; border-color: #2ECC71; }
+            .content {
+              padding: 24px;
+            }
+            .section-title {
+              font-size: 13px;
+              font-weight: 800;
+              color: #0A1628;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+              margin-bottom: 14px;
+              margin-top: 24px;
+            }
+            .ingredients-list {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            }
+            .ingredients-list li::before {
+              content: "●";
+              color: #2ECC71;
+              font-size: 8px;
+              margin-right: 10px;
+              vertical-align: middle;
+            }
+            .footer {
+              margin-top: 32px;
+              padding: 16px 24px;
+              background: #f8f9fa;
+              border-top: 1px solid #eee;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .footer-brand {
+              font-size: 13px;
+              font-weight: 800;
+              color: #0A1628;
+              letter-spacing: 1px;
+            }
+            .footer-sub {
+              font-size: 11px;
+              color: #999;
+              margin-top: 2px;
+            }
+            .footer-carbs {
+              font-size: 13px;
+              color: #2ECC71;
+              font-weight: 700;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="app-badge">PantryIQ Recipe</div>
+            <h1 class="recipe-name">${recipeName}</h1>
+            <p class="description">${description || ''}</p>
+          </div>
+
+          <div class="stats-row">
+            ${totalTime ? `<span class="stat-pill">⏱ ${totalTime}m</span>` : ''}
+            ${netCarbsPerServing ? `<span class="stat-pill green">🥦 ${netCarbsPerServing}g</span>` : ''}
+            ${caloriesPerServing ? `<span class="stat-pill">🔥 ${caloriesPerServing} cal</span>` : ''}
+            ${equipment ? `<span class="stat-pill">🍳 ${equipment}</span>` : ''}
+            ${difficulty ? `<span class="stat-pill">${'⭐'.repeat(difficulty)}</span>` : ''}
+          </div>
+
+          <div class="content">
+            <div class="section-title">Ingredients</div>
+            <ul class="ingredients-list">
+              ${ingredientsList}
+            </ul>
+
+            <div class="section-title">Instructions</div>
+            ${instructionsList}
+          </div>
+
+          <div class="footer">
+            <div>
+              <div class="footer-brand">PANTRYIQ</div>
+              <div class="footer-sub">Your Kitchen AI</div>
+            </div>
+            <div class="footer-carbs">
+              ${netCarbsPerServing || '—'} net carbs per serving
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({
+        html,
+        base64: false,
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: `Share ${recipeName}`,
+        UTI: 'com.adobe.pdf',
+      });
+    } catch (error) {
+      console.error('Share PDF error:', error);
+      showToast('Could not create PDF — try sharing as text instead', 'error');
+    }
+  };
+
+  const shareAsText = async () => {
+    setShowShareOptions(false);
+    try {
+      const ingredientsText = (ingredients || [])
+        .map((i) => `• ${i}`)
+        .join('\n');
+
+      const instructionsText = (instructions || [])
+        .map((step, idx) => `${idx + 1}. ${step}`)
+        .join('\n');
+
+      const message = `
+🍽️ ${recipeName}
+${description || ''}
+
+⏱ ${totalTime}m  |  🥦 ${netCarbsPerServing}g  |  🔥 ${caloriesPerServing} cal
+
+📋 INGREDIENTS
+${ingredientsText}
+
+👨‍🍳 INSTRUCTIONS
+${instructionsText}
+
+${crispiness ? `Crispiness: ${'🥨'.repeat(crispiness)}` : ''}
+${difficulty ? `Difficulty: ${'⭐'.repeat(difficulty)}` : ''}
+
+Shared from PantryIQ — Your Kitchen AI 🍳
+      `.trim();
+
+      await Share.share({
+        message,
+        title: recipeName,
+      });
+    } catch (error) {
+      if ((error as any).message !== 'The user did not share') {
+        showToast('Could not share — please try again', 'error');
+      }
+    }
+  };
+
   const totalTime = prepTime + cookTime;
 
   return (
-    <View
-      style={{
-        backgroundColor: Colors.navyCard,
-        borderRadius: BorderRadius.lg,
-        borderWidth: 1.5,
-        borderColor: Colors.green,
-        overflow: 'hidden',
-        marginHorizontal: Spacing.md,
-        marginVertical: Spacing.sm,
-        ...Shadows.card,
-      }}
-    >
-      {/* Header with recipe name and save button */}
+    <>
+      <View
+        ref={cardRef}
+        collapsable={false}
+        style={{
+          backgroundColor: Colors.navyCard,
+          borderRadius: BorderRadius.lg,
+          borderWidth: 1.5,
+          borderColor: Colors.green,
+          overflow: 'hidden',
+          marginHorizontal: Spacing.md,
+          marginVertical: Spacing.sm,
+          ...Shadows.card,
+        }}
+      >
+      {/* Header with recipe name and action buttons */}
       <View
         style={{
           flexDirection: 'row',
@@ -243,26 +528,46 @@ export function RecipeCard({
           ) : null}
         </View>
 
-        <Pressable
-          onPress={toggleFavoriteHeart}
-          disabled={isSaving}
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: isFavorite ? 'rgba(231, 76, 60, 0.15)' : 'rgba(255,255,255,0.05)',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderWidth: 1,
-            borderColor: isFavorite ? 'rgba(231, 76, 60, 0.4)' : 'rgba(255,255,255,0.1)',
-            marginLeft: Spacing.sm,
-            opacity: isSaving ? 0.6 : 1,
-          }}
-        >
-          <Text style={{ fontSize: 16 }}>
-            {isFavorite ? '❤️' : '🤍'}
-          </Text>
-        </Pressable>
+        {/* Heart and Share buttons */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: Spacing.sm }}>
+          <Pressable
+            onPress={toggleFavoriteHeart}
+            disabled={isSaving}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: isFavorite ? 'rgba(231, 76, 60, 0.15)' : 'rgba(255,255,255,0.05)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: isFavorite ? 'rgba(231, 76, 60, 0.4)' : 'rgba(255,255,255,0.1)',
+              opacity: isSaving ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>
+              {isFavorite ? '❤️' : '🤍'}
+            </Text>
+          </Pressable>
+
+          <TouchableOpacity
+            onPress={handleShareRecipe}
+            disabled={isSaving}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: 'rgba(255,255,255,0.05)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.1)',
+              opacity: isSaving ? 0.6 : 1,
+            }}
+          >
+            <Text style={{ fontSize: 16 }}>↗️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Quick info row */}
@@ -567,5 +872,233 @@ export function RecipeCard({
         />
       </Pressable>
     </View>
+
+      {/* Share Options Bottom Sheet */}
+      <Modal
+        visible={showShareOptions}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowShareOptions(false)}
+      >
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0,0,0,0.5)',
+            justifyContent: 'flex-end',
+          }}
+          onPress={() => setShowShareOptions(false)}
+          activeOpacity={1}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View
+              style={{
+                backgroundColor: '#152033',
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                padding: 24,
+                paddingBottom: 40,
+              }}
+            >
+              {/* Handle bar */}
+              <View
+                style={{
+                  width: 40,
+                  height: 4,
+                  backgroundColor: '#2D3748',
+                  borderRadius: 2,
+                  alignSelf: 'center',
+                  marginBottom: 20,
+                }}
+              />
+
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontSize: 18,
+                  fontWeight: '700',
+                  marginBottom: 6,
+                }}
+              >
+                Share Recipe
+              </Text>
+              <Text
+                style={{
+                  color: '#A0AEC0',
+                  fontSize: 13,
+                  marginBottom: 24,
+                }}
+              >
+                {recipeName}
+              </Text>
+
+              {/* Share as Image */}
+              <TouchableOpacity
+                onPress={() => shareAsImage()}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#1A2B4A',
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 10,
+                  gap: 14,
+                }}
+              >
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    backgroundColor: '#2ECC71',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 22 }}>🖼️</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Share as Image
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#A0AEC0',
+                      fontSize: 12,
+                      marginTop: 2,
+                    }}
+                  >
+                    Beautiful recipe card — perfect for Messages or Instagram
+                  </Text>
+                </View>
+                <Text style={{ color: '#4A6FA5', fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+
+              {/* Share as PDF */}
+              <TouchableOpacity
+                onPress={() => shareAsPDF()}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#1A2B4A',
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 10,
+                  gap: 14,
+                }}
+              >
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    backgroundColor: '#E74C3C',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 22 }}>📄</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Share as PDF
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#A0AEC0',
+                      fontSize: 12,
+                      marginTop: 2,
+                    }}
+                  >
+                    Full recipe document — great for email or saving to Files
+                  </Text>
+                </View>
+                <Text style={{ color: '#4A6FA5', fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+
+              {/* Share as Text */}
+              <TouchableOpacity
+                onPress={() => shareAsText()}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: '#1A2B4A',
+                  borderRadius: 14,
+                  padding: 16,
+                  marginBottom: 20,
+                  gap: 14,
+                }}
+              >
+                <View
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    backgroundColor: '#4A6FA5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 22 }}>💬</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Share as Text
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#A0AEC0',
+                      fontSize: 12,
+                      marginTop: 2,
+                    }}
+                  >
+                    Plain text recipe — works in any messaging app instantly
+                  </Text>
+                </View>
+                <Text style={{ color: '#4A6FA5', fontSize: 18 }}>›</Text>
+              </TouchableOpacity>
+
+              {/* Cancel */}
+              <TouchableOpacity
+                onPress={() => setShowShareOptions(false)}
+                style={{
+                  backgroundColor: '#0A1628',
+                  borderRadius: 14,
+                  padding: 16,
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: '#A0AEC0',
+                    fontSize: 15,
+                    fontWeight: '600',
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+    </>
   );
 }

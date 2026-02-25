@@ -4,6 +4,53 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Recipe Card Sharing Feature (v1.3.4) ✅ COMPLETE
+- **Share Button on Recipe Cards** — Arrow icon (↗️) next to heart button in card header
+  - Opens beautiful share options bottom sheet
+  - Positioned next to favorite heart button for easy access
+  - Disabled while recipe is being saved for better UX
+- **Three Share Formats** — Choose how to share recipes:
+  1. **Share as Image** — Uses `react-native-view-shot` to capture recipe card as PNG
+     - Perfect for Messages, WhatsApp, Instagram, email
+     - High-quality image with full recipe formatting
+     - Fallback: saves to Photos library if sharing unavailable
+  2. **Share as PDF** — Uses `expo-print` to generate professional PDF
+     - Beautiful PantryIQ branded header with gradient (navy → dark blue)
+     - Formatted ingredients list with bullet points
+     - Numbered instruction steps with green step indicators
+     - Nutrition stats in footer (carbs per serving)
+     - Perfect for emailing, saving to Files app, printing
+  3. **Share as Plain Text** — Uses native Share API
+     - Formatted recipe with all ingredients and numbered steps
+     - Emoji icons for visual appeal (🍽️ recipe name, ⏱ time, 🥦 carbs, etc.)
+     - Works instantly in any messaging app (iMessage, WhatsApp, email)
+     - No dependencies or processing required
+- **Bottom Sheet UI** — Professional modal with:
+  - Handle bar at top for discoverability
+  - Recipe name display
+  - Three option cards with icons, descriptions, and chevrons
+  - Cancel button at bottom
+  - Smooth slide-up animation
+  - Dark navy theme (#152033) matching app aesthetic
+- **User Feedback** — Toast messages for all states:
+  - "Preparing image..." while capturing card
+  - "Creating PDF..." while generating document
+  - Error handling with fallback suggestions
+  - Success confirmations on file save
+- **Implementation Details**:
+  - `cardRef` using `useRef` to capture entire recipe card view
+  - `shareAsImage()` — captureRef → Sharing.shareAsync
+  - `shareAsPDF()` — Print.printToFileAsync with custom HTML → Sharing.shareAsync
+  - `shareAsText()` — Share.share with formatted message
+  - All three methods close bottom sheet immediately and show appropriate toast
+  - Works from Chef Claude recipe cards AND Recipe Box saved recipes
+- **Architecture**:
+  - New state: `showShareOptions` boolean for modal visibility
+  - New handler: `handleShareRecipe()` to open sheet
+  - Three async handlers: `shareAsImage()`, `shareAsPDF()`, `shareAsText()`
+  - Modal always renders (not conditional) to avoid lint errors
+  - All necessary packages already installed in project
+
 ### Chef Claude Recipe Card Three Focused Fixes (v1.3.3) ✅ COMPLETE
 - **Fix 1: Expandable Description** — Description text now expands smoothly to show full content
   - Click "Read more" to expand description to unlimited lines
