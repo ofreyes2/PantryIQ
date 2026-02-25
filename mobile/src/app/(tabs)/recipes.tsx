@@ -25,7 +25,6 @@ import {
   ChefHat,
   Heart,
   Clock,
-  Sparkles,
   X,
   Star,
 } from 'lucide-react-native';
@@ -312,7 +311,6 @@ export default function RecipesScreen() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<string>('All');
-  const [fabOpen, setFabOpen] = useState(false);
   const [longPressRecipe, setLongPressRecipe] = useState<Recipe | null>(null);
 
   const recipes = useRecipesStore((s) => s.recipes);
@@ -373,15 +371,6 @@ export default function RecipesScreen() {
   const handleLongPress = (recipe: Recipe) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLongPressRecipe(recipe);
-  };
-
-  const fabScale = useSharedValue(1);
-  const fabStyle = useAnimatedStyle(() => ({ transform: [{ scale: fabScale.value }] }));
-
-  const handleFabPress = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    fabScale.value = withSpring(0.9, {}, () => { fabScale.value = withSpring(1); });
-    setFabOpen(true);
   };
 
   // Search results (takes priority)
@@ -655,151 +644,33 @@ export default function RecipesScreen() {
           )}
         </ScrollView>
 
-        {/* FAB */}
-        <Animated.View
-          style={[
-            fabStyle,
-            { position: 'absolute', bottom: 100, right: 20 },
-          ]}
+        {/* Chef Claude FAB */}
+        <Pressable
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push('/chef-claude');
+          }}
+          style={{
+            position: 'absolute',
+            bottom: 100,
+            right: 20,
+            width: 56,
+            height: 56,
+            borderRadius: 28,
+            backgroundColor: Colors.green,
+            alignItems: 'center',
+            justifyContent: 'center',
+            shadowColor: Colors.green,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.5,
+            shadowRadius: 12,
+            elevation: 8,
+            zIndex: 100,
+          }}
+          testID="chef-claude-fab"
         >
-          <Pressable
-            onPress={handleFabPress}
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: BorderRadius.full,
-              backgroundColor: Colors.green,
-              alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: Colors.green,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.4,
-              shadowRadius: 12,
-              elevation: 8,
-            }}
-            testID="recipe-fab-button"
-          >
-            <ChefHat size={24} color={Colors.navy} />
-          </Pressable>
-        </Animated.View>
-
-        {/* FAB Action Sheet Modal */}
-        <Modal
-          visible={fabOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setFabOpen(false)}
-        >
-          <Pressable
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
-            onPress={() => setFabOpen(false)}
-          >
-            <View
-              style={{
-                backgroundColor: Colors.navyCard,
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: Spacing.lg,
-                paddingBottom: 40,
-                borderWidth: 1,
-                borderColor: Colors.border,
-              }}
-            >
-              <View
-                style={{
-                  width: 36,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: Colors.border,
-                  alignSelf: 'center',
-                  marginBottom: 20,
-                }}
-              />
-              <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 16, color: Colors.textPrimary, marginBottom: 16, textAlign: 'center' }}>
-                Add Recipe
-              </Text>
-
-              <Pressable
-                onPress={() => {
-                  setFabOpen(false);
-                  router.push('/generate-recipe');
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: Colors.greenMuted,
-                  borderRadius: BorderRadius.md,
-                  padding: Spacing.md,
-                  marginBottom: 10,
-                  borderWidth: 1,
-                  borderColor: 'rgba(46,204,113,0.3)',
-                }}
-                testID="generate-recipe-option"
-              >
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: BorderRadius.md,
-                    backgroundColor: Colors.green,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 14,
-                  }}
-                >
-                  <Sparkles size={22} color={Colors.navy} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
-                    Generate Recipe with AI
-                  </Text>
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>
-                    Claude crafts a custom recipe for you
-                  </Text>
-                </View>
-              </Pressable>
-
-              <Pressable
-                onPress={() => {
-                  setFabOpen(false);
-                  router.push('/import-recipe');
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  backgroundColor: Colors.surface,
-                  borderRadius: BorderRadius.md,
-                  padding: Spacing.md,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                }}
-                testID="import-recipe-option"
-              >
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: BorderRadius.md,
-                    backgroundColor: Colors.surfaceLight,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 14,
-                  }}
-                >
-                  <Link size={22} color={Colors.textSecondary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontFamily: 'DMSans_700Bold', fontSize: 15, color: Colors.textPrimary }}>
-                    Import from URL
-                  </Text>
-                  <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 2 }}>
-                    Paste a recipe URL or text
-                  </Text>
-                </View>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Modal>
+          <ChefHat size={24} color="#fff" />
+        </Pressable>
 
         {/* Long Press Options Modal */}
         <Modal
