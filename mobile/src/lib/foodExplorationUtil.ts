@@ -315,6 +315,13 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       }
     }
 
+    // Extract instructions (numbered steps)
+    const instructions: string[] = [];
+    const instructionRegex = /^\s*\d+\.\s+(.+?)$/gm;
+    while ((match = instructionRegex.exec(recipeContent)) !== null) {
+      instructions.push(match[1].trim());
+    }
+
     recipes.push({
       recipeName,
       description,
@@ -322,7 +329,7 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       cookTime,
       servings: 1, // Default
       ingredients: ingredients.length > 0 ? ingredients : undefined,
-      instructions: undefined, // Not in table format
+      instructions: instructions.length > 0 ? instructions : undefined,
       netCarbsPerServing,
       caloriesPerServing,
       difficulty,
