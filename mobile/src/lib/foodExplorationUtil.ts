@@ -223,13 +223,18 @@ export function extractRecipeFromResponse(claudeResponse: string): {
   hasRecipe: boolean;
   recipeName?: string;
   servingTime?: string;
+  prepTime?: number;
+  cookTime?: number;
+  servings?: number;
   ingredients?: string[];
   instructions?: string[];
+  netCarbsPerServing?: number;
+  caloriesPerServing?: number;
 } {
   // Look for numbered steps (1. 2. 3.) or ingredient lists
   const hasNumberedSteps =
     /^\s*\d+\.\s/m.test(claudeResponse);
-  const hasIngredientMarkers = /[-•]\s+\d+\s+(tbsp|tsp|oz|cup|lb|g)/i.test(
+  const hasIngredientMarkers = /[-•]\s+\d+\s+(tbsp|tsp|oz|cup|lb|g|ml|serving)/i.test(
     claudeResponse
   );
 
@@ -237,21 +242,59 @@ export function extractRecipeFromResponse(claudeResponse: string): {
     return { hasRecipe: false };
   }
 
-  // Extract prep time if mentioned
-  const timeMatch = claudeResponse.match(/(\d+)\s*(minute|min|second|sec)\s+/i);
+  // Extract recipe name (usually in first line or after common headers)
+  const nameMatch = claudeResponse.match(/^(?:##\s+)?([A-Z][A-Za-z\s]+?)(?:\n|$)/);
+  const recipeName = nameMatch ? nameMatch[1].trim() : undefined;
+
+  // Extract prep/cook time if mentioned
+  const prepTimeMatch = claudeResponse.match(/(?:prep|preparation)\s+(?:time|time)?:?\s*(\d+)\s*(?:minute|min)/i);
+  const cookTimeMatch = claudeResponse.match(/cook(?:ing)?\s+time:?\s*(\d+)\s*(?:minute|min)/i);
+  const servingMatch = claudeResponse.match(/(?:yield|serves?):\s*(\d+)\s*(?:serving)?/i);
+
+  const prepTime = prepTimeMatch ? parseInt(prepTimeMatch[1]) : undefined;
+  const cookTime = cookTimeMatch ? parseInt(cookTimeMatch[1]) : undefined;
+  const servings = servingMatch ? parseInt(servingMatch[1]) : undefined;
+
+  // Extract first time mentioned if no specific labels (for servingTime display)
+  const timeMatch = claudeResponse.match(/(\d+)\s*(?:minute|min|second|sec)\s*/i);
   const servingTime = timeMatch ? timeMatch[0].trim() : undefined;
+
+  // Extract ingredients (lines with bullet points, dashes, or numbers)
+  const ingredients: string[] = [];
+  const ingredientRegex = /^\s*[-•*]\s+(.+?)$/gm;
+  let match;
+  while ((match = ingredientRegex.exec(claudeResponse)) !== null) {
+    const ingredient = match[1].trim();
+    // Filter out lines that look like instructions
+    if (!ingredient.match(/^(mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve)/i)) {
+      ingredients.push(ingredient);
+    }
+  }
 
   // Extract instructions (numbered lines)
   const instructions: string[] = [];
   const stepRegex = /^\s*\d+\.\s+(.+?)(?=\n\s*\d+\.|$)/gm;
-  let match;
   while ((match = stepRegex.exec(claudeResponse)) !== null) {
     instructions.push(match[1].trim());
   }
 
+  // Extract nutrition info if mentioned
+  const carbMatch = claudeResponse.match(/(\d+)\s*(?:g|grams?)\s*(?:net\s+)?carb/i);
+  const calorieMatch = claudeResponse.match(/(\d+)\s*(?:calories?|kcal)/i);
+
+  const netCarbsPerServing = carbMatch ? parseInt(carbMatch[1]) : undefined;
+  const caloriesPerServing = calorieMatch ? parseInt(calorieMatch[1]) : undefined;
+
   return {
     hasRecipe: true,
+    recipeName,
     servingTime,
+    prepTime,
+    cookTime,
+    servings,
+    ingredients: ingredients.length > 0 ? ingredients : undefined,
     instructions: instructions.length > 0 ? instructions : undefined,
+    netCarbsPerServing,
+    caloriesPerServing,
   };
 }

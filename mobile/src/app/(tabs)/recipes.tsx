@@ -59,9 +59,10 @@ interface RecipeCardProps {
   pantryMatchBadge?: string | null;
   onPress: () => void;
   onLongPress: () => void;
+  onFavoritePress: (recipeId: string) => void;
 }
 
-function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPress }: RecipeCardProps) {
+function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPress, onFavoritePress }: RecipeCardProps) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const gradColors = getCategoryGradient(recipe.category);
@@ -143,6 +144,7 @@ function RecipeCard({ recipe, width, height, pantryMatchBadge, onPress, onLongPr
           {/* Favorite heart */}
           <Pressable
             onPress={() => {
+              onFavoritePress(recipe.id);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
             style={{
@@ -514,6 +516,7 @@ export default function RecipesScreen() {
                     height={200}
                     onPress={() => handleRecipePress(recipe)}
                     onLongPress={() => handleLongPress(recipe)}
+                    onFavoritePress={toggleFavorite}
                   />
                 ))}
               </View>
@@ -541,6 +544,7 @@ export default function RecipesScreen() {
                       pantryMatchBadge={getPantryMatch(recipe)}
                       onPress={() => handleRecipePress(recipe)}
                       onLongPress={() => handleLongPress(recipe)}
+                      onFavoritePress={toggleFavorite}
                     />
                   ))}
                 </View>
@@ -568,6 +572,7 @@ export default function RecipesScreen() {
                     pantryMatchBadge={getPantryMatch(item)}
                     onPress={() => handleRecipePress(item)}
                     onLongPress={() => handleLongPress(item)}
+                    onFavoritePress={toggleFavorite}
                   />
                 )}
               />
@@ -590,6 +595,7 @@ export default function RecipesScreen() {
                         height={200}
                         onPress={() => handleRecipePress(item)}
                         onLongPress={() => handleLongPress(item)}
+                        onFavoritePress={toggleFavorite}
                       />
                     )}
                   />
@@ -614,6 +620,7 @@ export default function RecipesScreen() {
                         height={200}
                         onPress={() => handleRecipePress(item)}
                         onLongPress={() => handleLongPress(item)}
+                        onFavoritePress={toggleFavorite}
                       />
                     )}
                   />
@@ -638,6 +645,7 @@ export default function RecipesScreen() {
                         height={160}
                         onPress={() => handleRecipePress(item)}
                         onLongPress={() => handleLongPress(item)}
+                        onFavoritePress={toggleFavorite}
                       />
                     )}
                   />

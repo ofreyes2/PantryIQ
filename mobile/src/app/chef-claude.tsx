@@ -54,6 +54,7 @@ import { MealUpdateConfirmationCard } from '@/components/MealUpdateConfirmationC
 import { QuickLogSheet } from '@/components/QuickLogSheet';
 import { RecipeCaptureCard } from '@/components/RecipeCaptureCard';
 import { RecipeCreationModal } from '@/components/RecipeCreationModal';
+import { RecipeCard } from '@/components/RecipeCard';
 import { DuplicateWarningCard } from '@/components/DuplicateWarningCard';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ChatImagePlaceholder } from '@/components/ChatImagePlaceholder';
@@ -79,6 +80,16 @@ interface Message {
       changedFields?: string[];
     };
     additionalActions?: any[]; // Additional operations like delete duplicates
+  };
+  recipeData?: {
+    recipeName?: string;
+    ingredients?: string[];
+    instructions?: string[];
+    prepTime?: number;
+    cookTime?: number;
+    servings?: number;
+    netCarbsPerServing?: number;
+    caloriesPerServing?: number;
   };
 }
 
@@ -483,6 +494,28 @@ function MessageBubble({
           status={cardStatus === 'logging' ? 'loading' : cardStatus === 'success' ? 'success' : cardStatus === 'failure' ? 'failure' : 'pending'}
           errorMessage={cardError}
           additionalActions={message.mealUpdateAction.additionalActions}
+        />
+      </View>
+    );
+  }
+
+  // Show recipe card if this message has recipe data
+  if (message.recipeData && message.recipeData.recipeName && message.recipeData.ingredients && message.recipeData.instructions) {
+    return (
+      <View style={{ marginBottom: 12 }}>
+        <RecipeCard
+          recipeName={message.recipeData.recipeName}
+          ingredients={message.recipeData.ingredients}
+          instructions={message.recipeData.instructions}
+          prepTime={message.recipeData.prepTime ?? 10}
+          cookTime={message.recipeData.cookTime ?? 20}
+          servings={message.recipeData.servings ?? 2}
+          netCarbsPerServing={message.recipeData.netCarbsPerServing ?? 0}
+          caloriesPerServing={message.recipeData.caloriesPerServing ?? 0}
+          onSave={() => {
+            // Recipe saved successfully
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }}
         />
       </View>
     );
@@ -1917,6 +1950,16 @@ export default function ChefClaudeScreen() {
           timestamp: new Date(),
           mealAnalysis: mealAnalysis && mealAnalysis.isMealDescription ? mealAnalysis : undefined,
           mealUpdateAction: mealUpdateAction,
+          recipeData: recipeData.hasRecipe ? {
+            recipeName: recipeData.recipeName,
+            ingredients: recipeData.ingredients,
+            instructions: recipeData.instructions,
+            prepTime: recipeData.prepTime,
+            cookTime: recipeData.cookTime,
+            servings: recipeData.servings,
+            netCarbsPerServing: recipeData.netCarbsPerServing,
+            caloriesPerServing: recipeData.caloriesPerServing,
+          } : undefined,
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
