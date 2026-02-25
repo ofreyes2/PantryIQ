@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, TouchableOpacity } from 'react-native';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { Clock, Users, Flame, AlertCircle, Heart, ChevronDown } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { openURL } from '@/lib/messageFormatter';
 import * as Haptics from 'expo-haptics';
+import { useToast } from './Toast';
 
 interface RecipeCardProps {
   recipeName: string;
@@ -22,6 +23,8 @@ interface RecipeCardProps {
   videoUrl?: string;
   imageUrl?: string;
   onSave?: () => void;
+  onCookNow?: (recipe: any) => void;
+  onAddToShoppingList?: (ingredients: string[]) => void;
 }
 
 export function RecipeCard({
@@ -40,21 +43,35 @@ export function RecipeCard({
   videoUrl,
   imageUrl,
   onSave,
+  onCookNow,
+  onAddToShoppingList,
 }: RecipeCardProps) {
   const [isExpanded, setIsExpanded] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [descExpanded, setDescExpanded] = React.useState(false);
+  const [isFavorite, setIsFavorite] = React.useState(false);
+  const [savedToBox, setSavedToBox] = React.useState(false);
+  const { showToast } = useToast();
 
   // Check if this recipe exists in store to show correct heart state
   const recipes = useRecipesStore((s) => s.recipes);
   const addRecipe = useRecipesStore((s) => s.addRecipe);
-  const toggleFavorite = useRecipesStore((s) => s.toggleFavorite);
+  const toggleFavorite: any = useRecipesStore((s) => s.toggleFavorite);
 
   const existingRecipe = recipes.find(
     (r) => r.title.toLowerCase() === recipeName.toLowerCase()
   );
   const isSaved = !!existingRecipe;
 
-  const handleSave = async () => {
+  // Initialize favorite state from store
+  React.useEffect(() => {
+    if (existingRecipe) {
+      setIsFavorite(existingRecipe.isFavorite || false);
+      setSavedToBox(true);
+    }
+  }, [existingRecipe]);
+
+  const handleSaveToRecipeBox = async () => {
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       setIsSaving(true);
@@ -86,30 +103,57 @@ export function RecipeCard({
           prepTime,
           cookTime,
           servings,
-          difficulty: 2,
+          difficulty: (difficulty || 2) as 1 | 2 | 3 | 4 | 5,
           netCarbsPerServing,
           caloriesPerServing,
           proteinPerServing: 0,
           fatPerServing: 0,
           category: 'User Created',
           tags: ['chef-claude'],
-          isFavorite: true,
+          isFavorite: isFavorite,
           isUserCreated: true,
         });
 
+        setSavedToBox(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Saved to Recipe Box ✓', 'success');
       } else {
-        // Just toggle favorite if already exists
-        toggleFavorite(existingRecipe.id);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Already saved to Recipe Box', 'info');
+        setSavedToBox(true);
       }
 
       onSave?.();
     } catch (error) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Could not save — please try again', 'error');
       console.error('Failed to save recipe:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const toggleFavoriteHeart = async () => {
+    try {
+      const newFavoriteState = !isFavorite;
+      setIsFavorite(newFavoriteState);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+      // If recipe is already in store, update favorite status there
+      if (existingRecipe) {
+        toggleFavorite(existingRecipe.id);
+      } else if (newFavoriteState) {
+        // If favoriting before saving to box, mark the flag
+        // It will be saved with isFavorite=true when user hits Save to Recipe Box
+      }
+
+      showToast(
+        newFavoriteState ? '❤️ Added to Favorites' : 'Removed from Favorites',
+        'success'
+      );
+    } catch (error) {
+      setIsFavorite(!isFavorite);
+      showToast('Could not update favorite', 'error');
+      console.error('Failed to toggle favorite:', error);
     }
   };
 
@@ -152,38 +196,72 @@ export function RecipeCard({
             {recipeName}
           </Text>
           {description ? (
-            <Text
-              style={{
-                fontFamily: 'DMSans_400Regular',
-                fontSize: 12,
-                color: Colors.textSecondary,
-              }}
-              numberOfLines={1}
+            <TouchableOpacity
+              onPress={() => setDescExpanded(!descExpanded)}
+              activeOpacity={0.7}
             >
-              {description}
-            </Text>
+              <Text
+                style={{
+                  color: '#A0AEC0',
+                  fontSize: 13,
+                  lineHeight: 20,
+                }}
+                numberOfLines={descExpanded ? undefined : 2}
+              >
+                {description}
+              </Text>
+
+              {description && description.length > 80 ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginTop: 4,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#2ECC71',
+                      fontSize: 12,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {descExpanded ? 'Show less' : 'Read more'}
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#2ECC71',
+                      fontSize: 12,
+                    }}
+                  >
+                    {descExpanded ? '▲' : '▼'}
+                  </Text>
+                </View>
+              ) : null}
+            </TouchableOpacity>
           ) : null}
         </View>
 
         <Pressable
-          onPress={handleSave}
+          onPress={toggleFavoriteHeart}
           disabled={isSaving}
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: BorderRadius.full,
-            backgroundColor: Colors.surface,
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            backgroundColor: isFavorite ? 'rgba(231, 76, 60, 0.15)' : 'rgba(255,255,255,0.05)',
             alignItems: 'center',
             justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: isFavorite ? 'rgba(231, 76, 60, 0.4)' : 'rgba(255,255,255,0.1)',
             marginLeft: Spacing.sm,
             opacity: isSaving ? 0.6 : 1,
           }}
         >
-          <Heart
-            size={18}
-            color={isSaved ? '#E74C3C' : Colors.textSecondary}
-            fill={isSaved ? '#E74C3C' : 'transparent'}
-          />
+          <Text style={{ fontSize: 16 }}>
+            {isFavorite ? '❤️' : '🤍'}
+          </Text>
         </Pressable>
       </View>
 
@@ -369,6 +447,99 @@ export function RecipeCard({
           ) : null}
         </>
       ) : null}
+
+      {/* Save to Recipe Box — primary button row */}
+      <View
+        style={{
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+          padding: 12,
+          gap: 8,
+        }}
+      >
+        {/* Save to Recipe Box — primary button */}
+        <TouchableOpacity
+          onPress={handleSaveToRecipeBox}
+          style={{
+            backgroundColor: savedToBox ? '#27AE60' : '#2ECC71',
+            borderRadius: 12,
+            paddingVertical: 13,
+            alignItems: 'center',
+            flexDirection: 'row',
+            justifyContent: 'center',
+            gap: 6,
+          }}
+        >
+          <Text style={{ fontSize: 16 }}>
+            {savedToBox ? '✓' : '💾'}
+          </Text>
+          <Text
+            style={{
+              color: '#0A1628',
+              fontSize: 14,
+              fontWeight: '800',
+            }}
+          >
+            {savedToBox ? 'Saved to Recipe Box' : 'Save to Recipe Box'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Cook Now and Add to List — secondary row */}
+        <View style={{ flexDirection: 'row', gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => onCookNow && onCookNow({
+              title: recipeName,
+              description: description,
+              ingredients,
+              instructions,
+              prepTime,
+              cookTime,
+              servings,
+              netCarbsPerServing,
+              caloriesPerServing,
+              difficulty: (difficulty || 2) as 1 | 2 | 3 | 4 | 5,
+            })}
+            style={{
+              flex: 1,
+              backgroundColor: '#0A1628',
+              borderRadius: 12,
+              paddingVertical: 11,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 6,
+              borderWidth: 1,
+              borderColor: '#2ECC71',
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>👨‍🍳</Text>
+            <Text style={{ color: '#2ECC71', fontSize: 13, fontWeight: '600' }}>
+              Cook Now
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => onAddToShoppingList && onAddToShoppingList(ingredients)}
+            style={{
+              flex: 1,
+              backgroundColor: '#0A1628',
+              borderRadius: 12,
+              paddingVertical: 11,
+              alignItems: 'center',
+              flexDirection: 'row',
+              justifyContent: 'center',
+              gap: 6,
+              borderWidth: 1,
+              borderColor: '#4A6FA5',
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>🛒</Text>
+            <Text style={{ color: '#A0AEC0', fontSize: 13, fontWeight: '600' }}>
+              Add to List
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Expand/Collapse button */}
       <Pressable

@@ -4,6 +4,36 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Chef Claude Recipe Card Three Focused Fixes (v1.3.3) ✅ COMPLETE
+- **Fix 1: Expandable Description** — Description text now expands smoothly to show full content
+  - Click "Read more" to expand description to unlimited lines
+  - Click "Show less" to collapse back to 2 lines
+  - Up/down arrows provide clear visual indicator
+  - Green accent color (#2ECC71) for consistency
+  - Only shows expand/collapse for descriptions longer than 80 characters
+- **Fix 2: Save to Recipe Box Button** — New primary action button with secondary actions
+  - Large green button at bottom of card: "Save to Recipe Box" → "Saved to Recipe Box" (with checkmark)
+  - Saves recipe name, description, ingredients, instructions, and nutrition to Zustand store
+  - Shows toast confirmation: "Saved to Recipe Box ✓" or "Already saved to Recipe Box"
+  - Secondary row with two action buttons:
+    - 👨‍🍳 **Cook Now**: Opens cook mode with recipe details (callback-ready for parent)
+    - 🛒 **Add to List**: Adds all ingredients to shopping list (callback-ready for parent)
+  - Changed button styling: green primary, navy with green border for secondary actions
+- **Fix 3: Persistent Favorite Heart** — Heart icon persists favorite state everywhere
+  - White heart (🤍) → filled red heart (❤️) on tap with smooth transition
+  - Haptic feedback on toggle
+  - Toast feedback: "❤️ Added to Favorites" or "Removed from Favorites"
+  - Integrates with Zustand `toggleFavorite()` for unified state management
+  - When recipe saved via Save to Recipe Box, favorite status is preserved
+  - Favorite status persists across all screens (Chef Claude, Recipe Box, any recipe display)
+- **Architecture Notes**:
+  - Added `useToast` hook to display all user feedback
+  - Added `onCookNow` and `onAddToShoppingList` optional callbacks for parent integration
+  - Heart icon styled with conditional background color and border based on isFavorite state
+  - `descExpanded` state tracks description expansion locally
+  - `savedToBox` and `isFavorite` state integrated with store via `existingRecipe` hook
+  - All UI updates immediate (no async delays) for responsive feel
+
 ### Chef Claude Recipe Card Complete Fix (v1.3.2) ✅ COMPLETE
 - **System Prompt Recipe Format Enhancement** — Updated Chef Claude system prompt to return recipes in a standardized structured format:
   - Each recipe now includes: `### [NUMBER]. [NAME]`, description, Equipment, Time, Servings, Net Carbs, Calories, Crispiness (🥨 scale), Difficulty (⭐ scale)
