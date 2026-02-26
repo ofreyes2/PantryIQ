@@ -4,6 +4,51 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Recipe Image & Button Redesign (v1.4.2) ✅ COMPLETE
+- **Fixed Recipe Card Images Using Pexels API**
+  - Replaced unreliable Unsplash API with free Pexels API (no rate limits, professional photos)
+  - Added Pexels API Key field to Settings → API Keys section
+  - Label: "Pexels Image API"
+  - Subtitle: "Free food photos for recipe cards"
+  - AsyncStorage key: `pantryiq_pexels_api_key`
+  - Status badge shows green "Connected" when filled
+  - Recipe images now fetch real food photography for improved visual appeal
+  - Fallback: Shows emoji-based placeholder when no image available
+
+- **Image Placeholder with Food Emoji** — When recipe has no image:
+  - Dark blue background (#0D1F3C) fills the image area
+  - Large food emoji based on recipe name (🍗 chicken, 🥩 beef, 🍲 soup, etc.)
+  - Recipe name displays next to emoji
+  - Professional placeholder prevents gray boxes and keeps layout consistent
+
+- **Fixed Gradient Overlay** — Recipe card image gradient now uses LinearGradient:
+  - Replaced CSS-style gradient (doesn't work in React Native)
+  - Now uses `expo-linear-gradient` for proper transparency overlay
+  - Smooth fade from transparent to navy at bottom
+  - Text remains readable over image
+
+- **Compact Action Button Row** — Recipe cards redesigned with space-efficient layout:
+  - Save to Recipe Box: full-width button at top (green when saved)
+  - Compact 4-button row below: YouTube | Cook Now | Add to List | Share
+  - Each button is 1/4 width with emoji + small label
+  - Padding reduced from 12pt to 10pt, gap 6pt
+  - Professional appearance with better content density
+
+- **Unlimited Recipe Count** — Chef Claude now respects exact request counts:
+  - System prompt updated: reads user message and counts exact recipes requested
+  - "Show me 4 recipes" → Returns exactly 4 complete recipes
+  - "Give me 6 dinner ideas" → Returns exactly 6 recipes with full details
+  - Default is 3 recipes only if user doesn't specify number
+  - Parser has no slice(0,3) limits — returns all recipes generated
+  - Rendering component displays all recipes without truncation
+
+- **Implementation Details**:
+  - Settings: Added `pexelsKey` state and `handlePexelsApiKeyChange` handler
+  - RecipeCard: Added `getCategoryEmoji()` helper function, LinearGradient import, improved UI
+  - getFoodImage: Complete rewrite using Pexels API with AsyncStorage key lookup
+  - chef-claude.tsx: Enhanced RECIPE COUNT HANDLING section in system prompt
+  - All changes backward compatible with existing recipe display logic
+
 ### Kroger & Instacart API Key Configuration Fields (v1.4.1) ✅ COMPLETE
 - **Smart Shopping API Keys Section** — New editable fields in Settings for Kroger & Instacart credentials
 - **Three New API Key Input Fields** in Settings → API Keys section:

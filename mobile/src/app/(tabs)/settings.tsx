@@ -432,6 +432,7 @@ export default function SettingsScreen() {
   // API key state
   const [claudeKey, setClaudeKey] = useState(userProfile.claudeApiKey);
   const [usdaKey, setUsdaKey] = useState(userProfile.usdaApiKey);
+  const [pexelsKey, setPexelsKey] = useState('');
   const [krogerClientId, setKrogerClientId] = useState('');
   const [krogerClientSecret, setKrogerClientSecret] = useState('');
   const [instacartApiKey, setInstacartApiKey] = useState('');
@@ -451,6 +452,10 @@ export default function SettingsScreen() {
     });
     AsyncStorage.getItem('pantryiq_skip_photo_tips').then((val) => {
       if (val !== null) setShowPhotoTips(val !== 'true');
+    });
+    // Load Pexels key
+    AsyncStorage.getItem('pantryiq_pexels_api_key').then((val) => {
+      if (val) setPexelsKey(val);
     });
     // Load Kroger and Instacart keys
     AsyncStorage.getItem('pantryiq_kroger_client_id').then((val) => {
@@ -519,6 +524,11 @@ export default function SettingsScreen() {
   const handleInstacartApiKeyChange = useCallback((value: string) => {
     setInstacartApiKey(value);
     AsyncStorage.setItem('pantryiq_instacart_api_key', value);
+  }, []);
+
+  const handlePexelsApiKeyChange = useCallback((value: string) => {
+    setPexelsKey(value);
+    AsyncStorage.setItem('pantryiq_pexels_api_key', value);
   }, []);
 
   const handleExportData = () => {
@@ -737,6 +747,15 @@ export default function SettingsScreen() {
                 onChange={setUsdaKey}
                 helpUrl="https://fdc.nal.usda.gov/api-key-signup.html"
                 helpLabel="Get Key"
+              />
+              <View style={styles.divider} />
+              <ApiKeyField
+                label="Pexels Image API"
+                value={pexelsKey}
+                onChange={handlePexelsApiKeyChange}
+                helpUrl="https://www.pexels.com/api"
+                helpLabel="Get Key"
+                subtitle="Free food photos for recipe cards"
               />
               <Pressable style={[styles.saveButton, { marginTop: 12 }]} onPress={saveApiKeys} testID="save-api-keys-btn">
                 <Text style={styles.saveText}>Save API Keys</Text>

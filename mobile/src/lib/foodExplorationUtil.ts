@@ -3,6 +3,8 @@
  * Detects when Chef Claude is in exploration mode and extracts relevant context
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 export interface ExplorationTrigger {
   isExploration: boolean;
   triggerType?: 'pairing' | 'elevation' | 'substitution' | 'preparation' | 'flavor' | 'suggestion';
@@ -544,26 +546,51 @@ export function extractRecipeFromResponse(claudeResponse: string): {
 }
 
 /**
- * Generate a food image URL from Unsplash using the recipe name
+ * Generate a food image URL from Pexels API using the recipe name
  */
 export async function getFoodImage(recipeName: string): Promise<string | null> {
   try {
-    // Clean recipe name for search — remove keto/low carb descriptors
+    const pexelsKey = await AsyncStorage.getItem('pantryiq_pexels_api_key');
+
+    if (!pexelsKey) {
+      console.log('No Pexels key — skipping recipe image');
+      return null;
+    }
+
+    // Clean recipe name for better search results
     const searchTerm = recipeName
-      .toLowerCase()
-      .replace(/crispy|keto|low.carb|low-carb/gi, '')
+      .replace(/crispy|keto|low.carb|low-carb|easy|quick/gi, '')
+      .replace(/[^a-zA-Z\s]/g, '')
       .trim()
       .split(' ')
       .slice(0, 3)
-      .join(',');
+      .join(' ');
 
-    // Use Unsplash source for food images — no API key needed
-    // This returns a relevant food photo based on search term
-    const imageUrl = `https://source.unsplash.com/400x250/?food,${searchTerm}`;
+    const query = encodeURIComponent(searchTerm + ' food dish');
 
-    return imageUrl;
+    const response = await fetch(
+      `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=landscape`,
+      {
+        headers: {
+          'Authorization': pexelsKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.log('Pexels request failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+
+    if (data.photos && data.photos.length > 0) {
+      return data.photos[0].src.landscape || data.photos[0].src.large;
+    }
+
+    return null;
   } catch (error) {
-    console.error('Error generating food image:', error);
+    console.error('getFoodImage error:', error);
     return null;
   }
 }

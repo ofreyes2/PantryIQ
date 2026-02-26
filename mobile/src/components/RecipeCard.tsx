@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ScrollView, TouchableOpacity, Modal, Share, Image, Linking, ActivityIndicator } from 'react-native';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { Clock, Users, Flame, AlertCircle, Heart, ChevronDown } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import { openURL } from '@/lib/messageFormatter';
 import * as Haptics from 'expo-haptics';
@@ -30,6 +31,24 @@ interface RecipeCardProps {
   onCookNow?: (recipe: any) => void;
   onAddToShoppingList?: (ingredients: string[]) => void;
 }
+
+/**
+ * Get emoji based on recipe name keywords
+ */
+const getCategoryEmoji = (name: string): string => {
+  const lower = name.toLowerCase();
+  if (lower.includes('chicken')) return '🍗';
+  if (lower.includes('beef') || lower.includes('steak')) return '🥩';
+  if (lower.includes('pork') || lower.includes('bacon')) return '🥓';
+  if (lower.includes('egg')) return '🍳';
+  if (lower.includes('salad')) return '🥗';
+  if (lower.includes('soup')) return '🍲';
+  if (lower.includes('fish') || lower.includes('salmon')) return '🐟';
+  if (lower.includes('taco') || lower.includes('wrap')) return '🌮';
+  if (lower.includes('pizza')) return '🍕';
+  if (lower.includes('burger')) return '🍔';
+  return '🍽️';
+};
 
 export function RecipeCard({
   recipeName,
@@ -468,7 +487,7 @@ Shared from PantryIQ — Your Kitchen AI 🍳
           ...Shadows.card,
         }}
       >
-      {/* Recipe Image */}
+      {/* Recipe Image or Placeholder */}
       {imageUrl ? (
         <View style={{ position: 'relative', backgroundColor: '#1a2a3a' }}>
           <Image
@@ -482,14 +501,14 @@ Shared from PantryIQ — Your Kitchen AI 🍳
             onError={() => console.log('Image failed to load')}
           />
           {/* Gradient overlay for text readability */}
-          <View
+          <LinearGradient
+            colors={['transparent', 'rgba(10,22,40,0.95)']}
             style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              height: 100,
-              backgroundColor: 'rgba(10,22,40,0.95)',
+              height: 80,
             }}
           />
           {/* Medal badge on image */}
@@ -507,7 +526,34 @@ Shared from PantryIQ — Your Kitchen AI 🍳
             <Text style={{ fontSize: 18 }}>🥇</Text>
           </View>
         </View>
-      ) : null}
+      ) : (
+        <View
+          style={{
+            width: '100%',
+            height: 140,
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            backgroundColor: '#0D1F3C',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexDirection: 'row',
+            gap: 8,
+          }}
+        >
+          <Text style={{ fontSize: 32 }}>
+            {getCategoryEmoji(recipeName)}
+          </Text>
+          <Text
+            style={{
+              color: '#2D3748',
+              fontSize: 13,
+              fontWeight: '600',
+            }}
+          >
+            {recipeName}
+          </Text>
+        </View>
+      )}
 
       {/* Header with recipe name and action buttons */}
       <View
@@ -810,30 +856,30 @@ Shared from PantryIQ — Your Kitchen AI 🍳
         style={{
           borderTopWidth: 1,
           borderTopColor: Colors.border,
-          padding: 12,
-          gap: 8,
+          padding: 10,
+          gap: 6,
         }}
       >
-        {/* Save to Recipe Box — primary button */}
+        {/* Save to Recipe Box — full width */}
         <TouchableOpacity
           onPress={handleSaveToRecipeBox}
           style={{
             backgroundColor: savedToBox ? '#27AE60' : '#2ECC71',
-            borderRadius: 12,
-            paddingVertical: 13,
+            borderRadius: 10,
+            paddingVertical: 10,
             alignItems: 'center',
             flexDirection: 'row',
             justifyContent: 'center',
             gap: 6,
           }}
         >
-          <Text style={{ fontSize: 16 }}>
+          <Text style={{ fontSize: 13 }}>
             {savedToBox ? '✓' : '💾'}
           </Text>
           <Text
             style={{
               color: '#0A1628',
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: '800',
             }}
           >
@@ -841,33 +887,34 @@ Shared from PantryIQ — Your Kitchen AI 🍳
           </Text>
         </TouchableOpacity>
 
-        {/* Watch on YouTube button */}
-        <TouchableOpacity
-          onPress={() => openYouTubeSearch(recipeName)}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: '#FF0000',
-            borderRadius: 12,
-            paddingVertical: 12,
-            gap: 8,
-          }}
-        >
-          <Text style={{ fontSize: 18 }}>▶️</Text>
-          <Text
+        {/* Row 2 — YouTube, Cook, Add to List, Share in one row */}
+        <View style={{ flexDirection: 'row', gap: 6 }}>
+          {/* YouTube */}
+          <TouchableOpacity
+            onPress={() => openYouTubeSearch(recipeName)}
             style={{
-              color: '#FFFFFF',
-              fontSize: 14,
-              fontWeight: '700',
+              flex: 1,
+              backgroundColor: '#CC0000',
+              borderRadius: 10,
+              paddingVertical: 9,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
             }}
           >
-            Watch on YouTube
-          </Text>
-        </TouchableOpacity>
+            <Text style={{ fontSize: 14 }}>▶️</Text>
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 10,
+                fontWeight: '700',
+              }}
+            >
+              YouTube
+            </Text>
+          </TouchableOpacity>
 
-        {/* Cook Now and Add to List — secondary row */}
-        <View style={{ flexDirection: 'row', gap: 8 }}>
+          {/* Cook Now */}
           <TouchableOpacity
             onPress={() => onCookNow && onCookNow({
               title: recipeName,
@@ -884,40 +931,78 @@ Shared from PantryIQ — Your Kitchen AI 🍳
             style={{
               flex: 1,
               backgroundColor: '#0A1628',
-              borderRadius: 12,
-              paddingVertical: 11,
+              borderRadius: 10,
+              paddingVertical: 9,
               alignItems: 'center',
-              flexDirection: 'row',
               justifyContent: 'center',
-              gap: 6,
+              gap: 3,
               borderWidth: 1,
               borderColor: '#2ECC71',
             }}
           >
             <Text style={{ fontSize: 14 }}>👨‍🍳</Text>
-            <Text style={{ color: '#2ECC71', fontSize: 13, fontWeight: '600' }}>
+            <Text
+              style={{
+                color: '#2ECC71',
+                fontSize: 10,
+                fontWeight: '700',
+              }}
+            >
               Cook Now
             </Text>
           </TouchableOpacity>
 
+          {/* Add to List */}
           <TouchableOpacity
             onPress={() => onAddToShoppingList && onAddToShoppingList(ingredients)}
             style={{
               flex: 1,
               backgroundColor: '#0A1628',
-              borderRadius: 12,
-              paddingVertical: 11,
+              borderRadius: 10,
+              paddingVertical: 9,
               alignItems: 'center',
-              flexDirection: 'row',
               justifyContent: 'center',
-              gap: 6,
+              gap: 3,
               borderWidth: 1,
               borderColor: '#4A6FA5',
             }}
           >
             <Text style={{ fontSize: 14 }}>🛒</Text>
-            <Text style={{ color: '#A0AEC0', fontSize: 13, fontWeight: '600' }}>
+            <Text
+              style={{
+                color: '#A0AEC0',
+                fontSize: 10,
+                fontWeight: '700',
+              }}
+            >
               Add to List
+            </Text>
+          </TouchableOpacity>
+
+          {/* Share */}
+          <TouchableOpacity
+            onPress={() => setShowShareOptions(true)}
+            style={{
+              flex: 1,
+              backgroundColor: '#0A1628',
+              borderRadius: 10,
+              paddingVertical: 9,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 3,
+              borderWidth: 1,
+              borderColor: '#2D3748',
+            }}
+          >
+            <Text style={{ fontSize: 14 }}>↗️</Text>
+            <Text
+              style={{
+                color: '#A0AEC0',
+                fontSize: 10,
+                fontWeight: '700',
+              }}
+            >
+              Share
             </Text>
           </TouchableOpacity>
         </View>
