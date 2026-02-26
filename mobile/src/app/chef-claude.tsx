@@ -42,6 +42,7 @@ import {
   detectPositiveResponse,
   extractRecipeFromResponse,
   extractMultipleRecipesFromResponse,
+  getFoodImage,
 } from '@/lib/foodExplorationUtil';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import { buildPersonalityPrompt, getPersonalityConfig } from '@/lib/personalityModes';
@@ -409,6 +410,24 @@ CRITICAL INSTRUCTIONS FOR RECIPE DISPLAY:
 - Base ingredients on what is actually in the user's pantry
 - Use this format for EVERY recipe, no exceptions
 - Each recipe must be separated by three dashes: ---
+
+CRITICAL FORMATTING RULE FOR MULTIPLE RECIPES:
+When returning multiple recipes you MUST use this exact format for EVERY recipe including the last one:
+- A numbered header: ### 1. or ### 2. or ### 3.
+- Equipment, Time, Net Carbs fields
+- INGREDIENTS: header followed by dash-prefixed items
+- INSTRUCTIONS: header followed by numbered steps
+- Calorie estimate on its own line as: Calories: [number] per serving
+- A --- divider after each recipe including the last one
+- Do not shorten or abbreviate the last recipe to save space
+- ALL recipes must be equally complete and detailed
+- Never truncate the third recipe or skip fields to save space
+
+CALORIE FORMATTING RULE:
+- Always include calories for every recipe on its own line
+- Format: Calories: [number] per serving (example: Calories: 420 per serving)
+- Never omit calories - they are required for every recipe
+- Never write calories as part of another sentence - always on its own line
 
 GENERAL INSTRUCTIONS:
 - Always check actual pantry inventory before suggesting recipes
@@ -2049,7 +2068,17 @@ export default function ChefClaudeScreen() {
         const hasPositiveResponse = detectPositiveResponse(trimmed);
         const lastAssistantMsg = messages.filter((m) => m.role === 'assistant').pop();
         const recipeData = extractRecipeFromResponse(lastAssistantMsg?.content || '');
-        const multipleRecipes = extractMultipleRecipesFromResponse(displayText);
+        let multipleRecipes = extractMultipleRecipesFromResponse(displayText);
+
+        // Add images to recipes
+        if (multipleRecipes.length > 0) {
+          multipleRecipes = await Promise.all(
+            multipleRecipes.map(async (recipe) => ({
+              ...recipe,
+              imageUrl: (await getFoodImage(recipe.recipeName || 'food')) || undefined,
+            }))
+          );
+        }
 
         // Show recipe capture card if:
         // 1. User gave positive response to a suggestion

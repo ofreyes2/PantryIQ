@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, ScrollView, TouchableOpacity, Modal, Share } from 'react-native';
+import { View, Text, Pressable, ScrollView, TouchableOpacity, Modal, Share, Image, Linking, ActivityIndicator } from 'react-native';
 import { useRecipesStore } from '@/lib/stores/recipesStore';
 import { Clock, Users, Flame, AlertCircle, Heart, ChevronDown } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
@@ -135,6 +135,17 @@ export function RecipeCard({
       console.error('Failed to save recipe:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const openYouTubeSearch = (name: string) => {
+    try {
+      const searchQuery = encodeURIComponent(name + ' keto recipe how to make');
+      const youtubeUrl = `https://www.youtube.com/results?search_query=${searchQuery}`;
+      Linking.openURL(youtubeUrl);
+    } catch (error) {
+      showToast('Could not open YouTube', 'error');
+      console.error('YouTube link error:', error);
     }
   };
 
@@ -457,6 +468,47 @@ Shared from PantryIQ — Your Kitchen AI 🍳
           ...Shadows.card,
         }}
       >
+      {/* Recipe Image */}
+      {imageUrl ? (
+        <View style={{ position: 'relative', backgroundColor: '#1a2a3a' }}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={{
+              width: '100%',
+              height: 200,
+              backgroundColor: '#2a3a4a',
+            }}
+            resizeMode="cover"
+            onError={() => console.log('Image failed to load')}
+          />
+          {/* Gradient overlay for text readability */}
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 100,
+              backgroundColor: 'rgba(10,22,40,0.95)',
+            }}
+          />
+          {/* Medal badge on image */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 12,
+              left: 12,
+              backgroundColor: 'rgba(0,0,0,0.6)',
+              borderRadius: 20,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+            }}
+          >
+            <Text style={{ fontSize: 18 }}>🥇</Text>
+          </View>
+        </View>
+      ) : null}
+
       {/* Header with recipe name and action buttons */}
       <View
         style={{
@@ -786,6 +838,31 @@ Shared from PantryIQ — Your Kitchen AI 🍳
             }}
           >
             {savedToBox ? 'Saved to Recipe Box' : 'Save to Recipe Box'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Watch on YouTube button */}
+        <TouchableOpacity
+          onPress={() => openYouTubeSearch(recipeName)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#FF0000',
+            borderRadius: 12,
+            paddingVertical: 12,
+            gap: 8,
+          }}
+        >
+          <Text style={{ fontSize: 18 }}>▶️</Text>
+          <Text
+            style={{
+              color: '#FFFFFF',
+              fontSize: 14,
+              fontWeight: '700',
+            }}
+          >
+            Watch on YouTube
           </Text>
         </TouchableOpacity>
 
