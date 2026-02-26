@@ -546,20 +546,91 @@ export function extractRecipeFromResponse(claudeResponse: string): {
 }
 
 /**
- * Generate a food image URL from Pexels API using the recipe name
+ * Get cached image from AsyncStorage
  */
-export async function getFoodImage(recipeName: string): Promise<string | null> {
+async function getCachedImage(recipeName: string): Promise<{ url: string; source: string } | null> {
+  try {
+    const cache = await AsyncStorage.getItem('pantryiq_recipe_image_cache');
+    if (!cache) return null;
+
+    const cacheData = JSON.parse(cache);
+    return cacheData[recipeName] || null;
+  } catch (error) {
+    console.log('Cache read error:', error);
+    return null;
+  }
+}
+
+/**
+ * Cache image to AsyncStorage
+ */
+async function setCachedImage(
+  recipeName: string,
+  imageUrl: string,
+  source: 'mealdb' | 'pexels'
+): Promise<void> {
+  try {
+    const cache = await AsyncStorage.getItem('pantryiq_recipe_image_cache');
+    const cacheData = cache ? JSON.parse(cache) : {};
+
+    cacheData[recipeName] = { url: imageUrl, source };
+    await AsyncStorage.setItem('pantryiq_recipe_image_cache', JSON.stringify(cacheData));
+  } catch (error) {
+    console.log('Cache write error:', error);
+  }
+}
+
+/**
+ * Search TheMealDB for recipe image (free, no key required)
+ */
+async function getFoodImageFromMealDB(recipeName: string): Promise<string | null> {
+  try {
+    const searchTerm = recipeName
+      .replace(/crispy|keto|low.carb|low-carb|easy|quick|instant pot|air fryer/gi, '')
+      .replace(/[^a-zA-Z\s]/g, '')
+      .trim()
+      .split(' ')
+      .slice(0, 2)
+      .join(' ');
+
+    console.log('TheMealDB searching for:', searchTerm);
+
+    const response = await fetch(
+      `https://www.themealdb.com/api/json/v1/1/search.php?s=${encodeURIComponent(searchTerm)}`
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+
+    if (data.meals && data.meals.length > 0) {
+      console.log('TheMealDB found image for:', recipeName);
+      return data.meals[0].strMealThumb;
+    }
+
+    console.log('TheMealDB no match for:', recipeName);
+    return null;
+  } catch (error) {
+    console.log('TheMealDB error:', error);
+    return null;
+  }
+}
+
+/**
+ * Search Pexels for recipe image (requires API key)
+ */
+async function getFoodImageFromPexels(recipeName: string): Promise<string | null> {
   try {
     const pexelsKey = await AsyncStorage.getItem('pantryiq_pexels_api_key');
 
     if (!pexelsKey) {
-      console.log('No Pexels key — skipping recipe image');
+      console.log('No Pexels key — skipping Pexels search');
       return null;
     }
 
     // Clean recipe name for better search results
     const searchTerm = recipeName
-      .replace(/crispy|keto|low.carb|low-carb|easy|quick/gi, '')
+      .replace(/crispy|keto|low.carb|low-carb|easy|quick|instant pot|air fryer/gi, '')
       .replace(/[^a-zA-Z\s]/g, '')
       .trim()
       .split(' ')
@@ -567,6 +638,8 @@ export async function getFoodImage(recipeName: string): Promise<string | null> {
       .join(' ');
 
     const query = encodeURIComponent(searchTerm + ' food dish');
+
+    console.log('Pexels searching for:', query);
 
     const response = await fetch(
       `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=landscape`,
@@ -585,12 +658,42 @@ export async function getFoodImage(recipeName: string): Promise<string | null> {
     const data = await response.json();
 
     if (data.photos && data.photos.length > 0) {
+      console.log('Pexels found image for:', recipeName);
       return data.photos[0].src.landscape || data.photos[0].src.large;
     }
 
+    console.log('Pexels no match for:', recipeName);
     return null;
   } catch (error) {
-    console.error('getFoodImage error:', error);
+    console.log('Pexels error:', error);
     return null;
   }
+}
+
+/**
+ * Get food image — tries TheMealDB first (free), then Pexels, with caching
+ */
+export async function getFoodImage(recipeName: string): Promise<string | null> {
+  if (!recipeName) return null;
+
+  // Step 1 — Check cache first
+  const cached = await getCachedImage(recipeName);
+  if (cached) return cached.url;
+
+  // Step 2 — Try TheMealDB first (free, no key needed)
+  let imageUrl = await getFoodImageFromMealDB(recipeName);
+  let source: 'mealdb' | 'pexels' = 'mealdb';
+
+  // Step 3 — Fall back to Pexels if TheMealDB fails
+  if (!imageUrl) {
+    imageUrl = await getFoodImageFromPexels(recipeName);
+    source = 'pexels';
+  }
+
+  // Step 4 — Cache result
+  if (imageUrl) {
+    await setCachedImage(recipeName, imageUrl, source);
+  }
+
+  return imageUrl;
 }
