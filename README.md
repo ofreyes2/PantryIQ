@@ -4,6 +4,31 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Recipe Card Button Redesign & Unlimited Recipe Support (v1.4.3) ✅ COMPLETE
+- **Compact 4-Button Action Row** — Recipe cards now feature a single efficient button row:
+  - Replaced full-width "Save to Recipe Box" button with compact icon version
+  - Removed duplicate Share button from action row (already exists in card header as arrow icon)
+  - New single-row layout: Save | YouTube | Cook Now | Add to List
+  - Each button takes equal 1/4 width with icon emoji and compact 9pt label
+  - Save button shows green checkmark (✓) and darker green background (#27AE60) when saved
+  - Save button shows diskette emoji (💾) and dark background (#1A3A2A) when unsaved
+  - All buttons have consistent 10pt vertical padding and 6pt gaps
+  - Professional compact design maximizes content density
+
+- **Unlimited Recipe Request Support** — Chef Claude now respects exact recipe counts:
+  - System prompt updated: "default to 5 recipes" instead of hardcoded 3-recipe limit
+  - User can request any number: "show me 4 recipes", "give me 6 dinner ideas", "show me 10 keto snacks"
+  - Claude returns exactly the number requested (no truncation, no hardcoded limits)
+  - Default falls back to 5 recipes only if user doesn't specify a number
+  - Recipe extraction and rendering have no slice(0,3) limits
+  - All recipes display with full INGREDIENTS and INSTRUCTIONS sections
+
+- **Implementation Details**:
+  - RecipeCard.tsx: Replaced two-row button layout (lines 854-1009) with single-row 4-button design
+  - chef-claude.tsx: Updated system prompt (line 440) from "default to 3" to "default to 5"
+  - No changes to Share functionality — arrow icon in header remains for sharing recipes
+  - Backward compatible with existing recipe data structures and save functionality
+
 ### Recipe Image & Button Redesign (v1.4.2) ✅ COMPLETE
 - **Fixed Recipe Card Images Using Pexels API**
   - Replaced unreliable Unsplash API with free Pexels API (no rate limits, professional photos)

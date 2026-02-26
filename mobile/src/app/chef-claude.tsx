@@ -437,7 +437,7 @@ RECIPE COUNT HANDLING:
   - "Give me 5 keto snack ideas as recipes" → Return exactly 5 complete recipes
   - "Show me 2 breakfast recipes" → Return exactly 2 complete recipes
   - "Show me 6 dinner ideas" → Return exactly 6 complete recipes
-- If user does not specify a number, default to 3 recipes
+- If user does not specify a number, default to 5 recipes
 - NEVER limit recipes to 3 unless user asked for 3
 - NEVER truncate or skip any recipe no matter how many are requested
 - Every recipe must be equally complete with full INGREDIENTS and INSTRUCTIONS sections
