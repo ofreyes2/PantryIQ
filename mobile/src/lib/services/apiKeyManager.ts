@@ -39,9 +39,9 @@ export const apiKeyManager = {
 
   async refreshKrogerToken(): Promise<string | null> {
     try {
-      const credentials = Buffer.from(
+      const credentials = btoa(
         `${API_CONFIG.kroger.clientId}:${API_CONFIG.kroger.clientSecret}`
-      ).toString('base64');
+      );
 
       const response = await fetch(API_CONFIG.kroger.tokenUrl, {
         method: 'POST',
