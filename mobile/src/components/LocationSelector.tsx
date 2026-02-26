@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { locationService } from '@/lib/services/locationService';
 import { krogerService, type KrogerStore } from '@/lib/services/krogerService';
 import { apiKeyManager, type UserLocation } from '@/lib/services/apiKeyManager';
@@ -57,6 +58,16 @@ export function LocationSelector({ onLocationChange }: LocationSelectorProps) {
 
   const loadNearbyStores = async (zipCode: string | null) => {
     if (!zipCode) return;
+
+    // Check if Kroger credentials are configured before attempting to load stores
+    const clientId = await AsyncStorage.getItem('pantryiq_kroger_client_id');
+    const clientSecret = await AsyncStorage.getItem('pantryiq_kroger_client_secret');
+
+    if (!clientId || !clientSecret) {
+      // Credentials not configured - skip loading stores silently
+      return;
+    }
+
     const stores = await krogerService.findNearbyStores(zipCode);
     setNearbyStores(stores);
 
