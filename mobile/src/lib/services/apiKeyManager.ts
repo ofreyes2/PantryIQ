@@ -61,7 +61,7 @@ export const apiKeyManager = {
       });
 
       if (!response.ok) {
-        console.error(`Token refresh failed: ${response.status}`);
+        console.warn(`Token refresh failed: ${response.status} — check Kroger credentials in Settings`);
         return null;
       }
 
