@@ -4,6 +4,58 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Kroger & Instacart API Key Configuration Fields (v1.4.1) ✅ COMPLETE
+- **Smart Shopping API Keys Section** — New editable fields in Settings for Kroger & Instacart credentials
+- **Three New API Key Input Fields** in Settings → API Keys section:
+  1. **Kroger Client ID**
+     - Label: "Kroger Client ID"
+     - Subtitle: "Required for grocery price comparison"
+     - Secure text entry: false (IDs are not sensitive)
+     - Auto-save to AsyncStorage with 1-second debounce (`pantryiq_kroger_client_id`)
+     - Status badge: Green "Connected" when filled, gray "Not set" when empty
+     - Placeholder: "Enter Kroger Client ID..."
+  2. **Kroger Client Secret**
+     - Label: "Kroger Client Secret"
+     - Subtitle: "Keep this private"
+     - Secure text entry: true (shows •••••• while editing)
+     - Eye icon toggle to show/hide secret text
+     - Auto-save to AsyncStorage with 1-second debounce (`pantryiq_kroger_client_secret`)
+     - Status badge: Green "Connected" when filled, gray "Not set" when empty
+     - Placeholder: "Enter Kroger Client Secret..."
+  3. **Instacart API Key**
+     - Label: "Instacart API Key"
+     - Subtitle: "Approval pending — enter when received"
+     - Secure text entry: true (shows •••••• while editing)
+     - Eye icon toggle to show/hide key text
+     - Auto-save to AsyncStorage with 1-second debounce (`pantryiq_instacart_api_key`)
+     - Status badge: Amber "Pending Approval" when empty, green "Connected" when filled
+     - Placeholder: "Enter Instacart API Key..."
+- **Enhanced ApiKeyField Component**:
+  - New `subtitle` prop displays explanatory text below label
+  - New `secure` boolean prop controls eye toggle visibility
+  - New `statusVariant` prop switches between 'default' and 'pending' badge styles
+  - Maintains existing Claude API Key and USDA Key fields unchanged
+  - Consistent styling with green accent colors for connected status
+  - Amber muted background for pending approval badge
+- **Auto-save Debouncing**:
+  - Each field saves automatically 1 second after user stops typing
+  - No manual "Save" button needed (consistent with existing Claude/USDA keys)
+  - Debounce timers cleaned up on component unmount
+  - Rapid typing doesn't trigger multiple saves
+- **Credentials Read in Services**:
+  - `krogerService.ts`: `refreshKrogerToken()` reads `pantryiq_kroger_client_id` and `pantryiq_kroger_client_secret` from AsyncStorage
+  - `instacartService.ts`: `getInstacartKey()` reads `pantryiq_instacart_api_key` from AsyncStorage
+  - Updated to use user-provided credentials instead of hardcoded apiConfig
+- **User-Friendly Error Messages**:
+  - When Kroger credentials missing on price check: Shows friendly modal dialog with "🔑 Kroger Keys Required" message, "Go to Settings" button navigates directly to API Keys section
+  - When Instacart key missing on order: Shows friendly modal with "🔑 Instacart Key Pending" message, "Go to Settings" button navigates directly to API Keys section
+- **Implementation Details**:
+  - State management: Three new state variables (`krogerClientId`, `krogerClientSecret`, `instacartApiKey`)
+  - Loading: AsyncStorage load on component mount via useEffect
+  - Saving: Debounced handlers (`handleKrogerClientIdChange`, `handleKrogerClientSecretChange`, `handleInstacartApiKeyChange`) with `useCallback` and timeout refs
+  - Component exports: New `statusBadgeAmber` style added to stylesheet
+  - All code follows existing ApiKeyField patterns for consistency
+
 ### Smart Shopping with Kroger & Instacart (v1.4.0) ✅ COMPLETE
 - **Complete Smart Shopping Experience** — Real-time grocery price checking and order placement
 - **Part 1 — Location Services**:

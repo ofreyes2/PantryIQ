@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -155,31 +155,77 @@ function ApiKeyField({
   onChange,
   helpUrl,
   helpLabel,
+  subtitle,
+  secure = true,
+  statusVariant = 'default', // 'default' | 'pending'
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   helpUrl: string;
   helpLabel: string;
+  subtitle?: string;
+  secure?: boolean;
+  statusVariant?: 'default' | 'pending';
 }) {
   const [visible, setVisible] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const isSet = value.length > 0;
 
+  const getStatusBgColor = () => {
+    if (isSet) return styles.statusBadgeGreen;
+    if (statusVariant === 'pending') return styles.statusBadgeAmber;
+    return styles.statusBadgeGray;
+  };
+
+  const getStatusTextColor = () => {
+    if (isSet) return Colors.green;
+    if (statusVariant === 'pending') return Colors.amber;
+    return Colors.textTertiary;
+  };
+
+  const getStatusLabel = () => {
+    if (isSet) return 'Connected';
+    if (statusVariant === 'pending') return 'Pending Approval';
+    return 'Not set';
+  };
+
+  const renderEyeButton = () => {
+    if (!secure) return null;
+    return (
+      <Pressable onPress={() => setVisible(!visible)} style={styles.eyeBtn}>
+        {visible ? (
+          <EyeOff size={18} color={Colors.textTertiary} />
+        ) : (
+          <Eye size={18} color={Colors.textTertiary} />
+        )}
+      </Pressable>
+    );
+  };
+
+  const renderSubtitle = () => {
+    if (!subtitle) return null;
+    return (
+      <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginTop: 2 }}>
+        {subtitle}
+      </Text>
+    );
+  };
+
   return (
     <View style={styles.apiKeyBlock}>
       <View style={styles.apiKeyRow}>
-        <Text style={styles.apiKeyLabel}>{label}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.apiKeyLabel}>{label}</Text>
+          {renderSubtitle()}
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={[styles.statusBadge, isSet ? styles.statusBadgeGreen : styles.statusBadgeGray]}>
-            <Text style={[styles.statusText, isSet ? { color: Colors.green } : { color: Colors.textTertiary }]}>
-              {isSet ? 'Connected' : 'Not set'}
+          <View style={[styles.statusBadge, getStatusBgColor()]}>
+            <Text style={[styles.statusText, { color: getStatusTextColor() }]}>
+              {getStatusLabel()}
             </Text>
           </View>
-          <Pressable onPress={() => Linking.openURL(helpUrl)}>
-            <Text style={styles.getKeyLink}>{helpLabel}</Text>
-          </Pressable>
         </View>
       </View>
 
@@ -196,19 +242,13 @@ function ApiKeyField({
             setEditing(false);
             onChange(draft);
           }}
-          placeholder="Paste API key here..."
+          placeholder={`Enter ${label.toLowerCase()}...`}
           placeholderTextColor={Colors.textTertiary}
-          secureTextEntry={!visible && !editing}
+          secureTextEntry={!visible && !editing && secure}
           autoCapitalize="none"
           autoCorrect={false}
         />
-        <Pressable onPress={() => setVisible(!visible)} style={styles.eyeBtn}>
-          {visible ? (
-            <EyeOff size={18} color={Colors.textTertiary} />
-          ) : (
-            <Eye size={18} color={Colors.textTertiary} />
-          )}
-        </Pressable>
+        {renderEyeButton()}
       </View>
     </View>
   );
@@ -392,6 +432,9 @@ export default function SettingsScreen() {
   // API key state
   const [claudeKey, setClaudeKey] = useState(userProfile.claudeApiKey);
   const [usdaKey, setUsdaKey] = useState(userProfile.usdaApiKey);
+  const [krogerClientId, setKrogerClientId] = useState('');
+  const [krogerClientSecret, setKrogerClientSecret] = useState('');
+  const [instacartApiKey, setInstacartApiKey] = useState('');
 
   // Photo recognition settings
   const [photoRecognitionEnabled, setPhotoRecognitionEnabled] = useState<boolean>(true);
@@ -408,6 +451,16 @@ export default function SettingsScreen() {
     });
     AsyncStorage.getItem('pantryiq_skip_photo_tips').then((val) => {
       if (val !== null) setShowPhotoTips(val !== 'true');
+    });
+    // Load Kroger and Instacart keys
+    AsyncStorage.getItem('pantryiq_kroger_client_id').then((val) => {
+      if (val) setKrogerClientId(val);
+    });
+    AsyncStorage.getItem('pantryiq_kroger_client_secret').then((val) => {
+      if (val) setKrogerClientSecret(val);
+    });
+    AsyncStorage.getItem('pantryiq_instacart_api_key').then((val) => {
+      if (val) setInstacartApiKey(val);
     });
   }, []);
 
@@ -451,6 +504,35 @@ export default function SettingsScreen() {
     showToast('Goals saved', 'success');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
+
+  // Debounced save handlers for grocery API keys
+  const krogerClientIdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const krogerClientSecretTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const instacartApiKeyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleKrogerClientIdChange = useCallback((value: string) => {
+    setKrogerClientId(value);
+    if (krogerClientIdTimeoutRef.current !== null) clearTimeout(krogerClientIdTimeoutRef.current);
+    krogerClientIdTimeoutRef.current = setTimeout(() => {
+      AsyncStorage.setItem('pantryiq_kroger_client_id', value);
+    }, 1000);
+  }, []);
+
+  const handleKrogerClientSecretChange = useCallback((value: string) => {
+    setKrogerClientSecret(value);
+    if (krogerClientSecretTimeoutRef.current !== null) clearTimeout(krogerClientSecretTimeoutRef.current);
+    krogerClientSecretTimeoutRef.current = setTimeout(() => {
+      AsyncStorage.setItem('pantryiq_kroger_client_secret', value);
+    }, 1000);
+  }, []);
+
+  const handleInstacartApiKeyChange = useCallback((value: string) => {
+    setInstacartApiKey(value);
+    if (instacartApiKeyTimeoutRef.current !== null) clearTimeout(instacartApiKeyTimeoutRef.current);
+    instacartApiKeyTimeoutRef.current = setTimeout(() => {
+      AsyncStorage.setItem('pantryiq_instacart_api_key', value);
+    }, 1000);
+  }, []);
 
   const handleExportData = () => {
     const data = {
@@ -717,29 +799,34 @@ export default function SettingsScreen() {
                 Check real-time grocery prices and order on Instacart.
               </Text>
               <ApiKeyField
-                label="Kroger API Key"
-                value="Your Kroger Client ID is saved"
-                onChange={() => {}}
+                label="Kroger Client ID"
+                value={krogerClientId}
+                onChange={handleKrogerClientIdChange}
                 helpUrl="https://developer.kroger.com"
                 helpLabel="Get Key"
+                subtitle="Required for grocery price comparison"
+                secure={false}
+              />
+              <View style={styles.divider} />
+              <ApiKeyField
+                label="Kroger Client Secret"
+                value={krogerClientSecret}
+                onChange={handleKrogerClientSecretChange}
+                helpUrl="https://developer.kroger.com"
+                helpLabel="Get Key"
+                subtitle="Keep this private"
+                secure={true}
               />
               <View style={styles.divider} />
               <ApiKeyField
                 label="Instacart API Key"
-                value="Waiting for approval — enter key when received"
-                onChange={() => {}}
+                value={instacartApiKey}
+                onChange={handleInstacartApiKeyChange}
                 helpUrl="https://www.instacart.com/api"
                 helpLabel="Request Access"
-              />
-              <View style={styles.divider} />
-              <RowItem
-                label="Store Location"
-                value="Detect automatically"
-              />
-              <View style={styles.divider} />
-              <RowItem
-                label="Preferred Store"
-                value="Mariano's — Plainfield"
+                subtitle="Approval pending — enter when received"
+                secure={true}
+                statusVariant={instacartApiKey ? 'default' : 'pending'}
               />
             </SectionCard>
           </View>
@@ -1379,6 +1466,9 @@ const styles = StyleSheet.create({
   },
   statusBadgeGray: {
     backgroundColor: Colors.surface,
+  },
+  statusBadgeAmber: {
+    backgroundColor: Colors.amberMuted,
   },
   statusText: {
     fontFamily: 'DMSans_500Medium',
