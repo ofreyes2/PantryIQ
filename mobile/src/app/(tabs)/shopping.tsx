@@ -29,6 +29,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useShoppingStore, ShoppingItem } from '@/lib/stores/shoppingStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
+import { SmartShoppingScreen } from '@/components/SmartShoppingScreen';
 import { Colors, BorderRadius, Spacing } from '@/constants/theme';
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -158,6 +159,7 @@ export default function ShoppingScreen() {
   const [cartCollapsed, setCartCollapsed] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [addStoreModalVisible, setAddStoreModalVisible] = useState(false);
+  const [showSmartShopping, setShowSmartShopping] = useState(false);
 
   // Add item form state
   const [newItemName, setNewItemName] = useState('');
@@ -315,6 +317,51 @@ export default function ShoppingScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+          {/* Smart Shopping Button */}
+          <Pressable
+            onPress={() => setShowSmartShopping(true)}
+            style={{
+              marginHorizontal: Spacing.md,
+              backgroundColor: Colors.navyCard,
+              borderRadius: BorderRadius.lg,
+              padding: Spacing.md,
+              marginBottom: Spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: Spacing.md,
+              borderWidth: 1,
+              borderColor: Colors.green,
+            }}
+          >
+            <View
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: BorderRadius.md,
+                backgroundColor: Colors.green,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: 22 }}>🏷️</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text
+                style={{
+                  color: Colors.textPrimary,
+                  fontSize: 15,
+                  fontWeight: '700',
+                }}
+              >
+                Smart Shopping
+              </Text>
+              <Text style={{ color: Colors.textTertiary, fontSize: 12, marginTop: 1 }}>
+                Check Kroger prices • Order on Instacart
+              </Text>
+            </View>
+            <Text style={{ color: Colors.green, fontSize: 20 }}>›</Text>
+          </Pressable>
+
           {/* Pantry Suggestions */}
           {lowStockNotInList.length > 0 ? (
             <View
@@ -1055,6 +1102,17 @@ export default function ShoppingScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* Smart Shopping Modal */}
+        <SmartShoppingScreen
+          visible={showSmartShopping}
+          shoppingItems={displayedItems.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            unit: item.unit,
+          }))}
+          onClose={() => setShowSmartShopping(false)}
+        />
       </SafeAreaView>
     </View>
   );

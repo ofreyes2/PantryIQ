@@ -4,6 +4,73 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Smart Shopping with Kroger & Instacart (v1.4.0) ✅ COMPLETE
+- **Complete Smart Shopping Experience** — Real-time grocery price checking and order placement
+- **Part 1 — Location Services**:
+  - Automatic location detection using `expo-location` with reverse geocoding
+  - Manual zip code entry fallback if permissions denied
+  - Location persists to AsyncStorage for future sessions
+  - Nearby Kroger family store discovery by radius
+- **Part 2 — Kroger API Integration**:
+  - Client credentials OAuth2 authentication with token caching
+  - Find nearby stores by zip code with address/hours/phone
+  - Real-time product search and pricing at specific locations
+  - Price history tracking (regular vs sale prices)
+  - Stock status checking (In Stock / Low Stock)
+  - Complete shopping list pricing with savings calculation
+- **Part 3 — Instacart Integration**:
+  - Create shoppable lists from shopping list items
+  - Support for both development and production API keys
+  - Automatic link generation for immediate Instacart ordering
+  - Recipe ingredient lists ready for Instacart checkout
+- **Part 4 — LocationSelector Component**:
+  - Reusable location picker with smart defaults
+  - Auto-detect location with 🎯 button
+  - Manual zip code entry with validation
+  - Nearby stores horizontal scroll selector
+  - Selected store highlighting with persistence
+- **Part 5 — SmartShoppingScreen Modal**:
+  - Beautiful full-screen modal for price checking flow
+  - Location selection and store picker
+  - Price check results with individual item breakdown
+  - Summary card with total savings, sale items, stock status
+  - Instacart one-tap ordering from results
+  - Refresh prices button for updated checks
+  - Professional UI matching app theme (navy + green)
+- **Part 6 — Shopping Tab Integration**:
+  - Green banner button at top: "Smart Shopping"
+  - Description: "Check Kroger prices • Order on Instacart"
+  - Tap opens full Smart Shopping modal
+  - Passes current shopping list items to price checker
+  - Beautiful icon and visual hierarchy
+- **Part 7 — Settings UI**:
+  - New "Smart Shopping" section in Settings tab
+  - Kroger API Key field (shows: "Your Kroger Client ID is saved")
+  - Instacart API Key field (shows: "Waiting for approval")
+  - Store Location setting with auto-detect option
+  - Preferred Store display (e.g., "Mariano's — Plainfield")
+- **Part 8 — Secure API Configuration**:
+  - `apiConfig.ts` — Centralized Kroger & Instacart endpoints
+  - `apiKeyManager.ts` — AsyncStorage-based key persistence
+  - Token caching with expiry checking
+  - No hardcoded credentials in source
+  - Ready for user-provided API keys in Settings
+- **Architecture**:
+  - Four core services: `krogerService.ts`, `instacartService.ts`, `locationService.ts`, `apiKeyManager.ts`
+  - Type-safe interfaces for all API responses
+  - Reusable LocationSelector component
+  - Full-screen SmartShoppingScreen modal
+  - Integrated into existing Shopping tab workflow
+  - expo-location plugin configured with permission string
+  - All data flows through existing shoppingStore
+- **Production Ready**:
+  - When Instacart production key arrives, change one line: `activeUrl: 'https://connect.instacart.com'`
+  - Kroger client ID/secret stored in user's Settings
+  - All API calls respect rate limits with delays
+  - Error handling with user-friendly messages
+  - Haptic feedback on key actions
+  - Toast notifications for all outcomes
+
 ### Recipe Card Sharing Feature (v1.3.4) ✅ COMPLETE
 - **Share Button on Recipe Cards** — Arrow icon (↗️) next to heart button in card header
   - Opens beautiful share options bottom sheet

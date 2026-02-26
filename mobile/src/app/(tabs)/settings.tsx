@@ -710,7 +710,39 @@ export default function SettingsScreen() {
             </SectionCard>
           </View>
 
-          {/* Chef Claude Personality */}
+          {/* Smart Shopping Settings */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+            <SectionCard title="Smart Shopping" icon={<Package size={18} color={Colors.green} />}>
+              <Text style={{ fontFamily: 'DMSans_400Regular', fontSize: 12, color: Colors.textTertiary, marginBottom: 12 }}>
+                Check real-time grocery prices and order on Instacart.
+              </Text>
+              <ApiKeyField
+                label="Kroger API Key"
+                value="Your Kroger Client ID is saved"
+                onChange={() => {}}
+                helpUrl="https://developer.kroger.com"
+                helpLabel="Get Key"
+              />
+              <View style={styles.divider} />
+              <ApiKeyField
+                label="Instacart API Key"
+                value="Waiting for approval — enter key when received"
+                onChange={() => {}}
+                helpUrl="https://www.instacart.com/api"
+                helpLabel="Request Access"
+              />
+              <View style={styles.divider} />
+              <RowItem
+                label="Store Location"
+                value="Detect automatically"
+              />
+              <View style={styles.divider} />
+              <RowItem
+                label="Preferred Store"
+                value="Mariano's — Plainfield"
+              />
+            </SectionCard>
+          </View>
           <View style={{ paddingHorizontal: 16, marginBottom: 16 }}>
             <SectionCard title="Chef Claude" icon={<ChefHat size={18} color={Colors.green} />}>
               <Text style={{ fontFamily: 'DMSans_500Medium', fontSize: 12, color: Colors.textTertiary, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 }}>
