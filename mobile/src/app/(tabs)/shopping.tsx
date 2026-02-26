@@ -264,8 +264,7 @@ export default function ShoppingScreen() {
   const allStores = ['All', ...stores];
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.navy }} testID="shopping-screen">
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.navy }} edges={['top']} testID="shopping-screen">
         {/* Header */}
         <View
           style={{
@@ -1113,7 +1112,6 @@ export default function ShoppingScreen() {
           }))}
           onClose={() => setShowSmartShopping(false)}
         />
-      </SafeAreaView>
-    </View>
+    </SafeAreaView>
   );
 }
