@@ -7,6 +7,8 @@ const KEYS = {
   krogerStoreId: 'pantryiq_kroger_store_id',
   userZipCode: 'pantryiq_user_zip_code',
   userLocation: 'pantryiq_user_location',
+  krogerClientId: 'pantryiq_kroger_client_id',
+  krogerClientSecret: 'pantryiq_kroger_client_secret',
 };
 
 export interface UserLocation {
@@ -39,9 +41,15 @@ export const apiKeyManager = {
 
   async refreshKrogerToken(): Promise<string | null> {
     try {
-      const credentials = btoa(
-        `${API_CONFIG.kroger.clientId}:${API_CONFIG.kroger.clientSecret}`
-      );
+      const clientId = await AsyncStorage.getItem(KEYS.krogerClientId);
+      const clientSecret = await AsyncStorage.getItem(KEYS.krogerClientSecret);
+
+      if (!clientId || !clientSecret) {
+        console.log('Kroger credentials not configured');
+        return null;
+      }
+
+      const credentials = btoa(`${clientId}:${clientSecret}`);
 
       const response = await fetch(API_CONFIG.kroger.tokenUrl, {
         method: 'POST',

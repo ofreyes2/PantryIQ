@@ -1,13 +1,20 @@
 import { API_CONFIG } from './apiConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface InstacartLinkResult {
   success: boolean;
   url?: string;
   expiresAt?: string;
   error?: string;
+  notConfigured?: boolean;
 }
 
 export const instacartService = {
+  // Get Instacart API key from AsyncStorage
+  async getInstacartKey(): Promise<string | null> {
+    return await AsyncStorage.getItem('pantryiq_instacart_api_key');
+  },
+
   // Create a shoppable link from shopping list
   // This works with both dev and production keys
   async createShoppingListLink(
@@ -15,6 +22,16 @@ export const instacartService = {
     locationContext?: any
   ): Promise<InstacartLinkResult> {
     try {
+      const apiKey = await this.getInstacartKey();
+
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'Instacart API key not configured',
+          notConfigured: true,
+        };
+      }
+
       const lineItems = items.map((item) => ({
         name: item.name,
         quantity: item.quantity || 1,
@@ -28,7 +45,7 @@ export const instacartService = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `InstacartAPI ${API_CONFIG.instacart.apiKey}`,
+            Authorization: `InstacartAPI ${apiKey}`,
           },
           body: JSON.stringify({
             title: 'PantryIQ Shopping List',
@@ -68,6 +85,16 @@ export const instacartService = {
     servings: number = 1
   ): Promise<InstacartLinkResult> {
     try {
+      const apiKey = await this.getInstacartKey();
+
+      if (!apiKey) {
+        return {
+          success: false,
+          error: 'Instacart API key not configured',
+          notConfigured: true,
+        };
+      }
+
       const lineItems = (recipe.ingredients || []).map((ingredient) => ({
         name: ingredient,
         display_text: ingredient,
@@ -79,7 +106,7 @@ export const instacartService = {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `InstacartAPI ${API_CONFIG.instacart.apiKey}`,
+            Authorization: `InstacartAPI ${apiKey}`,
           },
           body: JSON.stringify({
             title: recipe.name,
