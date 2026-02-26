@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -505,33 +505,20 @@ export default function SettingsScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  // Debounced save handlers for grocery API keys
-  const krogerClientIdTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const krogerClientSecretTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const instacartApiKeyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // Save handlers for grocery API keys (autosave on blur)
   const handleKrogerClientIdChange = useCallback((value: string) => {
     setKrogerClientId(value);
-    if (krogerClientIdTimeoutRef.current !== null) clearTimeout(krogerClientIdTimeoutRef.current);
-    krogerClientIdTimeoutRef.current = setTimeout(() => {
-      AsyncStorage.setItem('pantryiq_kroger_client_id', value);
-    }, 1000);
+    AsyncStorage.setItem('pantryiq_kroger_client_id', value);
   }, []);
 
   const handleKrogerClientSecretChange = useCallback((value: string) => {
     setKrogerClientSecret(value);
-    if (krogerClientSecretTimeoutRef.current !== null) clearTimeout(krogerClientSecretTimeoutRef.current);
-    krogerClientSecretTimeoutRef.current = setTimeout(() => {
-      AsyncStorage.setItem('pantryiq_kroger_client_secret', value);
-    }, 1000);
+    AsyncStorage.setItem('pantryiq_kroger_client_secret', value);
   }, []);
 
   const handleInstacartApiKeyChange = useCallback((value: string) => {
     setInstacartApiKey(value);
-    if (instacartApiKeyTimeoutRef.current !== null) clearTimeout(instacartApiKeyTimeoutRef.current);
-    instacartApiKeyTimeoutRef.current = setTimeout(() => {
-      AsyncStorage.setItem('pantryiq_instacart_api_key', value);
-    }, 1000);
+    AsyncStorage.setItem('pantryiq_instacart_api_key', value);
   }, []);
 
   const handleExportData = () => {
