@@ -399,6 +399,25 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
     console.log(`  Instructions: ${instructions.length}`);
     console.log(`  Calories: ${calories}`);
 
+    // VALIDATE: Apply 4-condition check for recipe cards
+    // Condition 1: At least 3 ingredients
+    if (ingredients.length < 3) {
+      console.log(`  ❌ Skipped: Only ${ingredients.length} ingredients (need 3+)`);
+      return; // Skip this "recipe"
+    }
+
+    // Condition 2: At least 2 instructions
+    if (instructions.length < 2) {
+      console.log(`  ❌ Skipped: Only ${instructions.length} instructions (need 2+)`);
+      return; // Skip this "recipe"
+    }
+
+    // Condition 3: Calories > 0
+    if (!calories || calories <= 0) {
+      console.log(`  ❌ Skipped: Calories ${calories} (need > 0)`);
+      return; // Skip this "recipe"
+    }
+
     // Parse time, prep time, servings, etc from fields
     const timeStr = getField('Time');
     const prepTimeStr = getField('Prep Time');
@@ -427,6 +446,14 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       if (carbMatch) netCarbsPerServing = parseInt(carbMatch[1]);
     }
 
+    // Condition 4: Net carbs is not null and not "0" / "0g"
+    if (netCarbsPerServing === undefined || netCarbsPerServing === 0) {
+      console.log(`  ❌ Skipped: Net carbs ${netCarbsPerServing}g (need > 0g)`);
+      return; // Skip this "recipe"
+    }
+
+    console.log(`  ✅ Valid recipe — all 4 conditions met`);
+
     // Count difficulty stars ⭐
     const difficultyStr = getField('Difficulty');
     let difficulty: number | undefined;
@@ -450,7 +477,7 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
       ingredients: ingredients.length > 0 ? ingredients : undefined,
       instructions: instructions.length > 0 ? instructions : undefined,
       netCarbsPerServing,
-      caloriesPerServing: calories || undefined,
+      caloriesPerServing: calories,
       difficulty,
       crispiness,
       equipment: getField('Equipment'),
@@ -464,6 +491,12 @@ export function extractMultipleRecipesFromResponse(claudeResponse: string): Arra
 
 /**
  * Extract single recipe from Claude response when it contains preparation instructions
+ *
+ * A response is ONLY considered a recipe if ALL 4 conditions are true:
+ * 1. Response contains "INGREDIENTS" header with at least 3 items listed below it
+ * 2. Response contains "INSTRUCTIONS" header with at least 2 numbered steps below it
+ * 3. Calories value is greater than 0
+ * 4. Net carbs value is not null and not "0g"
  */
 export function extractRecipeFromResponse(claudeResponse: string): {
   hasRecipe: boolean;
@@ -477,23 +510,89 @@ export function extractRecipeFromResponse(claudeResponse: string): {
   netCarbsPerServing?: number;
   caloriesPerServing?: number;
 } {
-  // Look for numbered steps (1. 2. 3.) or ingredient lists
-  const hasNumberedSteps =
-    /^\s*\d+\.\s/m.test(claudeResponse);
-  const hasIngredientMarkers = /[-•]\s+\d+\s+(tbsp|tsp|oz|cup|lb|g|ml|serving)/i.test(
-    claudeResponse
-  );
-
-  if (!hasNumberedSteps && !hasIngredientMarkers) {
+  // Find INGREDIENTS section
+  const ingredientHeaderMatch = claudeResponse.match(/\*?\*?INGREDIENTS\*?\*?/i);
+  if (!ingredientHeaderMatch) {
     return { hasRecipe: false };
   }
+
+  // Extract ingredients (lines with bullet points after INGREDIENTS header)
+  const ingredients: string[] = [];
+  const ingredientText = claudeResponse.substring(ingredientHeaderMatch.index! + ingredientHeaderMatch[0].length);
+  const ingredientLines = ingredientText.split('\n').slice(0, 20); // Look at next 20 lines
+
+  for (const line of ingredientLines) {
+    const trimmed = line.trim();
+    // Stop at next section header
+    if (trimmed.match(/\*?\*?(INSTRUCTIONS|PREPARATION|STEPS|DIRECTIONS|MISSING|NOTES)\*?\*?/i)) {
+      break;
+    }
+    // Collect ingredient lines that start with - or •
+    if (trimmed.startsWith('-') || trimmed.startsWith('•')) {
+      ingredients.push(trimmed.replace(/^[-•]\s*/, '').trim());
+    }
+  }
+
+  // Condition 1: At least 3 ingredients
+  if (ingredients.length < 3) {
+    return { hasRecipe: false };
+  }
+
+  // Find INSTRUCTIONS section
+  const instructionHeaderMatch = claudeResponse.match(/\*?\*?INSTRUCTIONS\*?\*?/i);
+  if (!instructionHeaderMatch) {
+    return { hasRecipe: false };
+  }
+
+  // Extract numbered instructions
+  const instructions: string[] = [];
+  const instructionText = claudeResponse.substring(instructionHeaderMatch.index! + instructionHeaderMatch[0].length);
+  const instructionLines = instructionText.split('\n').slice(0, 30); // Look at next 30 lines
+
+  for (const line of instructionLines) {
+    const trimmed = line.trim();
+    // Stop at next section header
+    if (trimmed.match(/\*?\*?(NUTRITION|MISSING|NOTES|EQUIPMENT|TIPS|SERVING)\*?\*?/i) && !trimmed.match(/^\d+\./)) {
+      break;
+    }
+    // Collect numbered steps (1. 2. 3. etc)
+    const stepMatch = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (stepMatch) {
+      instructions.push(stepMatch[1]);
+    }
+  }
+
+  // Condition 2: At least 2 instructions
+  if (instructions.length < 2) {
+    return { hasRecipe: false };
+  }
+
+  // Extract nutrition info
+  const calorieMatch = claudeResponse.match(/(\d+)\s*(?:calories?|kcal|cal)/i);
+  const caloriesPerServing = calorieMatch ? parseInt(calorieMatch[1]) : undefined;
+
+  // Condition 3: Calories > 0
+  if (!caloriesPerServing || caloriesPerServing <= 0) {
+    return { hasRecipe: false };
+  }
+
+  // Extract net carbs
+  const carbMatch = claudeResponse.match(/(\d+)\s*g(?:rams?)?\s*(?:net\s+)?carb/i);
+  const netCarbsPerServing = carbMatch ? parseInt(carbMatch[1]) : undefined;
+
+  // Condition 4: Net carbs is not null and not "0g"
+  if (netCarbsPerServing === undefined || netCarbsPerServing === 0) {
+    return { hasRecipe: false };
+  }
+
+  // All 4 conditions passed - extract remaining fields for the recipe
 
   // Extract recipe name (usually in first line or after common headers)
   const nameMatch = claudeResponse.match(/^(?:##\s+)?([A-Z][A-Za-z\s]+?)(?:\n|$)/);
   const recipeName = nameMatch ? nameMatch[1].trim() : undefined;
 
   // Extract prep/cook time if mentioned
-  const prepTimeMatch = claudeResponse.match(/(?:prep|preparation)\s+(?:time|time)?:?\s*(\d+)\s*(?:minute|min)/i);
+  const prepTimeMatch = claudeResponse.match(/(?:prep|preparation)\s+(?:time)?:?\s*(\d+)\s*(?:minute|min)/i);
   const cookTimeMatch = claudeResponse.match(/cook(?:ing)?\s+time:?\s*(\d+)\s*(?:minute|min)/i);
   const servingMatch = claudeResponse.match(/(?:yield|serves?):\s*(\d+)\s*(?:serving)?/i);
 
@@ -504,32 +603,6 @@ export function extractRecipeFromResponse(claudeResponse: string): {
   // Extract first time mentioned if no specific labels (for servingTime display)
   const timeMatch = claudeResponse.match(/(\d+)\s*(?:minute|min|second|sec)\s*/i);
   const servingTime = timeMatch ? timeMatch[0].trim() : undefined;
-
-  // Extract ingredients (lines with bullet points, dashes, or numbers)
-  const ingredients: string[] = [];
-  const ingredientRegex = /^\s*[-•*]\s+(.+?)$/gm;
-  let match;
-  while ((match = ingredientRegex.exec(claudeResponse)) !== null) {
-    const ingredient = match[1].trim();
-    // Filter out lines that look like instructions
-    if (!ingredient.match(/^(mix|stir|heat|add|combine|cook|bake|fry|boil|season|serve)/i)) {
-      ingredients.push(ingredient);
-    }
-  }
-
-  // Extract instructions (numbered lines)
-  const instructions: string[] = [];
-  const stepRegex = /^\s*\d+\.\s+(.+?)(?=\n\s*\d+\.|$)/gm;
-  while ((match = stepRegex.exec(claudeResponse)) !== null) {
-    instructions.push(match[1].trim());
-  }
-
-  // Extract nutrition info if mentioned
-  const carbMatch = claudeResponse.match(/(\d+)\s*(?:g|grams?)\s*(?:net\s+)?carb/i);
-  const calorieMatch = claudeResponse.match(/(\d+)\s*(?:calories?|kcal)/i);
-
-  const netCarbsPerServing = carbMatch ? parseInt(carbMatch[1]) : undefined;
-  const caloriesPerServing = calorieMatch ? parseInt(calorieMatch[1]) : undefined;
 
   return {
     hasRecipe: true,
