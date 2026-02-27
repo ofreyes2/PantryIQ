@@ -5,6 +5,95 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+/**
+ * Extract RECIPE_DATA JSON block from Claude response
+ * Returns parsed recipes and cleaned text without the JSON block
+ */
+export function extractRecipeDataJSON(responseText: string): {
+  recipes: Array<{
+    recipeName?: string;
+    description?: string;
+    ingredients?: string[];
+    instructions?: string[];
+    prepTime?: number;
+    cookTime?: number;
+    servings?: number;
+    netCarbsPerServing?: number;
+    caloriesPerServing?: number;
+    difficulty?: number;
+    crispiness?: number;
+    equipment?: string;
+    videoUrl?: string;
+    imageUrl?: string;
+  }>;
+  cleanedText: string;
+} {
+  const recipeDataMatch = responseText.match(/<RECIPE_DATA>([\s\S]*?)<\/RECIPE_DATA>/);
+
+  if (!recipeDataMatch) {
+    return { recipes: [], cleanedText: responseText };
+  }
+
+  try {
+    const jsonStr = recipeDataMatch[1].trim();
+    const parsed = JSON.parse(jsonStr);
+
+    if (!parsed.hasRecipeData || !Array.isArray(parsed.recipes)) {
+      return { recipes: [], cleanedText: responseText };
+    }
+
+    // Transform the recipes to match our internal format
+    const transformedRecipes = parsed.recipes.map((recipe: any) => {
+      // Handle ingredients: could be array of objects or array of strings
+      let ingredients: string[] = [];
+      if (Array.isArray(recipe.ingredients)) {
+        ingredients = recipe.ingredients.map((ing: any) => {
+          if (typeof ing === 'string') return ing;
+          if (typeof ing === 'object' && ing.name) {
+            const qty = ing.quantity ? `${ing.quantity} ` : '';
+            const unit = ing.unit ? `${ing.unit} ` : '';
+            return `${qty}${unit}${ing.name}`.trim();
+          }
+          return '';
+        }).filter(Boolean);
+      }
+
+      // Ensure equipment is a string, not array
+      let equipmentStr: string | undefined;
+      if (typeof recipe.equipment === 'string') {
+        equipmentStr = recipe.equipment;
+      } else if (Array.isArray(recipe.equipment)) {
+        equipmentStr = recipe.equipment.join(', ');
+      }
+
+      return {
+        recipeName: recipe.name || recipe.recipeName || 'Recipe',
+        description: recipe.description,
+        prepTime: recipe.prepTime || recipe.timeMinutes,
+        cookTime: recipe.cookTime || recipe.timeMinutes,
+        servings: recipe.servings || 1,
+        ingredients: ingredients.length > 0 ? ingredients : undefined,
+        instructions: recipe.instructions,
+        netCarbsPerServing: recipe.netCarbsPerServing,
+        caloriesPerServing: recipe.caloriesPerServing,
+        difficulty: recipe.difficultyRating,
+        crispiness: recipe.crispinessRating,
+        equipment: equipmentStr,
+        videoUrl: recipe.videoUrl,
+        imageUrl: recipe.imageUrl,
+      };
+    });
+
+    // Remove the RECIPE_DATA block from the display text
+    const cleanedText = responseText.replace(/<RECIPE_DATA>[\s\S]*?<\/RECIPE_DATA>\s*/g, '').trim();
+
+    return { recipes: transformedRecipes, cleanedText };
+  } catch (error) {
+    console.log('Error parsing RECIPE_DATA JSON:', error);
+    return { recipes: [], cleanedText: responseText };
+  }
+}
+
 export interface ExplorationTrigger {
   isExploration: boolean;
   triggerType?: 'pairing' | 'elevation' | 'substitution' | 'preparation' | 'flavor' | 'suggestion';

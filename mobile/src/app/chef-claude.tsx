@@ -42,6 +42,7 @@ import {
   detectPositiveResponse,
   extractRecipeFromResponse,
   extractMultipleRecipesFromResponse,
+  extractRecipeDataJSON,
   getFoodImage,
 } from '@/lib/foodExplorationUtil';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
@@ -2098,10 +2099,18 @@ export default function ChefClaudeScreen() {
         }
 
         // Check for recipes in response
+        // PATH 1: Check for RECIPE_DATA JSON block first (always takes priority)
+        const { recipes: jsonRecipes, cleanedText: textAfterJsonRemoval } = extractRecipeDataJSON(displayText);
+
+        // Use cleaned text for further processing
+        const displayTextForCards = textAfterJsonRemoval;
+
         const hasPositiveResponse = detectPositiveResponse(trimmed);
         const lastAssistantMsg = messages.filter((m) => m.role === 'assistant').pop();
-        const recipeData = extractRecipeFromResponse(lastAssistantMsg?.content || '');
-        let multipleRecipes = extractMultipleRecipesFromResponse(displayText);
+
+        // PATH 2: Check for plain text recipes only if no JSON recipes found
+        const recipeData = jsonRecipes.length === 0 ? extractRecipeFromResponse(lastAssistantMsg?.content || '') : { hasRecipe: false };
+        let multipleRecipes = jsonRecipes.length > 0 ? jsonRecipes : extractMultipleRecipesFromResponse(displayTextForCards);
 
         // Add images to recipes
         if (multipleRecipes.length > 0) {
@@ -2123,7 +2132,7 @@ export default function ChefClaudeScreen() {
             name: mealName,
             servingTime: recipeData.servingTime,
             netCarbs: 0,
-            description: displayText.substring(0, 100),
+            description: displayTextForCards.substring(0, 100),
             foods: mentionedFoods,
             instructions: recipeData.instructions || [],
           });
@@ -2134,7 +2143,7 @@ export default function ChefClaudeScreen() {
         const assistantMessage: Message = {
           id: `msg-${Date.now()}-reply`,
           role: 'assistant',
-          content: displayText,
+          content: displayTextForCards,
           timestamp: new Date(),
           mealAnalysis: mealAnalysis && mealAnalysis.isMealDescription ? mealAnalysis : undefined,
           mealUpdateAction: mealUpdateAction,
@@ -2153,9 +2162,9 @@ export default function ChefClaudeScreen() {
 
         setMessages((prev) => [...prev, assistantMessage]);
 
-        // Auto-speak if in voice mode
-        if (isVoiceMode && displayText) {
-          setTimeout(() => speakResponse(displayText), 300);
+        // Auto-speak if in voice mode (use cleaned text without RECIPE_DATA block)
+        if (isVoiceMode && displayTextForCards) {
+          setTimeout(() => speakResponse(displayTextForCards), 300);
         }
 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
