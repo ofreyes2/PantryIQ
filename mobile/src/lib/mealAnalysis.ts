@@ -40,6 +40,9 @@ export interface MealAnalysis {
   targetDate?: string; // YYYY-MM-DD format, defaults to today if not specified
   displayDate?: string; // Human-readable date like "Today", "Yesterday", or day name
   additionalActions?: AdditionalAction[]; // Additional operations (delete duplicates, etc.)
+  restaurant?: string | null; // Restaurant name if fast food item
+  ketoStatus?: 'keto_friendly' | 'keto_moderate' | 'keto_borderline' | 'not_keto' | null; // Keto status
+  ketoModification?: string | null; // Suggestion to make item keto
 }
 
 /**

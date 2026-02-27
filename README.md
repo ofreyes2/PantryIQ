@@ -4,6 +4,75 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Fast Food Mode (v1.5.0) ✅ COMPLETE
+- **Complete Fast Food Nutrition Lookup System** — Quick access to restaurant menu items with keto analysis
+- **Part 1 — Restaurant Selector**:
+  - Grid of 12 major fast food chains with emoji logos (McDonald's 🍟, Chick-fil-A 🐔, Taco Bell 🌮, etc.)
+  - Custom restaurant name entry for any restaurant not in preset list
+  - Smooth navigation between restaurant selection and menu search
+- **Part 2 — Menu Search**:
+  - Search bar for specific menu items at selected restaurant
+  - Claude AI powered search returns up to 8 matching items with complete nutrition data
+  - Searches include calories, total carbs, fiber, net carbs, protein, fat, and category
+- **Part 3 — Keto Status Badges**:
+  - Automatic keto classification for all fast food items:
+    - 🥑 KETO FRIENDLY (< 5g net carbs) — green badge
+    - ✅ KETO MODERATE (5-10g net carbs) — yellow badge
+    - ⚠️ BORDERLINE (10-20g net carbs) — amber badge
+    - ❌ NOT KETO (> 20g net carbs) — red badge
+  - Large orange net carbs number for quick scanning
+  - Protein and fat stats displayed for macro tracking
+- **Part 4 — Smart Modifications**:
+  - Green tip box with modification suggestions: "Make it keto: Order without the bun for only 3g net carbs"
+  - Only shows for items that can be modified (null for already-keto items)
+  - "Make it Keto" button opens Chef Claude for natural language optimization advice
+- **Part 5 — One-Tap Logging**:
+  - "Log This Meal" button adds item directly to today's meals
+  - Auto-logs as "Lunch" meal type (configurable)
+  - Toast confirmation: "✅ Logged: Big Mac (McDonald's)"
+  - Automatically returns to Chef Claude after logging
+- **Part 6 — Natural Language Integration**:
+  - Chef Claude system prompt detects fast food mentions: "I just had a Big Mac", "At Chipotle", "Chick-fil-A grilled nuggets"
+  - Automatically responds with nutrition data and keto badge
+  - MEAL_DATA JSON now includes: restaurant, ketoStatus, ketoModification fields
+- **Part 7 — Chef Claude Quick Prompt**:
+  - New "🍔 Fast Food" button in quick prompts row
+  - Tap to open Fast Food Mode directly from chat
+  - Replaces need to explain what you're eating with one-tap access
+- **Part 8 — Meal Confirmation UI**:
+  - MealConfirmationCard displays keto badge when meal is logged
+  - Shows badge emoji, status label, and modification suggestion if available
+  - Badge styling matches status: green for keto friendly, red for not keto
+- **Implementation Details**:
+  - New `fast-food-mode.tsx` screen (497 lines) with 3-step wizard UI
+  - Restaurant grid with 12 presets + custom entry support
+  - Claude API queries for nutrition data parsing
+  - Keto status classification logic with color coding
+  - Integration with existing meal logging pipeline
+  - Enhanced MealAnalysis interface with keto fields
+  - MealConfirmationCard keto badge display
+  - Chef Claude system prompt with fast food detection
+- **Data Flow**:
+  1. User taps 🍔 Fast Food button → opens fast-food-mode.tsx
+  2. Selects restaurant (preset or custom) → search step
+  3. Searches menu (e.g., "burger") → Claude returns 8 items with nutrition
+  4. Taps "Log This Meal" → addEntry to meals store with keto metadata
+  5. Or taps "Make it Keto" → opens Chef Claude with context
+  6. MealConfirmationCard displays keto badge during confirmation
+  7. Meal logged with restaurant name and keto status for historical tracking
+- **Files Modified**:
+  - `chef-claude.tsx`: Added Fast Food quick prompt + system prompt detection + MEAL_DATA keto fields
+  - `mealAnalysis.ts`: Enhanced MealAnalysis interface with keto fields
+  - `MealConfirmationCard.tsx`: Added keto status badge display
+- **Files Created**:
+  - `fast-food-mode.tsx`: Complete Fast Food Mode screen (497 lines)
+- **User Benefits**:
+  - No need to guess fast food nutrition — Claude provides accurate data
+  - Keto status badges show diet impact at a glance
+  - One-tap logging saves time vs manual entry
+  - Modification suggestions help stay within carb goals
+  - Integration with Chef Claude allows natural conversation about modifications
+
 ### Recipe Card Button Redesign & Unlimited Recipe Support (v1.4.3) ✅ COMPLETE
 - **Compact 4-Button Action Row** — Recipe cards now feature a single efficient button row:
   - Replaced full-width "Save to Recipe Box" button with compact icon version

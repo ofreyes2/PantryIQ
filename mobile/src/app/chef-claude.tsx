@@ -122,6 +122,7 @@ interface ConversationMetadata {
 type MealCardStatus = 'pending' | 'logging' | 'success' | 'failure' | 'loading';
 
 const QUICK_PROMPTS = [
+  "🍔 Fast Food",
   "Log my morning coffee",
   "What can I make for dinner tonight?",
   "How are my carbs today",
@@ -276,6 +277,13 @@ YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
 1. Write friendly response about the food they ate
 2. COPY AND PASTE THIS EXACT JSON BLOCK AT THE END (replace example numbers with real data)
 
+FAST FOOD DETECTION:
+When the user mentions eating fast food (e.g., "I just had a Big Mac", "I ate at Chipotle", "Had Chick-fil-A grilled nuggets"), AUTOMATICALLY detect it as a meal and include keto status in the MEAL_DATA:
+- Always include "ketoStatus" field: "keto_friendly" (< 5g net carbs), "keto_moderate" (5-10g), "keto_borderline" (10-20g), or "not_keto" (> 20g)
+- Always include "restaurant" field with the restaurant name
+- If modification is possible, include "ketoModification" with the suggestion (or null if already keto friendly)
+- The app will automatically show a keto status badge (🥑, ✅, ⚠️, or ❌) when meal is logged
+
 <MEAL_DATA>
 {
   "hasMealData": true,
@@ -296,7 +304,10 @@ YOU MUST ALWAYS DO THIS WHEN USER DESCRIBES FOOD:
   "needsDateConfirmation": true,
   "confirmationMessage": "Logging to YESTERDAY — Sunday February 23 — Breakfast",
   "needsMealType": false,
-  "missingInfo": null
+  "missingInfo": null,
+  "restaurant": null,
+  "ketoStatus": null,
+  "ketoModification": null
 }
 </MEAL_DATA>
 
@@ -1887,6 +1898,13 @@ export default function ChefClaudeScreen() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isTyping) return;
+
+      // Special handling for Fast Food Mode
+      if (trimmed === '🍔 Fast Food') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        router.push('/fast-food-mode');
+        return;
+      }
 
       const apiKey = userProfile.claudeApiKey;
       if (!apiKey) {

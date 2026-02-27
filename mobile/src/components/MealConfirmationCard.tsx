@@ -213,6 +213,60 @@ export function MealConfirmationCard({
         </Text>
       </View>
 
+      {/* Keto Status Badge - show for fast food items */}
+      {analysis.ketoStatus ? (
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            borderTopWidth: 1,
+            borderTopColor: Colors.border,
+          }}
+        >
+          {(() => {
+            const statusConfig: Record<string, { emoji: string; label: string; color: string }> = {
+              keto_friendly: { emoji: '🥑', label: 'KETO FRIENDLY', color: Colors.green },
+              keto_moderate: { emoji: '✅', label: 'KETO MODERATE', color: Colors.amber },
+              keto_borderline: { emoji: '⚠️', label: 'BORDERLINE', color: '#E67E22' },
+              not_keto: { emoji: '❌', label: 'NOT KETO', color: Colors.error },
+            };
+            const config = statusConfig[analysis.ketoStatus ?? 'not_keto'] || statusConfig.not_keto;
+            return (
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: BorderRadius.md,
+                  backgroundColor: `${config.color}20`,
+                  alignSelf: 'flex-start',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: config.color,
+                  }}
+                >
+                  {config.emoji} {config.label}
+                </Text>
+              </View>
+            );
+          })()}
+          {analysis.ketoModification && analysis.ketoModification !== null ? (
+            <Text
+              style={{
+                fontSize: 11,
+                color: Colors.textSecondary,
+                marginTop: 6,
+              }}
+            >
+              💡 {analysis.ketoModification}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {/* Error message - show on failure */}
       {status === 'failure' && errorMessage ? (
         <View
