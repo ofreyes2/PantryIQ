@@ -6,6 +6,37 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
+ * Validate that a recipe is actually a recipe and not a conversational response
+ */
+function isValidRecipe(recipe: any): boolean {
+  if (!recipe) return false;
+
+  // A real recipe must have actual content
+  // Reject anything that looks like a conversational response wrapped in recipe tags
+
+  const hasRealCalories = recipe.caloriesPerServing && recipe.caloriesPerServing > 0;
+
+  const hasRealIngredients =
+    Array.isArray(recipe.ingredients) && recipe.ingredients.length >= 2;
+
+  const hasRealInstructions =
+    Array.isArray(recipe.instructions) && recipe.instructions.length >= 2;
+
+  const hasRealName =
+    recipe.name &&
+    recipe.name.length > 3 &&
+    // Reject names that are clearly not recipes
+    !recipe.name.toLowerCase().includes('great question') &&
+    !recipe.name.toLowerCase().includes('yes,') &&
+    !recipe.name.toLowerCase().includes('starbucks has') &&
+    !recipe.name.toLowerCase().includes('here are') &&
+    !recipe.name.toLowerCase().includes('frappuccino') && // Not a recipe when just describing
+    !recipe.name.toLowerCase().includes('does starbucks');
+
+  return hasRealCalories && hasRealIngredients && hasRealInstructions && hasRealName;
+}
+
+/**
  * Extract RECIPE_DATA JSON block from Claude response
  * Returns parsed recipes and cleaned text without the JSON block
  */
@@ -42,20 +73,31 @@ export function extractRecipeDataJSON(responseText: string): {
       return { recipes: [], cleanedText: responseText };
     }
 
-    // Transform the recipes to match our internal format
-    const transformedRecipes = parsed.recipes.map((recipe: any) => {
+    // Filter recipes - only include valid ones
+    const validRecipes = parsed.recipes.filter(isValidRecipe);
+
+    if (validRecipes.length === 0) {
+      // No valid recipes found - return cleaned text without the JSON block
+      const cleanedText = responseText.replace(/<RECIPE_DATA>[\s\S]*?<\/RECIPE_DATA>\s*/g, '').trim();
+      return { recipes: [], cleanedText };
+    }
+
+    // Transform the valid recipes to match our internal format
+    const transformedRecipes = validRecipes.map((recipe: any) => {
       // Handle ingredients: could be array of objects or array of strings
       let ingredients: string[] = [];
       if (Array.isArray(recipe.ingredients)) {
-        ingredients = recipe.ingredients.map((ing: any) => {
-          if (typeof ing === 'string') return ing;
-          if (typeof ing === 'object' && ing.name) {
-            const qty = ing.quantity ? `${ing.quantity} ` : '';
-            const unit = ing.unit ? `${ing.unit} ` : '';
-            return `${qty}${unit}${ing.name}`.trim();
-          }
-          return '';
-        }).filter(Boolean);
+        ingredients = recipe.ingredients
+          .map((ing: any) => {
+            if (typeof ing === 'string') return ing;
+            if (typeof ing === 'object' && ing.name) {
+              const qty = ing.quantity ? `${ing.quantity} ` : '';
+              const unit = ing.unit ? `${ing.unit} ` : '';
+              return `${qty}${unit}${ing.name}`.trim();
+            }
+            return '';
+          })
+          .filter(Boolean);
       }
 
       // Ensure equipment is a string, not array
@@ -90,7 +132,9 @@ export function extractRecipeDataJSON(responseText: string): {
     return { recipes: transformedRecipes, cleanedText };
   } catch (error) {
     console.log('Error parsing RECIPE_DATA JSON:', error);
-    return { recipes: [], cleanedText: responseText };
+    // On error, remove the broken JSON block and return the text
+    const cleanedText = responseText.replace(/<RECIPE_DATA>[\s\S]*?<\/RECIPE_DATA>\s*/g, '').trim();
+    return { recipes: [], cleanedText };
   }
 }
 
