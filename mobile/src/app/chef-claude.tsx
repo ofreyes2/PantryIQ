@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { ChefClaudeTools } from '@/lib/chefClaudeTools';
 import {
   View,
   Text,
@@ -593,6 +594,75 @@ async function callClaude(
   systemPrompt: string,
   apiKey: string
 ): Promise<string> {
+  // Get complete app data snapshot for Claude context
+  const appSnapshot = await ChefClaudeTools.getDailySummary();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+  const yesterdayMeals = await ChefClaudeTools.getMealsForDate(yesterdayStr);
+  const weekHistory = await ChefClaudeTools.getWeekMeals();
+  const streak = await ChefClaudeTools.getStreakData();
+  const weight = await ChefClaudeTools.getCurrentWeight();
+  const pantryItems = await ChefClaudeTools.getPantryItems();
+  const shoppingList = await ChefClaudeTools.getShoppingList();
+  const recipes = await ChefClaudeTools.getSavedRecipes();
+
+  console.log('=== CHEF CLAUDE CONTEXT BUILT ===');
+  console.log('Streak:', streak?.currentStreak || 0);
+  console.log('Today carbs:', appSnapshot?.totals?.netCarbs || 0);
+  console.log('Yesterday meals:', yesterdayMeals?.length || 0);
+  console.log('Pantry items:', pantryItems?.length || 0);
+  console.log('=================================');
+
+  // Build the context string
+  const liveContext = `
+========================================
+LIVE APP DATA — READ THIS BEFORE RESPONDING
+========================================
+
+TODAY'S NUTRITION:
+• Calories: ${appSnapshot?.totals?.calories || 0} of ${appSnapshot?.goals?.dailyCalorieGoal || 1800} goal
+• Net Carbs: ${appSnapshot?.totals?.netCarbs || 0}g of ${appSnapshot?.goals?.dailyCarbGoal || 20}g goal
+• Protein: ${appSnapshot?.totals?.protein || 0}g of ${appSnapshot?.goals?.dailyProteinGoal || 120}g goal
+• Fat: ${appSnapshot?.totals?.fat || 0}g of ${appSnapshot?.goals?.dailyFatGoal || 140}g goal
+• Carbs remaining: ${Math.max(0, (appSnapshot?.goals?.dailyCarbGoal || 20) - (appSnapshot?.totals?.netCarbs || 0))}g
+• Calories remaining: ${Math.max(0, (appSnapshot?.goals?.dailyCalorieGoal || 1800) - (appSnapshot?.totals?.calories || 0))}
+• Meals logged today: ${appSnapshot?.meals?.length || 0}
+
+TODAY'S MEALS:
+${appSnapshot?.meals?.length ? appSnapshot.meals.map((m: any) => `- ${m.name} (${m.calories}cal, ${m.netCarbs}g carbs, ${m.protein}g protein)`).join('\n') : 'No meals logged yet'}
+
+YESTERDAY (${yesterdayStr}):
+${yesterdayMeals?.length ? yesterdayMeals.map((m: any) => `- ${m.name} (${m.calories}cal, ${m.netCarbs}g carbs)`).join('\n') : 'No meals logged'}
+
+STREAK DATA:
+• Current streak: ${streak?.currentStreak || 0} days
+• Longest streak: ${streak?.longestStreak || 0} days
+
+WEIGHT:
+• Current: ${weight?.weight ? weight.weight + ' lbs' : 'Not logged'}
+• Recent log: ${weight?.date || 'Never'}
+
+PANTRY (${pantryItems?.length || 0} items):
+${pantryItems?.length ? pantryItems.slice(0, 10).map((i: any) => `- ${i.name}`).join('\n') : 'Pantry empty'}
+
+SHOPPING LIST (${shoppingList?.length || 0} items):
+${shoppingList?.length ? shoppingList.slice(0, 10).map((i: any) => `- ${i.name}`).join('\n') : 'Shopping list empty'}
+
+RECIPE BOX (${recipes?.length || 0} recipes):
+${recipes?.length ? recipes.slice(0, 5).map((r: any) => `- ${r.name}`).join('\n') : 'No recipes saved'}
+
+========================================
+YOU HAVE FULL ACCESS TO ALL THIS DATA.
+NEVER say you don't have access to streak data.
+NEVER say you can't see yesterday's meals.
+USE THE ACTUAL NUMBERS ABOVE IN YOUR RESPONSES.
+========================================
+`;
+
+  // Inject live context into system prompt
+  const fullSystemPrompt = systemPrompt + liveContext;
+
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -603,7 +673,7 @@ async function callClaude(
     body: JSON.stringify({
       model: 'claude-opus-4-5-20251101',
       max_tokens: 1024,
-      system: systemPrompt,
+      system: fullSystemPrompt,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     }),
   });
