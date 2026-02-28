@@ -32,7 +32,7 @@ export const ChefClaudeTools = {
    */
   async getTodaysMeals() {
     try {
-      const key = `pantryiq_meals_${getLocalToday()}`;
+      const key = `pantryiq_daily_log_${getLocalToday()}`;
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
@@ -46,7 +46,7 @@ export const ChefClaudeTools = {
    */
   async getMealsForDate(dateString: string) {
     try {
-      const key = `pantryiq_meals_${dateString}`;
+      const key = `pantryiq_daily_log_${dateString}`;
       const data = await AsyncStorage.getItem(key);
       return data ? JSON.parse(data) : [];
     } catch (error) {
@@ -65,7 +65,7 @@ export const ChefClaudeTools = {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = formatLocalDate(date);
-        const key = `pantryiq_meals_${dateStr}`;
+        const key = `pantryiq_daily_log_${dateStr}`;
         const data = await AsyncStorage.getItem(key);
         if (data) {
           meals[dateStr] = JSON.parse(data);
@@ -160,7 +160,7 @@ export const ChefClaudeTools = {
   }) {
     try {
       const today = getLocalToday();
-      const key = `pantryiq_meals_${today}`;
+      const key = `pantryiq_daily_log_${today}`;
       const existing = await AsyncStorage.getItem(key);
       const meals = existing ? JSON.parse(existing) : [];
 
@@ -197,7 +197,7 @@ export const ChefClaudeTools = {
   async deleteMeal(mealId: string, date?: string) {
     try {
       const dateStr = date || getLocalToday();
-      const key = `pantryiq_meals_${dateStr}`;
+      const key = `pantryiq_daily_log_${dateStr}`;
       const data = await AsyncStorage.getItem(key);
       if (!data) return false;
 
@@ -218,7 +218,7 @@ export const ChefClaudeTools = {
   async updateMeal(mealId: string, updates: any, date?: string) {
     try {
       const dateStr = date || getLocalToday();
-      const key = `pantryiq_meals_${dateStr}`;
+      const key = `pantryiq_daily_log_${dateStr}`;
       const data = await AsyncStorage.getItem(key);
       if (!data) return false;
 
@@ -240,7 +240,7 @@ export const ChefClaudeTools = {
    */
   async clearMealsForDate(dateString: string) {
     try {
-      const key = `pantryiq_meals_${dateString}`;
+      const key = `pantryiq_daily_log_${dateString}`;
       await AsyncStorage.removeItem(key);
       console.log('[ChefClaudeTools] Cleared meals for date:', dateString);
       return true;
