@@ -687,6 +687,70 @@ export const ChefClaudeTools = {
       return {};
     }
   },
+
+  /**
+   * Get complete app snapshot with all critical data
+   * Used by Chef Claude system prompt to have real-time access to app state
+   */
+  async getFullAppSnapshot() {
+    try {
+      // Get daily summary using existing function
+      const dailySummary = await this.getDailySummary();
+
+      // Get week overview using existing function
+      const weekOverview = await this.getWeekOverview();
+
+      // Read streak directly with CORRECT key
+      const streakRaw = await AsyncStorage.getItem('pantryiq_streak_data');
+      const streak = streakRaw
+        ? JSON.parse(streakRaw)
+        : {
+            currentStreak: 0,
+            longestStreak: 0,
+            lastLoggedDate: null,
+          };
+
+      // Read yesterday's meals with CORRECT key format
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yStr = [
+        yesterday.getFullYear(),
+        String(yesterday.getMonth() + 1).padStart(2, '0'),
+        String(yesterday.getDate()).padStart(2, '0'),
+      ].join('-');
+
+      const yesterdayRaw = await AsyncStorage.getItem('pantryiq_daily_log_' + yStr);
+      const yesterdayMeals = yesterdayRaw ? JSON.parse(yesterdayRaw) : [];
+
+      // Read fasting from correct key
+      const fastingRaw = await AsyncStorage.getItem('pantryiq_active_fast');
+      const fasting = fastingRaw ? JSON.parse(fastingRaw) : null;
+
+      return {
+        dailySummary,
+        weekOverview,
+        streak,
+        yesterdayMeals,
+        yesterdayDate: yStr,
+        fasting,
+      };
+    } catch (error) {
+      console.error('[ChefClaudeTools] Error getting full app snapshot:', error);
+      return {
+        dailySummary: null,
+        weekOverview: {},
+        streak: { currentStreak: 0, longestStreak: 0, lastLoggedDate: null },
+        yesterdayMeals: [],
+        yesterdayDate: '',
+        fasting: null,
+      };
+    }
+  },
 };
 
 export type ChefClaudeToolsType = typeof ChefClaudeTools;
+
+/**
+ * Get complete app snapshot - exported for direct use in system prompt
+ */
+export const getFullAppSnapshot = ChefClaudeTools.getFullAppSnapshot;

@@ -6,6 +6,9 @@
 import { getLocalToday } from '@/lib/dateUtils';
 
 // ─── Meals Store ──────────────────────────────────────────────────────────
+// LEGACY KEY — not used for new meal logging
+// kept only for backward compatibility
+// New meals use pantryiq_daily_log_* with dateUtils.today()
 export const MEAL_LOG_KEY = 'mealLog';
 export const getMealLogKey = (dateYYYYMMDD: string) => `${MEAL_LOG_KEY}_${dateYYYYMMDD}`;
 export const MEALS_STORE_KEY = 'pantryiq-meals-store';

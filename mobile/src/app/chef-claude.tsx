@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
-import { ChefClaudeTools } from '@/lib/chefClaudeTools';
+import { ChefClaudeTools, getFullAppSnapshot } from '@/lib/chefClaudeTools';
 import {
   View,
   Text,
@@ -173,7 +173,7 @@ const NEVER_CARD_PATTERNS = [
   'what can i eat',
 ];
 
-function buildSystemPrompt(
+async function buildSystemPrompt(
   pantryItems: PantryItem[],
   todayEntries: FoodEntry[],
   dailyTotals: DailyTotals,
@@ -181,8 +181,9 @@ function buildSystemPrompt(
   todayStr: string,
   kitchenEquipmentSummary: string,
   preferencesSummary: string
-): string {
-  // Safe personality prompt building with null safety
+): Promise<string> {
+  // Get full app snapshot with live data
+  const snapshot = await getFullAppSnapshot();
   const personalityInstructions = buildPersonalityPrompt(
     userProfile?.personalityMode ?? 'default',
     userProfile?.customPersonality ?? null
@@ -566,6 +567,38 @@ When in MODE 2 respond with plain conversational text. NEVER use any special for
 CRITICAL RULE: If you are not giving the user a recipe they will cook at home — use MODE 2. Always. When in doubt — use MODE 2.
 
 CRITICAL RULE FOR CONVERSATIONAL QUESTIONS: When the user asks about their tracked data (carbs, calories, macros, meals logged today), ALWAYS respond in plain conversational text. NEVER attempt to format these as recipe cards, even if the response mentions nutrition numbers or ingredients. These are data questions, not recipe requests.
+
+
+=== COMPLETE APP DATA (LIVE) ===
+
+STREAK:
+- Current streak: ${snapshot.streak.currentStreak} days
+- Longest streak: ${snapshot.streak.longestStreak} days
+- Last logged: ${snapshot.streak.lastLoggedDate}
+
+YESTERDAY (${snapshot.yesterdayDate}):
+${
+  snapshot.yesterdayMeals.length > 0
+    ? snapshot.yesterdayMeals
+        .map(
+          (m: any) =>
+            `- ${m.mealType}: ${m.name} (${m.calories} cal, ${m.netCarbs}g net carbs)`
+        )
+        .join('\n')
+    : 'No meals logged yesterday'
+}
+
+THIS WEEK OVERVIEW:
+${JSON.stringify(snapshot.weekOverview, null, 2)}
+
+FASTING STATUS:
+${
+  snapshot.fasting
+    ? `Active fast: Started ${snapshot.fasting.startTime}, Elapsed: ${snapshot.fasting.elapsedHours}h`
+    : 'No active fast'
+}
+
+=== END APP DATA ===
 
 
 ---RECIPE FORMAT RULES END---`;
@@ -2204,7 +2237,7 @@ export default function ChefClaudeScreen() {
         // Send all messages to Claude - Claude will handle meal logging detection
         // CRITICAL: Use dateUtils.today() for local time, NOT UTC
         const todayForSystemPrompt = dateUtils.today();
-        let systemPrompt = buildSystemPrompt(
+        let systemPrompt = await buildSystemPrompt(
           pantryItems,
           getEntriesForDate(todayForSystemPrompt),
           getDailyTotals(todayForSystemPrompt),

@@ -72,7 +72,7 @@ export const checkAndHandleDailyReset = async (): Promise<DailyResetResult> => {
       }
 
       // Initialize empty meal log for today (if not already present)
-      const mealLogKey = `pantryiq_meal_log_${today}`;
+      const mealLogKey = `pantryiq_daily_log_${today}`;
       const existingToday = await AsyncStorage.getItem(mealLogKey);
       if (!existingToday) {
         await AsyncStorage.setItem(
@@ -116,8 +116,14 @@ export const checkAndHandleDailyReset = async (): Promise<DailyResetResult> => {
       if (fastingDataStr) {
         try {
           const fastingData = JSON.parse(fastingDataStr);
-          const fastDate = fastingData.startTime?.split('T')[0];
-          if (fastDate && fastDate < today) {
+          // Use dateUtils.today() instead of splitting ISO time to avoid UTC bug
+          const startDate = new Date(fastingData.startTime);
+          const fastDateStr = [
+            startDate.getFullYear(),
+            String(startDate.getMonth() + 1).padStart(2, '0'),
+            String(startDate.getDate()).padStart(2, '0')
+          ].join('-');
+          if (fastDateStr && fastDateStr < today) {
             console.log('[DailyReset] Active fasting session carries over from yesterday');
             // Keep the fasting session running across midnight
             // The fasting timer will handle the continuous countdown
@@ -146,7 +152,7 @@ export const checkAndHandleDailyReset = async (): Promise<DailyResetResult> => {
       await AsyncStorage.setItem(DAILY_RESET_COMPLETE_KEY, today);
 
       // Initialize today's data
-      const mealLogKey = `pantryiq_meal_log_${today}`;
+      const mealLogKey = `pantryiq_daily_log_${today}`;
       await AsyncStorage.setItem(
         mealLogKey,
         JSON.stringify({
@@ -239,7 +245,7 @@ const checkStreakValidity = async (today: string, lastOpenedDate: string | null)
     } else if (daysDifference === 1) {
       // User opened app yesterday, now it's a new day
       // Increment streak if they logged meals yesterday
-      const yesterdayMealLogKey = `pantryiq_meal_log_${lastOpenedDate}`;
+      const yesterdayMealLogKey = `pantryiq_daily_log_${lastOpenedDate}`;
       const yesterdayLogStr = await AsyncStorage.getItem(yesterdayMealLogKey);
 
       if (yesterdayLogStr) {

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { FoodEntry, MealType } from '@/lib/stores/mealsStore';
+import { FoodEntry, MealType, useMealsStore } from '@/lib/stores/mealsStore';
 import { dateUtils, getLocalToday } from '@/lib/dateUtils';
 
 const DAILY_LOG_KEY_PREFIX = 'pantryiq_daily_log_';
@@ -58,6 +58,28 @@ class MealLoggerService {
 
       const updatedEntries = [...existingEntries, entry];
       await AsyncStorage.setItem(logKey, JSON.stringify(updatedEntries));
+
+      // Sync to Zustand immediately after AsyncStorage write succeeds
+      try {
+        const { addEntry: addZustandEntry } = useMealsStore.getState();
+        const entryForZustand: Omit<FoodEntry, 'id'> = {
+          name: entry.name,
+          mealType: entry.mealType,
+          date: entry.date,
+          servings: entry.servings,
+          calories: entry.calories,
+          carbs: entry.carbs,
+          protein: entry.protein,
+          fat: entry.fat,
+          fiber: entry.fiber,
+          netCarbs: entry.netCarbs,
+          isFavorite: entry.isFavorite,
+        };
+        addZustandEntry(entryForZustand);
+        console.log(`[MealLogger] Synced meal to Zustand for ${date}:`, entry.id);
+      } catch (zustandError) {
+        console.warn(`[MealLogger] Failed to sync to Zustand (but meal was saved to AsyncStorage):`, zustandError);
+      }
 
       // Verify write
       const verifyData = await AsyncStorage.getItem(logKey);
