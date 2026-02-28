@@ -2106,10 +2106,9 @@ export default function ChefClaudeScreen() {
         const displayTextForCards = textAfterJsonRemoval;
 
         const hasPositiveResponse = detectPositiveResponse(trimmed);
-        const lastAssistantMsg = messages.filter((m) => m.role === 'assistant').pop();
 
         // PATH 2: Check for plain text recipes only if no JSON recipes found
-        const recipeData = jsonRecipes.length === 0 ? extractRecipeFromResponse(lastAssistantMsg?.content || '') : { hasRecipe: false };
+        const recipeData = jsonRecipes.length === 0 ? extractRecipeFromResponse(displayTextForCards) : { hasRecipe: false };
         let multipleRecipes = jsonRecipes.length > 0 ? jsonRecipes : extractMultipleRecipesFromResponse(displayTextForCards);
 
         // Add images to recipes
