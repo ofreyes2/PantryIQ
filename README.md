@@ -4,6 +4,75 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Diagnostics & Self-Repair System (v1.6.0) ✅ COMPLETE
+- **Complete Health Check & Auto-Repair Framework** — Automatic app diagnostics with intelligent self-repair
+- **Part 1 — diagnostics.ts (350 lines)**: Comprehensive 10-point health check system:
+  1. **Meal Storage Keys** — Verifies meals stored in new format, detects old format with migration fix
+  2. **Streak Data Integrity** — Checks streak exists and matches meal logs
+  3. **Zustand Sync** — Compares AsyncStorage vs Zustand entries, detects out-of-sync state
+  4. **Date Format Sanity** — Validates local vs UTC date consistency across timezones
+  5. **Yesterday Meals Readable** — Confirms previous day's meals are accessible
+  6. **Chef Claude Tools** — Verifies Claude integration and data access
+  7. **Anthropic API Key** — Validates API key presence and format
+  8. **Pantry Data** — Checks pantry items exist and are accessible
+  9. **Shopping List** — Verifies shopping list state
+  10. **User Profile** — Confirms user profile is initialized
+- **Diagnostics Report Structure**:
+  - `timestamp`: When check was run
+  - `overallStatus`: HEALTHY | ISSUES_FOUND | CRITICAL (based on pass/fail counts)
+  - `results[]`: Array of 10 check results with name, status, message, and optional fix ID
+  - `repairableCount`: Number of issues with automated fixes available
+
+- **Part 2 — selfRepair.ts (240 lines)**: Automated repair system with 6 fixable issues:
+  1. **migrate_meal_keys** — Move meals from old key format to new format
+  2. **init_streak** — Initialize missing streak data
+  3. **recalculate_streak** — Recalculate streak based on actual meal logs
+  4. **sync_zustand** — Resync AsyncStorage meals into Zustand store
+  5. **check_tools_import** — Verify Chef Claude tools are accessible
+  6. **check_api_key** — Validate API key is available
+- **Auto-Repair Cycle**:
+  - `runSelfRepair(fixes)` takes array of fix IDs and applies them
+  - Returns array of successfully applied fixes
+  - Each fix wrapped in try/catch for safety
+  - Detailed console logging for debugging (`[SelfRepair]` prefix)
+- **High-Level Integration**:
+  - `runDiagnosticsAndRepair()` runs full cycle: diagnose → extract fixable issues → repair
+  - Returns report + repaired count for monitoring
+  - Safe for automatic execution (never throws, always logs)
+
+- **Part 3 — Integration in App Startup** (_layout.tsx):
+  - Diagnostics run automatically after all stores hydrate
+  - Executes in background with `.catch()` error handling
+  - Doesn't block app startup or splash screen
+  - Logs all results with `[AppInitialization]` prefix
+  - Safe for every app launch
+
+- **How It Works**:
+  1. User launches app
+  2. All Zustand stores hydrate from AsyncStorage
+  3. Diagnostics runner checks all 10 system health points
+  4. Report generated with overall status (HEALTHY/ISSUES_FOUND/CRITICAL)
+  5. All fixable issues extracted (those with `fix` property)
+  6. Self-repair cycle applies fixes (migrate keys, sync stores, etc.)
+  7. Results logged for debugging
+  8. App continues normally (diagnostics don't block or interrupt)
+
+- **Benefits**:
+  - ✅ Automatic detection of data corruption
+  - ✅ Self-healing without user intervention
+  - ✅ Prevents Chef Claude "data not found" errors
+  - ✅ Catches timezone/date inconsistencies
+  - ✅ Logs detailed reports for debugging
+  - ✅ Zero user friction (runs silently in background)
+  - ✅ Safe defaults (never modifies data unless explicitly fixing)
+
+- **Files Created**:
+  - `mobile/src/lib/diagnostics.ts` — 10-point health check system
+  - `mobile/src/lib/selfRepair.ts` — Automated repair cycle
+
+- **Files Modified**:
+  - `mobile/src/app/_layout.tsx` — Added diagnostics integration on app startup
+
 ### Chef Claude Tools System (v1.5.4) ✅ COMPLETE
 - **Capability**: Chef Claude now has full read and write access to every data store in the app
 - **Purpose**: Claude can answer questions with REAL data and update app state based on user requests

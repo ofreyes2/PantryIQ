@@ -33,6 +33,7 @@ import { checkAndHandleDailyReset } from '@/lib/dailyReset';
 import { NewDayGreeting } from '@/components/NewDayGreeting';
 import { MealLogger } from '@/lib/mealLogger';
 import { dateUtils } from '@/lib/dateUtils';
+import { runDiagnosticsAndRepair } from '@/lib/selfRepair';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -164,6 +165,11 @@ export default function RootLayout() {
         hydrateKitchenMapStore(),
         hydrateChefConversationStore(),
       ]);
+
+      // Run diagnostics and auto-repair in background
+      runDiagnosticsAndRepair().catch((error) => {
+        console.error('[AppInitialization] Diagnostics error:', error);
+      });
 
       await SplashScreen.hideAsync();
     }
