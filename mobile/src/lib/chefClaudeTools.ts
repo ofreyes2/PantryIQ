@@ -637,9 +637,9 @@ export const ChefClaudeTools = {
   async getDailySummary(dateString?: string) {
     try {
       const date = dateString || getLocalToday();
-      const meals = await this.getMealsForDate(date);
-      const totals = await this.getTotalsForDate(date);
-      const goals = await this.getDailyGoals();
+      const meals = await ChefClaudeTools.getMealsForDate(date);
+      const totals = await ChefClaudeTools.getTotalsForDate(date);
+      const goals = await ChefClaudeTools.getDailyGoals();
 
       return {
         date,
