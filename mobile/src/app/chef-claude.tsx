@@ -134,6 +134,44 @@ const QUICK_PROMPTS = [
   "How is my streak",
 ];
 
+/**
+ * CRITICAL INTERCEPTOR: Patterns that NEVER render as recipe cards
+ * These are conversational questions about the user's data/tracking
+ * Even if they contain recipe-like keywords, they should never show as cards
+ */
+const NEVER_CARD_PATTERNS = [
+  // Questions about today's data
+  'how many carbs',
+  'how many calories',
+  'how much protein',
+  'have i had today',
+  'did i eat',
+  'what did i log',
+  'how many calories today',
+  'carbs today',
+  'my total',
+  'my macros',
+  'calorie intake',
+  'carb intake',
+  'am i over',
+  'how much have i',
+  // Questions about macros/totals
+  'total calories',
+  'total carbs',
+  'total protein',
+  'net carbs today',
+  'remaining carbs',
+  // Other conversational patterns
+  'how are my',
+  'how is my',
+  'should i eat',
+  'should i have',
+  'can i eat',
+  'am i allowed',
+  'can i have',
+  'what can i eat',
+];
+
 function buildSystemPrompt(
   pantryItems: PantryItem[],
   todayEntries: FoodEntry[],
@@ -520,12 +558,34 @@ Use plain conversational text for EVERYTHING that is not a recipe the user will 
 - Any general conversation
 - Any question about Starbucks menu items
 - Any question starting with: does, is, can, what, should, tell me, help me, how many, which
+- **ANY QUESTION ABOUT TODAY'S MEALS OR TRACKING DATA** (e.g., "how many carbs have I had today", "what did I log", "how many calories", etc.)
 
 When in MODE 2 respond with plain conversational text. NEVER use any special formatting. NEVER wrap anything in tags or JSON.
 
 CRITICAL RULE: If you are not giving the user a recipe they will cook at home — use MODE 2. Always. When in doubt — use MODE 2.
 
+CRITICAL RULE FOR CONVERSATIONAL QUESTIONS: When the user asks about their tracked data (carbs, calories, macros, meals logged today), ALWAYS respond in plain conversational text. NEVER attempt to format these as recipe cards, even if the response mentions nutrition numbers or ingredients. These are data questions, not recipe requests.
+
+
 ---RECIPE FORMAT RULES END---`;
+}
+
+/**
+ * Pre-send interceptor: Check if response should NEVER be rendered as recipe cards
+ * This runs BEFORE recipe extraction and serves as a safety gate
+ */
+function shouldPreventRecipeCardRendering(userMessage: string, claudeResponse: string): boolean {
+  const fullContext = `${userMessage} ${claudeResponse}`.toLowerCase();
+
+  // Check if any NEVER_CARD_PATTERN appears in the full context
+  for (const pattern of NEVER_CARD_PATTERNS) {
+    if (fullContext.includes(pattern.toLowerCase())) {
+      console.log(`🚫 CARD BLOCKER: Found pattern "${pattern}" in context. Preventing recipe card rendering.`);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 async function callClaude(
@@ -2160,6 +2220,12 @@ export default function ChefClaudeScreen() {
           }
         }
 
+        // ========================================
+        // 🚫 CRITICAL: PRE-SEND INTERCEPTOR
+        // Check if this should NEVER be rendered as recipe cards
+        // ========================================
+        const shouldBlockCards = shouldPreventRecipeCardRendering(userMessage.content, displayText);
+
         // Check for recipes in response
         // PATH 1: Check for RECIPE_DATA JSON block first (always takes priority)
         const { recipes: jsonRecipes, cleanedText: textAfterJsonRemoval } = extractRecipeDataJSON(displayText);
@@ -2170,8 +2236,9 @@ export default function ChefClaudeScreen() {
         const hasPositiveResponse = detectPositiveResponse(trimmed);
 
         // PATH 2: Check for plain text recipes only if no JSON recipes found
-        const recipeData = jsonRecipes.length === 0 ? extractRecipeFromResponse(displayTextForCards) : { hasRecipe: false };
-        let multipleRecipes = jsonRecipes.length > 0 ? jsonRecipes : extractMultipleRecipesFromResponse(displayTextForCards);
+        // BUT: If interceptor blocked cards, don't extract recipes at all
+        const recipeData = !shouldBlockCards && jsonRecipes.length === 0 ? extractRecipeFromResponse(displayTextForCards) : { hasRecipe: false };
+        let multipleRecipes = !shouldBlockCards && jsonRecipes.length > 0 ? jsonRecipes : (!shouldBlockCards ? extractMultipleRecipesFromResponse(displayTextForCards) : []);
 
         // Add images to recipes
         if (multipleRecipes.length > 0) {

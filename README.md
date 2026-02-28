@@ -4,6 +4,41 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Chef Claude Recipe Card & Conversational Mode Fixes (v1.5.1) ✅ COMPLETE
+- **Problem 1 — Conversational Questions Showing as Recipe Cards**:
+  - Issue: Question like "How many carbs have I had today" was showing as recipe card with gray photo, 0g net carbs, 25m time, and buttons
+  - Root cause: Recipe extraction was happening on ALL Claude responses without checking context
+  - Solution: Implemented **pre-send interceptor** with NEVER_CARD_PATTERNS guard
+  - Patterns that block recipe card rendering (conversational questions):
+    - "how many carbs", "how many calories", "how much protein"
+    - "have i had today", "did i eat", "what did i log"
+    - "my total", "my macros", "am i over"
+    - "how are my", "how is my", "should i eat", "can i have", etc.
+  - Implementation: Added `shouldPreventRecipeCardRendering()` function that runs BEFORE recipe extraction
+  - When pattern detected, recipe extraction is completely skipped, preventing card rendering
+  - Logs "🚫 CARD BLOCKER" message for debugging
+
+- **Problem 2 — System Prompt MODE 1/MODE 2 Rules Verification**:
+  - Verified: MODE 1 (recipe card mode) and MODE 2 (conversational mode) rules already present in system prompt
+  - Enhanced: Added explicit section in MODE 2 documentation:
+    - "ANY QUESTION ABOUT TODAY'S MEALS OR TRACKING DATA"
+    - "When the user asks about their tracked data (carbs, calories, macros, meals logged today), ALWAYS respond in plain conversational text"
+    - "NEVER attempt to format these as recipe cards"
+  - Added critical rule: "If you are not giving the user a recipe they will cook at home — use MODE 2. Always."
+
+- **Implementation Details**:
+  - New `NEVER_CARD_PATTERNS` constant array with 20+ conversational patterns
+  - New `shouldPreventRecipeCardRendering(userMessage, claudeResponse)` function
+  - Integration in message handler: checks shouldBlockCards before any recipe extraction
+  - Safe default: If pattern matches, `multipleRecipes = []` and `recipeData.hasRecipe = false`
+  - Console logging for debugging: "🚫 CARD BLOCKER: Found pattern X in context"
+
+- **User Experience**:
+  - Conversational questions now show as plain text responses, not recipe cards
+  - No more gray photo placeholder + fake nutrition data for data questions
+  - Users see appropriate response type based on question intent
+  - All recipe functionality preserved for actual recipe requests ("show me recipes", "how do I make...", etc.)
+
 ### Fast Food Mode (v1.5.0) ✅ COMPLETE
 - **Complete Fast Food Nutrition Lookup System** — Quick access to restaurant menu items with keto analysis
 - **Part 1 — Restaurant Selector**:
