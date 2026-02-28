@@ -3,6 +3,8 @@
  * All keys follow a consistent naming pattern for easy management
  */
 
+import { getLocalToday } from '@/lib/dateUtils';
+
 // ─── Meals Store ──────────────────────────────────────────────────────────
 export const MEAL_LOG_KEY = 'mealLog';
 export const getMealLogKey = (dateYYYYMMDD: string) => `${MEAL_LOG_KEY}_${dateYYYYMMDD}`;
@@ -54,5 +56,9 @@ export const APP_STORE_KEY = 'pantryiq-app-store';
 
 // ─── Utility: Date format helper ───────────────────────────────────────────
 export const getDateKey = (date: Date = new Date()): string => {
-  return date.toISOString().split('T')[0]; // YYYY-MM-DD
+  // CRITICAL: Use getLocalToday() for current date to respect device timezone
+  // Only use the date parameter for non-current dates
+  return date.getTime() === new Date().getTime()
+    ? getLocalToday()
+    : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };

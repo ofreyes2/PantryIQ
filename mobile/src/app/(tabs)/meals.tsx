@@ -26,7 +26,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { dateUtils } from '@/lib/dateUtils';
+import { dateUtils, getLocalToday } from '@/lib/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -2069,7 +2069,7 @@ export default function MealsScreen() {
   const navigateDay = (dir: -1 | 1) => {
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + dir);
-    const newDate = d.toISOString().split('T')[0];
+    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const newDate = `${year}-${month}-${day}`;
     setSelectedDate(newDate);
   };
 

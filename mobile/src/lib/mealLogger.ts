@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodEntry, MealType } from '@/lib/stores/mealsStore';
-import { dateUtils } from '@/lib/dateUtils';
+import { dateUtils, getLocalToday } from '@/lib/dateUtils';
 
 const DAILY_LOG_KEY_PREFIX = 'pantryiq_daily_log_';
 const FAVORITES_KEY = 'pantryiq_favorites';
@@ -192,7 +192,11 @@ class MealLoggerService {
       for (let i = 0; i < 30; i++) {
         const checkDate = new Date(thirtyDaysAgo);
         checkDate.setDate(checkDate.getDate() + i);
-        const dateStr = checkDate.toISOString().split('T')[0];
+        // Format date using local time, not UTC
+        const year = checkDate.getFullYear();
+        const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+        const day = String(checkDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
         const logKey = `${DAILY_LOG_KEY_PREFIX}${dateStr}`;
         const logData = await AsyncStorage.getItem(logKey);
 

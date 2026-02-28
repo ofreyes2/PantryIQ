@@ -4,6 +4,53 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Complete UTC Date Elimination & Local Time Standardization (v1.5.3) ✅ COMPLETE
+- **Problem**: Meals being logged to yesterday's date (UTC time was rolling back the date for US timezones)
+- **Root Cause**: Remaining UTC date methods throughout the codebase:
+  - `d.toISOString().split('T')[0]` (returns UTC)
+  - Various places using UTC for current date instead of local time
+- **The Comprehensive Fix**:
+  - **Step 1**: Created `getLocalToday()` exported function in dateUtils.ts
+    - Provides standardized way to get today's local date as YYYY-MM-DD
+    - Uses `getLocalDateString()` internally which respects device timezone
+    - Safe to call from anywhere in the app
+
+  - **Step 2**: Fixed all date formatting throughout the codebase (9 files):
+    - **dateUtils.ts**: Added `getLocalToday()` export
+    - **storageKeys.ts**: Fixed `getDateKey()` to use `getLocalToday()` for current dates
+    - **mealLogger.ts**: Fixed 30-day food frequency check to use local date formatting
+    - **QuickLogSheet.tsx**: Fixed date comparison (already using dateUtils)
+    - **MealConfirmationModal.tsx**: Already using dateUtils
+    - **health.tsx**: Fixed StreakHeatmap date generation
+    - **meals.tsx**: Fixed navigateDay() to use local time
+    - **meal-type-detail.tsx**: Fixed toDateStr() helper
+    - **healthStore.ts**: Fixed weight entry seed data generation and getWeightTrend filtering
+    - **pantryStore.ts**: Fixed expiry date calculations for seed items
+
+  - **Step 3**: Verified all UTC methods eliminated:
+    - ✅ All `toISOString().split('T')[0]` replaced (8 instances)
+    - ✅ All `toISOString().substring(0, 10)` checked (none found)
+    - ✅ All `toISOString().slice(0, 10)` checked (none found)
+    - ✅ All remaining `toISOString()` are for timestamps, not dates (acceptable)
+
+- **Result**: Meals now log to CORRECT date (today's local date, not UTC)
+  - Dashboard and Chef Claude both read from same date
+  - All date-based queries use local time
+  - Health tracking uses local time
+  - Date navigation uses local time
+  - Expiry dates use local time
+  - Works correctly in ALL timezones
+
+- **Files Modified (9 total)**:
+  1. `dateUtils.ts` — Added `getLocalToday()` export
+  2. `storageKeys.ts` — Fixed `getDateKey()` function
+  3. `mealLogger.ts` — Fixed 30-day check date loop
+  4. `health.tsx` (tabs) — Fixed StreakHeatmap date generation
+  5. `meals.tsx` (tabs) — Fixed navigateDay() helper
+  6. `meal-type-detail.tsx` — Fixed toDateStr() helper
+  7. `healthStore.ts` — Fixed seed data and date filtering (2 places)
+  8. `pantryStore.ts` — Fixed expiry date calculations for all 4 seed items
+
 ### Chef Claude Meal Log Date Bug Fix (v1.5.2) ✅ COMPLETE
 - **Problem**: Dashboard showed "16g carbs and 679 cal today" but Chef Claude said "you haven't logged any food yet today"
 - **Root Cause**: Timezone Mismatch — Date inconsistency across the entire app

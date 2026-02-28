@@ -13,6 +13,15 @@ const getLocalDateString = (date: Date): string => {
   return `${year}-${month}-${day}`;
 };
 
+/**
+ * Get today's date in local timezone as YYYY-MM-DD string
+ * This is the primary function to use for getting today's date
+ * Never use new Date().toISOString() as it returns UTC time
+ */
+export const getLocalToday = (): string => {
+  return getLocalDateString(new Date());
+};
+
 export const dateUtils = {
   /**
    * Get today's date as YYYY-MM-DD string

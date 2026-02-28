@@ -77,7 +77,7 @@ const generateSeedWeightEntries = (): WeightEntry[] => {
   for (let i = 0; i < 14; i++) {
     const d = new Date();
     d.setDate(d.getDate() - 13 + i);
-    const dateStr = d.toISOString().split('T')[0];
+    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const dateStr = `${year}-${month}-${day}`;
     const trend = startWeight + dailyChange * i;
     const fluctuation = fluctuations[i] ?? 0;
     const weight = Math.round((trend + fluctuation) * 10) / 10;
@@ -172,7 +172,7 @@ export const useHealthStore = create<HealthState>()(
         const { weightEntries } = get();
         const cutoff = new Date();
         cutoff.setDate(cutoff.getDate() - days);
-        const cutoffStr = cutoff.toISOString().split('T')[0];
+        const year = cutoff.getFullYear(); const month = String(cutoff.getMonth() + 1).padStart(2, '0'); const day = String(cutoff.getDate()).padStart(2, '0'); const cutoffStr = `${year}-${month}-${day}`;
         return weightEntries.filter((e) => e.date >= cutoffStr);
       },
 

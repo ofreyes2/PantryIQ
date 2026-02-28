@@ -55,7 +55,7 @@ import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
 import { Toast, useToast } from '@/components/Toast';
 import { ConfettiCelebration } from '@/components/ConfettiCelebration';
 
-import { dateUtils } from '@/lib/dateUtils';
+import { dateUtils, getLocalToday } from '@/lib/dateUtils';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_HEIGHT = 180;
 const CHART_PADDING_LEFT = 40;
@@ -349,7 +349,7 @@ function StreakHeatmap() {
   const last30 = Array.from({ length: 30 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - 29 + i);
-    return d.toISOString().split('T')[0];
+    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); return `${year}-${month}-${day}`;
   });
 
   const getDayColor = (date: string) => {

@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getLocalToday } from '@/lib/dateUtils';
 
+const getLocalDateString = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 export type PantryCategory =
   | 'Proteins'
   | 'Dairy'
@@ -133,7 +140,7 @@ const seedItems: PantryItem[] = [
     servingSize: '1 large egg (50g)',
     dateAdded: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    expiryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    expiryDate: getLocalDateString(new Date(Date.now() + 14 * 24 * 60 * 60 * 1000)),
     restockHistory: [],
     locationId: 'loc-1',
     subZoneId: 'Middle Shelf',
@@ -156,7 +163,7 @@ const seedItems: PantryItem[] = [
     servingSize: '1 cup (30g)',
     dateAdded: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    expiryDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    expiryDate: getLocalDateString(new Date(Date.now() + 4 * 24 * 60 * 60 * 1000)),
     restockHistory: [],
     locationId: 'loc-1',
     subZoneId: 'Crisper Drawer Left',
@@ -179,7 +186,7 @@ const seedItems: PantryItem[] = [
     servingSize: '1 oz (28g)',
     dateAdded: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    expiryDate: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    expiryDate: getLocalDateString(new Date(Date.now() + 21 * 24 * 60 * 60 * 1000)),
     restockHistory: [],
     locationId: 'loc-1',
     subZoneId: 'Deli Drawer',
@@ -268,7 +275,7 @@ const seedItems: PantryItem[] = [
     servingSize: '5.3 oz container (150g)',
     dateAdded: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdated: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    expiryDate: getLocalDateString(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)),
     restockHistory: [],
     locationId: 'loc-1',
     subZoneId: 'Upper Shelf',
