@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dateUtils } from '@/lib/dateUtils';
 
 export interface WeightEntry {
   id: string;
@@ -96,7 +97,7 @@ const seedWeightEntries = generateSeedWeightEntries();
 
 const seedMeasurementEntry: MeasurementEntry = {
   id: 'seed-measure-1',
-  date: new Date().toISOString().split('T')[0],
+  date: dateUtils.today(),
   neck: 15.5,
   waist: 34.0,
   hips: 38.5,
@@ -106,7 +107,7 @@ const seedMeasurementEntry: MeasurementEntry = {
 
 const seedGoal: HealthGoal = {
   startWeight: 195,
-  startDate: seedWeightEntries[0]?.date ?? new Date().toISOString().split('T')[0],
+  startDate: seedWeightEntries[0]?.date ?? dateUtils.today(),
   targetWeight: 180,
   targetBodyFat: 18,
 };

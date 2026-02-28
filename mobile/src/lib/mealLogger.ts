@@ -169,7 +169,7 @@ class MealLoggerService {
    */
   async getTodayLog(): Promise<(FoodEntry & { id: string })[]> {
     try {
-      const todayStr = new Date().toISOString().split('T')[0];
+      const todayStr = dateUtils.today();
       const logKey = `${DAILY_LOG_KEY_PREFIX}${todayStr}`;
       const logData = await AsyncStorage.getItem(logKey);
       return logData ? JSON.parse(logData) : [];
@@ -331,7 +331,7 @@ class MealLoggerService {
     dateStr?: string
   ): Promise<{ success: boolean; entry?: FoodEntry; error?: string }> {
     try {
-      const date = dateStr || new Date().toISOString().split('T')[0];
+      const date = dateStr || dateUtils.today();
       const key = `${DAILY_LOG_KEY_PREFIX}${date}`;
       const stored = await AsyncStorage.getItem(key);
 
@@ -367,7 +367,7 @@ class MealLoggerService {
     fieldsToUpdate: Partial<FoodEntry>
   ): Promise<{ success: boolean; updatedEntry?: FoodEntry; error?: string }> {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = dateUtils.today();
       const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
       const stored = await AsyncStorage.getItem(key);
 
@@ -398,7 +398,7 @@ class MealLoggerService {
    */
   async deleteEntry(entryId: string): Promise<{ success: boolean; deletedCount?: number; error?: string }> {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = dateUtils.today();
       const key = `${DAILY_LOG_KEY_PREFIX}${today}`;
       const stored = await AsyncStorage.getItem(key);
 

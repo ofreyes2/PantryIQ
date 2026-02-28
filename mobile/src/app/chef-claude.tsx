@@ -1758,7 +1758,7 @@ export default function ChefClaudeScreen() {
    */
   const handleMealUpdate = useCallback(
     async (mealData: any): Promise<{ success: boolean; message: string }> => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = dateUtils.today();
       const entries = getEntriesForDate(today);
       const deleteEntry = useMealsStore.getState().deleteEntry;
       const updateEntry = useMealsStore.getState().updateEntry;
@@ -2132,12 +2132,14 @@ export default function ChefClaudeScreen() {
         }
 
         // Send all messages to Claude - Claude will handle meal logging detection
+        // CRITICAL: Use dateUtils.today() for local time, NOT UTC
+        const todayForSystemPrompt = dateUtils.today();
         let systemPrompt = buildSystemPrompt(
           pantryItems,
-          getEntriesForDate(new Date().toISOString().split('T')[0]),
-          getDailyTotals(new Date().toISOString().split('T')[0]),
+          getEntriesForDate(todayForSystemPrompt),
+          getDailyTotals(todayForSystemPrompt),
           userProfile,
-          new Date().toISOString().split('T')[0],
+          todayForSystemPrompt,
           getEquipmentSummary().join(', '),
           getPreferencesSummary()
         );
@@ -2453,7 +2455,7 @@ export default function ChefClaudeScreen() {
           const entries = useMealsStore.getState().entries;
 
           // Get all entries of this meal type for today
-          const today = new Date().toISOString().split('T')[0];
+          const today = dateUtils.today();
           const relevantEntries = entries.filter(
             (e) => e.mealType === mealType && e.date === today
           );
@@ -2519,7 +2521,7 @@ export default function ChefClaudeScreen() {
             for (const additionalAction of mealUpdateAction.additionalActions) {
               if (additionalAction.action === 'delete') {
                 const deleteResult = await handleDeleteDuplicates(
-                  additionalAction.targetDate || new Date().toISOString().split('T')[0],
+                  additionalAction.targetDate || dateUtils.today(),
                   additionalAction.mealType || mealUpdateAction.details.fromMealType || 'unknown',
                   additionalAction.deleteCount || 1
                 );

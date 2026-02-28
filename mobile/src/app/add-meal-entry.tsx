@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useMealsStore, MealType, FoodEntry } from '@/lib/stores/mealsStore';
 import { usePantryStore } from '@/lib/stores/pantryStore';
+import { dateUtils } from '@/lib/dateUtils';
 import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 
 type Tab = 'search' | 'pantry' | 'favorites';
@@ -76,7 +77,7 @@ export default function AddMealEntryScreen() {
 
   const mealType = (params.mealType as MealType) ?? 'Breakfast';
   const date =
-    params.date ?? new Date().toISOString().split('T')[0];
+    params.date ?? dateUtils.today();
 
   const addEntry = useMealsStore((s) => s.addEntry);
   const allEntries = useMealsStore((s) => s.entries);

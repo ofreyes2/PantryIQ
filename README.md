@@ -4,6 +4,61 @@ A premium React Native Expo iOS app for pantry management, meal tracking, and pe
 
 ## Latest Updates
 
+### Chef Claude Meal Log Date Bug Fix (v1.5.2) ✅ COMPLETE
+- **Problem**: Dashboard showed "16g carbs and 679 cal today" but Chef Claude said "you haven't logged any food yet today"
+- **Root Cause**: Timezone Mismatch — Date inconsistency across the entire app
+  - **Dashboard**: Used `dateUtils.today()` (local device time, YYYY-MM-DD)
+  - **Chef Claude**: Used `new Date().toISOString().split('T')[0]` (UTC time)
+  - **Result**: For users in timezones BEHIND UTC (US Eastern -5, Central -6, Mountain -7, Pacific -8), UTC would be tomorrow while user is still experiencing today
+  - **Example**: User in Pacific timezone at 6 PM (18:00 local) = 2 AM UTC next day → Chef Claude looking at tomorrow's empty meal log while Dashboard shows today's data
+
+- **The Fix — Complete Timezone Standardization**:
+  - **Step 1 - Chef Claude System Prompt Loading (Lines 2136-2145)**:
+    - Created `todayForSystemPrompt = dateUtils.today()`
+    - Passed to all three functions: `getEntriesForDate()`, `getDailyTotals()`, `buildSystemPrompt()`
+    - Claude now reads meals from SAME date as Dashboard
+
+  - **Step 2 - Meal Operations (Lines 1761-1762, 2458-2460, 2524)**:
+    - Replaced all `new Date().toISOString().split('T')[0]` with `dateUtils.today()`
+    - Fixed handleMealUpdate, handleDeleteDuplicates, and meal type filtering
+
+  - **Step 3 - Component & Store Updates**:
+    - **QuickLogSheet**: Added dateUtils import, fixed `formatTime()` date comparisons
+    - **MealConfirmationModal**: Replaced UTC time with `dateUtils.today()`
+    - **MealLogger Service**: Fixed 4 occurrences (getTodayLog, moveEntry, updateEntry, deleteEntry)
+    - **Health Tab**: Fixed all 5 date usages across weight entry and measurement screens
+    - **Add Meal Entry**: Replaced date default logic
+    - **Fast Food Mode**: Fixed meal logging date
+    - **HealthStore**: Fixed seed entry dates
+    - **FastingStore**: Fixed fasting session date tracking
+
+  - **Result**: All 13 files now consistently use local device time via `dateUtils.today()`
+
+- **Files Modified (13 total)**:
+  1. `chef-claude.tsx` — System prompt, meal operations, 3 fixes
+  2. `QuickLogSheet.tsx` — Date comparisons
+  3. `MealConfirmationModal.tsx` — Meal confirmation dates
+  4. `mealLogger.ts` — 4 date usages in meal operations
+  5. `health.tsx` (tabs) — 5 date usages for weight/measurements
+  6. `add-meal-entry.tsx` — Default date logic
+  7. `fast-food-mode.tsx` — Fast food meal logging date
+  8. `healthStore.ts` — Seed entry dates
+  9. `fastingStore.ts` — Fasting session dates
+
+- **Impact**:
+  - ✅ Dashboard and Chef Claude now always read from same date
+  - ✅ All meal logging uses consistent local time
+  - ✅ Health tracking respects device timezone
+  - ✅ Fasting timer respects device timezone
+  - ✅ No more "meal data doesn't exist" errors in Chef Claude
+  - ✅ App now works correctly for users in all timezones (not just UTC)
+
+- **Technical Details**:
+  - `dateUtils.today()` uses `getLocalDateString()` which calls `date.getFullYear()`, `date.getMonth()`, `date.getDate()` for timezone-aware local time
+  - Never uses `toISOString()` which is always UTC regardless of device timezone
+  - All date keys in AsyncStorage now use consistent YYYY-MM-DD format from local time
+  - Zustand stores receive correct dates for filtering and retrieval
+
 ### Chef Claude Recipe Card & Conversational Mode Fixes (v1.5.1) ✅ COMPLETE
 - **Problem 1 — Conversational Questions Showing as Recipe Cards**:
   - Issue: Question like "How many carbs have I had today" was showing as recipe card with gray photo, 0g net carbs, 25m time, and buttons

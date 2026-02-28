@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { api } from '@/lib/api/api';
 import { Colors, BorderRadius } from '@/constants/theme';
 import { useMealsStore } from '@/lib/stores/mealsStore';
+import { dateUtils } from '@/lib/dateUtils';
 import { useToast } from '@/components/Toast';
 
 interface MenuItem {
@@ -149,7 +150,7 @@ Return ONLY the JSON array. No other text.`;
 
   const handleLogMeal = useCallback(
     (item: MenuItem) => {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const today = dateUtils.today(); // YYYY-MM-DD format
       const entry = {
         name: `${item.name} (${selectedRestaurant})`,
         quantity: 1,

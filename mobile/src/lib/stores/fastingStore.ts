@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dateUtils } from '@/lib/dateUtils';
 
 export type FastingProtocol = '16:8' | '18:6' | '20:4' | 'OMAD' | '5:2' | 'custom';
 export type FastingPhase = 'Fed State' | 'Early Fasting' | 'Fasting State' | 'Deep Fasting' | 'Metabolic Advantage' | 'Extended Fast';
@@ -52,7 +53,7 @@ export const useFastingStore = create<FastingState>()(
       startFast: (protocol, customHours) =>
         set((state) => {
           const now = Date.now();
-          const today = new Date().toISOString().split('T')[0];
+          const today = dateUtils.today();
 
           return {
             history: {

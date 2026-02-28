@@ -13,6 +13,7 @@ import { Colors, BorderRadius, Shadows } from '@/constants/theme';
 import type { MealAnalysis } from '@/lib/mealAnalysis';
 import { formatNutrient } from '@/lib/mealAnalysis';
 import { useFavoritesStore } from '@/lib/stores/favoritesStore';
+import { dateUtils } from '@/lib/dateUtils';
 import * as Haptics from 'expo-haptics';
 
 interface MealConfirmationModalProps {
@@ -53,7 +54,7 @@ export function MealConfirmationModal({
 
   const [selectedMealType, setSelectedMealType] = useState<'Breakfast' | 'Lunch' | 'Dinner' | 'Snacks'>(getDefaultMealType());
   // Use targetDate from analysis/props if available, otherwise default to today
-  const selectedDate = targetDate || currentDate || new Date().toISOString().split('T')[0];
+  const selectedDate = targetDate || currentDate || dateUtils.today();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isFavoritingLoading, setIsFavoritingLoading] = useState(false);
 

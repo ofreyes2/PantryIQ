@@ -55,6 +55,7 @@ import { Colors, BorderRadius, Spacing, Shadows } from '@/constants/theme';
 import { Toast, useToast } from '@/components/Toast';
 import { ConfettiCelebration } from '@/components/ConfettiCelebration';
 
+import { dateUtils } from '@/lib/dateUtils';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_HEIGHT = 180;
 const CHART_PADDING_LEFT = 40;
@@ -412,7 +413,7 @@ function LogWeightModal({
   const [weight, setWeight] = useState('');
   const [unit, setUnit] = useState<'lbs' | 'kg'>('lbs');
   const [note, setNote] = useState('');
-  const today = new Date().toISOString().split('T')[0];
+  const today = dateUtils.today();
 
   const handleSave = () => {
     const w = parseFloat(weight);
@@ -519,7 +520,7 @@ function LogMeasurementsModal({
   })();
 
   const handleSave = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = dateUtils.today();
     onSave({
       date: today,
       neck: parseFloat(neck) || undefined,
@@ -811,7 +812,7 @@ export default function HealthScreen() {
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      const today = new Date().toISOString().split('T')[0];
+      const today = dateUtils.today();
       addProgressPhoto({ date: today, uri: result.assets[0].uri });
       showToast('Progress photo added!', 'success');
     }
@@ -1174,7 +1175,7 @@ export default function HealthScreen() {
           visible={showLogWeight}
           onClose={() => setShowLogWeight(false)}
           onSave={(weight, unit, note) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = dateUtils.today();
             addWeightEntry({ date: today, weight, unit, note: note || undefined });
             showToast(`Logged ${weight} ${unit}`, 'success');
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1194,7 +1195,7 @@ export default function HealthScreen() {
           visible={showSetGoal}
           onClose={() => setShowSetGoal(false)}
           onSave={(targetWeight, targetBF) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = dateUtils.today();
             setGoal({
               startWeight: latestWeight?.weight ?? targetWeight,
               startDate: today,

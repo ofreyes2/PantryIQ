@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Zap, Mic, X } from 'lucide-react-native';
 import { Colors, BorderRadius, Shadows, Spacing } from '@/constants/theme';
 import type { FoodEntry } from '@/lib/stores/mealsStore';
+import { dateUtils } from '@/lib/dateUtils';
 
 interface QuickLogSheetProps {
   visible: boolean;
@@ -26,8 +27,8 @@ interface QuickLogSheetProps {
 
 function formatTime(dateStr: string, timeStr?: string): string {
   const date = new Date(dateStr);
-  const today = new Date().toISOString().split('T')[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const today = dateUtils.today();
+  const yesterday = dateUtils.yesterday();
 
   let dayStr = '';
   if (dateStr === today) {
