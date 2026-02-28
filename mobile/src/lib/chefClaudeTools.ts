@@ -670,14 +670,14 @@ export const ChefClaudeTools = {
    */
   async getWeekOverview() {
     try {
-      const weekMeals = await this.getWeekMeals();
+      const weekMeals = await ChefClaudeTools.getWeekMeals();
       const weekSummary: any = {};
 
       for (let i = 0; i < 7; i++) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = formatLocalDate(date);
-        const summary = await this.getDailySummary(dateStr);
+        const summary = await ChefClaudeTools.getDailySummary(dateStr);
         weekSummary[dateStr] = summary;
       }
 
@@ -695,10 +695,10 @@ export const ChefClaudeTools = {
   async getFullAppSnapshot() {
     try {
       // Get daily summary using existing function
-      const dailySummary = await this.getDailySummary();
+      const dailySummary = await ChefClaudeTools.getDailySummary();
 
       // Get week overview using existing function
-      const weekOverview = await this.getWeekOverview();
+      const weekOverview = await ChefClaudeTools.getWeekOverview();
 
       // Read streak directly with CORRECT key
       const streakRaw = await AsyncStorage.getItem('pantryiq_streak_data');
