@@ -311,7 +311,8 @@ class MealLoggerService {
       const stored = await AsyncStorage.getItem(logKey);
       if (!stored) return;
 
-      let entries: (FoodEntry & { id: string })[] = JSON.parse(stored);
+      const parsed = JSON.parse(stored);
+      let entries: (FoodEntry & { id: string })[] = Array.isArray(parsed) ? parsed : [];
       const seen = new Set<string>();
 
       entries = entries.filter((entry: FoodEntry & { id: string }) => {
@@ -327,7 +328,7 @@ class MealLoggerService {
       await AsyncStorage.setItem(logKey, JSON.stringify(entries));
       console.log(`[MealLogger] Cleaned duplicates for ${date}`);
     } catch (error) {
-      console.error('[MealLogger] Error cleaning duplicates:', error instanceof Error ? error.message : String(error));
+      console.log('[MealLogger] Error cleaning duplicates:', error instanceof Error ? error.message : String(error));
     }
   }
 
