@@ -85,7 +85,7 @@ function RootLayoutNav() {
         await MealLogger.cleanupDuplicatesForDate(yesterday);
         console.log('[DailyReset] Cleaned duplicates for today and yesterday');
       } catch (error) {
-        console.error('[DailyReset] Error cleaning duplicates:', error);
+        console.error('[DailyReset] Error cleaning duplicates:', error instanceof Error ? error.message : String(error));
       }
     };
     cleanup();

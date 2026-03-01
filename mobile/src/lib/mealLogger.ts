@@ -196,7 +196,7 @@ class MealLoggerService {
       const logData = await AsyncStorage.getItem(logKey);
       return logData ? JSON.parse(logData) : [];
     } catch (error) {
-      console.error('[MealLogger] Error getting today log:', error);
+      console.error('[MealLogger] Error getting today log:', error instanceof Error ? error.message : String(error));
       return [];
     }
   }
@@ -254,7 +254,7 @@ class MealLoggerService {
       const favoritesData = await AsyncStorage.getItem(FAVORITES_KEY);
       return favoritesData ? JSON.parse(favoritesData) : [];
     } catch (error) {
-      console.error('[MealLogger] Error getting favorites:', error);
+      console.error('[MealLogger] Error getting favorites:', error instanceof Error ? error.message : String(error));
       return [];
     }
   }
@@ -297,7 +297,7 @@ class MealLoggerService {
 
       return recentDuplicate || exactDuplicate || null;
     } catch (error) {
-      console.error('[MealLogger] Error checking duplicates:', error);
+      console.error('[MealLogger] Error checking duplicates:', error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -327,7 +327,7 @@ class MealLoggerService {
       await AsyncStorage.setItem(logKey, JSON.stringify(entries));
       console.log(`[MealLogger] Cleaned duplicates for ${date}`);
     } catch (error) {
-      console.error('[MealLogger] Error cleaning duplicates:', error);
+      console.error('[MealLogger] Error cleaning duplicates:', error instanceof Error ? error.message : String(error));
     }
   }
 

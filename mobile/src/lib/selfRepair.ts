@@ -185,14 +185,14 @@ export const runDiagnosticsAndRepair = async () => {
       successCount: 0,
       failureCount: 0,
     };
-  } catch (error) {
-    console.error('[DiagnosticsAndRepair] Error:', error);
+  } catch (_error) {
+    // Silently swallow errors — diagnostics should never crash the app
     return {
       report: null,
       repaired: [],
       successCount: 0,
       failureCount: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: _error instanceof Error ? _error.message : 'Unknown error',
     };
   }
 };
