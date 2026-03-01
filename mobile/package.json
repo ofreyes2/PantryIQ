@@ -4,8 +4,8 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "DARK_MODE=class expo start --web",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit"
@@ -120,7 +120,6 @@
     "react-native-get-random-values": "~1.11.0",
     "react-native-gifted-chat": "2.6.3",
     "react-native-image-colors": "^2.5.0",
-    "react-native-ios-context-menu": "3.1.0",
     "react-native-ios-utilities": "5.1.5",
     "react-native-keyboard-controller": "^1.19.2",
     "react-native-maps": "^1.24.3",
@@ -171,10 +170,6 @@
     "typescript": "~5.8.3"
   },
   "private": true,
-  "overrides": {
-    "react-native-css-interop": "0.1.22",
-    "react-native-reanimated": "3.17.4"
-  },
   "patchedDependencies": {
     "react-native@0.79.6": "patches/react-native@0.79.6.patch",
     "expo-asset@11.1.5": "patches/expo-asset@11.1.5.patch"
