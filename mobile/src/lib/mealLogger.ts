@@ -312,13 +312,15 @@ class MealLoggerService {
       if (!stored) return;
 
       const parsed = JSON.parse(stored);
-      let entries: (FoodEntry & { id: string })[] = Array.isArray(parsed) ? parsed : [];
+      const allEntries: (FoodEntry & { id: string })[] = Array.isArray(parsed) ? parsed : [];
       const seen = new Set<string>();
+      const removedIds: string[] = [];
 
-      entries = entries.filter((entry: FoodEntry & { id: string }) => {
+      const entries = allEntries.filter((entry: FoodEntry & { id: string }) => {
         const signature = `${entry.name?.toLowerCase()}_${entry.calories}`;
         if (seen.has(signature)) {
           console.log(`[MealLogger] Removing duplicate: ${signature}`);
+          removedIds.push(entry.id);
           return false;
         }
         seen.add(signature);
@@ -327,6 +329,16 @@ class MealLoggerService {
 
       await AsyncStorage.setItem(logKey, JSON.stringify(entries));
       console.log(`[MealLogger] Cleaned duplicates for ${date}`);
+
+      // Sync removed entries to Zustand
+      if (removedIds.length > 0) {
+        try {
+          const { deleteEntry: deleteZustandEntry } = useMealsStore.getState();
+          removedIds.forEach((id) => deleteZustandEntry(id));
+        } catch (zustandError) {
+          console.warn('[MealLogger] Failed to sync cleanup to Zustand:', zustandError);
+        }
+      }
     } catch (error) {
       console.log('[MealLogger] Error cleaning duplicates:', error instanceof Error ? error.message : String(error));
     }
@@ -379,6 +391,13 @@ class MealLoggerService {
       entries[entryIndex] = entry;
       await AsyncStorage.setItem(key, JSON.stringify(entries));
 
+      // Sync to Zustand
+      try {
+        useMealsStore.getState().updateEntry(entryId, { mealType: toMealType });
+      } catch (zustandError) {
+        console.warn('[MealLogger] Failed to sync moveEntry to Zustand:', zustandError);
+      }
+
       return { success: true, entry };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -413,6 +432,13 @@ class MealLoggerService {
       await AsyncStorage.setItem(key, JSON.stringify(entries));
       await this.recalculateTotals(today);
 
+      // Sync to Zustand
+      try {
+        useMealsStore.getState().updateEntry(entryId, fieldsToUpdate);
+      } catch (zustandError) {
+        console.warn('[MealLogger] Failed to sync editEntry to Zustand:', zustandError);
+      }
+
       return { success: true, updatedEntry: entries[entryIndex] };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -440,6 +466,13 @@ class MealLoggerService {
 
       await AsyncStorage.setItem(key, JSON.stringify(filtered));
       await this.recalculateTotals(today);
+
+      // Sync to Zustand
+      try {
+        useMealsStore.getState().deleteEntry(entryId);
+      } catch (zustandError) {
+        console.warn('[MealLogger] Failed to sync deleteEntry to Zustand:', zustandError);
+      }
 
       return { success: true, deletedCount: beforeCount - afterCount };
     } catch (error) {

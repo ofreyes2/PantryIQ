@@ -251,11 +251,15 @@ const checkStreakValidity = async (today: string, lastOpenedDate: string | null)
       if (yesterdayLogStr) {
         try {
           const yesterdayLog = JSON.parse(yesterdayLogStr);
-          const hasEntries =
-            (yesterdayLog.breakfast?.length || 0) +
-            (yesterdayLog.lunch?.length || 0) +
-            (yesterdayLog.dinner?.length || 0) +
-            (yesterdayLog.snacks?.length || 0) > 0;
+          // Support both flat-array format (written by MealLogger) and
+          // legacy object format {breakfast:[], lunch:[], ...}
+          const hasEntries = Array.isArray(yesterdayLog)
+            ? yesterdayLog.length > 0
+            : (yesterdayLog.breakfast?.length || 0) +
+                (yesterdayLog.lunch?.length || 0) +
+                (yesterdayLog.dinner?.length || 0) +
+                (yesterdayLog.snacks?.length || 0) >
+              0;
 
           if (hasEntries) {
             console.log('[Streak] Incrementing streak — user logged meals yesterday');

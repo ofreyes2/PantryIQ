@@ -700,15 +700,14 @@ export const ChefClaudeTools = {
       // Get week overview using existing function
       const weekOverview = await ChefClaudeTools.getWeekOverview();
 
-      // Read streak directly with CORRECT key
-      const streakRaw = await AsyncStorage.getItem('pantryiq_streak_data');
-      const streak = streakRaw
-        ? JSON.parse(streakRaw)
-        : {
-            currentStreak: 0,
-            longestStreak: 0,
-            lastLoggedDate: null,
-          };
+      // Read streak from live Zustand store (always current, not just on new-day events).
+      // The Zustand app-store uses field names current/longest/lastLogDate — normalize them.
+      const zustandStreak = await ChefClaudeTools.getStreakData();
+      const streak = {
+        currentStreak: (zustandStreak as any).current ?? (zustandStreak as any).currentStreak ?? 0,
+        longestStreak: (zustandStreak as any).longest ?? (zustandStreak as any).longestStreak ?? 0,
+        lastLoggedDate: (zustandStreak as any).lastLogDate ?? null,
+      };
 
       // Read yesterday's meals with CORRECT key format
       const yesterday = new Date();
